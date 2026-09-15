@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import {
   Clock,
@@ -48,10 +48,12 @@ import {
   getPriorityConfig,
   getTicketDisplayCode,
 } from '@/hooks/use-ticket-data'
+import { shouldOfferRating } from '@/lib/tickets/should-offer-rating'
 
 export default function ClientTicketDetailPage() {
   const params = useParams()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { data: session } = useSession()
   const { getTicket, updateTicket, deleteTicket, loading } = useTicketData()
   const { toast } = useToast()
@@ -65,9 +67,29 @@ export default function ClientTicketDetailPage() {
   const [ratingKey, setRatingKey] = useState(0)
   const [editForm, setEditForm] = useState({ title: '', description: '' })
   const [showRatingModal, setShowRatingModal] = useState(false)
+  // Un ticket puede llegar a CLOSED sin que el cliente haya calificado nunca
+  // (p. ej. "Cerrar directamente" de Super Admin, o un cambio de estado que
+  // salta RESOLVED) — a diferencia de RESOLVED, aquí sí hace falta confirmar
+  // que no exista ya una calificación antes de ofrecerla, porque CLOSED es
+  // también el estado normal tras calificar.
+  const [closedNeedsRating, setClosedNeedsRating] = useState(false)
   const prevStatusRef = useRef<string | null>(null)
 
   const ticketId = params.id as string
+
+  const offerRatingIfNotAlreadyRated = useCallback(async (id: string) => {
+    try {
+      const res = await fetch(`/api/tickets/${id}/rating`)
+      const json = await res.json()
+      if (json?.success && json.data === null) {
+        setClosedNeedsRating(true)
+        setShowRatingModal(true)
+      }
+    } catch {
+      /* si falla la consulta no forzamos el modal — el cliente igual puede
+         calificar desde la barra lateral si el ticket lo permite */
+    }
+  }, [])
 
   const applyTicketUpdate = useCallback(
     (data: Ticket, opts?: { openRatingIfResolved?: boolean }) => {
@@ -81,17 +103,19 @@ export default function ClientTicketDetailPage() {
         setRatingKey(k => k + 1)
       }
 
-      if (
-        opts?.openRatingIfResolved !== false &&
-        prevStatus &&
-        prevStatus !== 'RESOLVED' &&
-        data.status === 'RESOLVED' &&
-        data.source !== 'PATROL'
-      ) {
+      const offer = shouldOfferRating({
+        prevStatus,
+        newStatus: data.status,
+        source: data.source,
+        openRatingIfResolved: opts?.openRatingIfResolved,
+      })
+      if (offer === 'resolved') {
         setShowRatingModal(true)
+      } else if (offer === 'closed-check') {
+        void offerRatingIfNotAlreadyRated(data.id)
       }
     },
-    []
+    [offerRatingIfNotAlreadyRated]
   )
 
   const refreshTicketSilent = useCallback(async () => {
@@ -137,11 +161,28 @@ export default function ClientTicketDetailPage() {
     // Si ya está resuelto al entrar, ofrecer calificar
     if (data.status === 'RESOLVED' && data.source !== 'PATROL') {
       setShowRatingModal(true)
+    } else if (data.status === 'CLOSED' && data.source !== 'PATROL') {
+      void offerRatingIfNotAlreadyRated(data.id)
     }
   }
 
+  // Deep-link desde el email/notificación "califica el servicio"
+  // (?rate=1) — antes no lo consumía ninguna página, así que no hacía nada.
+  useEffect(() => {
+    if (!ticket || searchParams.get('rate') !== '1' || ticket.source === 'PATROL') return
+    if (ticket.status === 'RESOLVED') {
+      setShowRatingModal(true)
+    } else if (ticket.status === 'CLOSED') {
+      void offerRatingIfNotAlreadyRated(ticket.id)
+    }
+    // Deliberadamente solo depende de `ticket` (no de `searchParams`, que no
+    // cambia tras la carga inicial) — evita reabrir el modal en cada refetch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ticket?.id, ticket?.status])
+
   const handleRatingSubmitted = () => {
     setShowRatingModal(false)
+    setClosedNeedsRating(false)
     setTicket(prev =>
       prev ? { ...prev, status: 'CLOSED', closedAt: new Date().toISOString() } : prev
     )
@@ -322,30 +363,35 @@ export default function ClientTicketDetailPage() {
             </CardContent>
           </Card>
 
-          {/* Banner: ticket resuelto */}
-          {ticket.status === 'RESOLVED' && ticket.source !== 'PATROL' && (
-            <Card className='border-amber-300 bg-amber-50 dark:bg-amber-950 dark:border-amber-700'>
-              <CardContent className='pt-5 flex items-start gap-3'>
-                <Star className='h-5 w-5 text-amber-600 shrink-0 mt-0.5' />
-                <div>
-                  <p className='font-semibold text-amber-900 dark:text-amber-100'>
-                    Tu ticket ha sido resuelto
-                  </p>
-                  <p className='text-sm text-amber-800 dark:text-amber-200 mt-1'>
-                    Por favor califica el servicio para cerrar el ticket.
-                  </p>
-                  <Button
-                    size='sm'
-                    className='mt-2 bg-amber-600 hover:bg-amber-700 text-white'
-                    onClick={() => setShowRatingModal(true)}
-                  >
-                    <Star className='h-4 w-4 mr-2' />
-                    Calificar
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+          {/* Banner: ticket resuelto (o cerrado directo sin calificar aún) */}
+          {(ticket.status === 'RESOLVED' || (ticket.status === 'CLOSED' && closedNeedsRating)) &&
+            ticket.source !== 'PATROL' && (
+              <Card className='border-amber-300 bg-amber-50 dark:bg-amber-950 dark:border-amber-700'>
+                <CardContent className='pt-5 flex items-start gap-3'>
+                  <Star className='h-5 w-5 text-amber-600 shrink-0 mt-0.5' />
+                  <div>
+                    <p className='font-semibold text-amber-900 dark:text-amber-100'>
+                      {ticket.status === 'RESOLVED'
+                        ? 'Tu ticket ha sido resuelto'
+                        : 'Tu ticket fue cerrado'}
+                    </p>
+                    <p className='text-sm text-amber-800 dark:text-amber-200 mt-1'>
+                      {ticket.status === 'RESOLVED'
+                        ? 'Por favor califica el servicio para cerrar el ticket.'
+                        : 'Aún puedes calificar el servicio recibido.'}
+                    </p>
+                    <Button
+                      size='sm'
+                      className='mt-2 bg-amber-600 hover:bg-amber-700 text-white'
+                      onClick={() => setShowRatingModal(true)}
+                    >
+                      <Star className='h-4 w-4 mr-2' />
+                      Calificar
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
           {/* Banner informativo: ticket de rondas resuelto (agente no califica) */}
           {ticket.status === 'RESOLVED' && ticket.source === 'PATROL' && (
