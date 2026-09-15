@@ -159,6 +159,52 @@ describe('CategorySelector', () => {
     })
   })
 
+  // Regresión: handleCategorySelect llamaba onChange(categoryId) para
+  // CUALQUIER categoría, incluida una "contenedora" con subcategorías (sin
+  // técnicos ni prioridad propios) — pasaba desde sugerencias, búsqueda y el
+  // propio árbol manual. 'Infraestructura' (id '1') tiene una hija
+  // ('Servidores', id '2') en mockCategories.
+  it('regresión: seleccionar una categoría con subcategorías no la fija — expande sus hijas en vez de llamar onChange', async () => {
+    const onChange = jest.fn()
+    const user = userEvent.setup()
+
+    renderWithQueryClient(
+      <CategorySelector onChange={onChange} clientId='client1' categories={mockCategories} />
+    )
+
+    const showTreeButton = screen.getByRole('button', {
+      name: /ver árbol completo.*seleccionar manualmente/i,
+    })
+    await user.click(showTreeButton)
+
+    const parentNode = await screen.findByText('Infraestructura')
+    await user.click(parentNode)
+
+    // Se expande mostrando la hija, en vez de fijar la selección
+    expect(await screen.findByText('Servidores')).toBeInTheDocument()
+    expect(onChange).not.toHaveBeenCalled()
+    expect(screen.getByText(/agrupa varias subcategorías/i)).toBeInTheDocument()
+  })
+
+  it('sí permite seleccionar directamente una categoría sin hijas', async () => {
+    const onChange = jest.fn()
+    const user = userEvent.setup()
+
+    renderWithQueryClient(
+      <CategorySelector onChange={onChange} clientId='client1' categories={mockCategories} />
+    )
+
+    await user.click(
+      screen.getByRole('button', { name: /ver árbol completo.*seleccionar manualmente/i })
+    )
+    await user.click(await screen.findByText('Infraestructura'))
+
+    const leafNode = await screen.findByText('Servidores')
+    await user.click(leafNode)
+
+    expect(onChange).toHaveBeenCalledWith('2')
+  })
+
   it('tracks analytics events', async () => {
     const onChange = jest.fn()
     const fetchMock = global.fetch as jest.Mock

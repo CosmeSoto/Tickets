@@ -247,6 +247,20 @@ export function CategorySelector({
   // Get selected category
   const selectedCategory = value ? categories.find(c => c.id === value) : null
 
+  // Última categoría del path actual que aún no se fijó como `value` (typ.
+  // porque tiene hijas — ver handleCategorySelect) — hint visible mientras
+  // el usuario todavía tiene que elegir una hoja.
+  const pendingContainer = useMemo(() => {
+    if (!state.selectedPath.length || state.selectedPath[state.selectedPath.length - 1] === value) {
+      return null
+    }
+    const lastId = state.selectedPath[state.selectedPath.length - 1]
+    const last = categories.find(c => c.id === lastId)
+    if (!last) return null
+    const hasChildren = categories.some(c => c.parentId === last.id)
+    return hasChildren ? last : null
+  }, [state.selectedPath, value, categories])
+
   // Update selected path when value changes
   useEffect(() => {
     if (value) {
@@ -360,6 +374,23 @@ export function CategorySelector({
   const handleCategorySelect = useCallback(
     (categoryId: string, method: CategorySelectorState['interactionMethod']) => {
       const category = categories.find(c => c.id === categoryId)
+
+      // Categorías "contenedoras" (con subcategorías) no son una selección
+      // final válida — no tienen técnicos ni prioridad propios, solo
+      // agrupan a sus hijas. Antes, una sugerencia/búsqueda/clic en el
+      // árbol sobre una de estas la fijaba igual vía onChange(categoryId)
+      // sin comprobar si tenía hijos, dejando un ticket con una categoría
+      // no-hoja. En vez de fijarla, se despliega el árbol en ese nodo para
+      // que el usuario complete la selección en una hoja.
+      const hasChildren = categories.some(c => c.parentId === categoryId)
+      if (hasChildren) {
+        setTreeBrowseMode('all')
+        setState(prev => ({ ...prev, selectedPath: buildCategoryPath(categoryId) }))
+        if (category) {
+          setAnnouncement(`"${category.name}" tiene subcategorías. Elige una para continuar.`)
+        }
+        return
+      }
 
       // Announce selection to screen readers
       if (category) {
@@ -665,6 +696,12 @@ export function CategorySelector({
                       ? `Mostrando ${relatedMatches.length} categoría${relatedMatches.length !== 1 ? 's' : ''} relacionadas con el título/descripción (y sus ramas). Usa Ctrl+K para afinar.`
                       : 'Navega el árbol completo del área o usa la búsqueda (Ctrl+K).'}
                   </p>
+                  {pendingContainer && (
+                    <p className='text-xs text-amber-700 dark:text-amber-400'>
+                      &ldquo;{pendingContainer.name}&rdquo; agrupa varias subcategorías — elige una
+                      de abajo para continuar.
+                    </p>
+                  )}
                   <CategoryTree
                     key={treeBrowseMode}
                     categories={treeBrowseMode === 'related' ? relatedTreeCategories : categories}
