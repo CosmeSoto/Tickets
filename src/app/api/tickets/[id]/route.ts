@@ -7,10 +7,10 @@ import { auditTicketChange } from '@/lib/audit'
 import { WebhookService } from '@/lib/services/webhook-service'
 import { SLAService } from '@/lib/services/sla-service'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
-import { NotificationService } from '@/lib/services/notification-service'
 import { notifyTicketChanged, invalidateTicketCaches } from '@/lib/tickets/notify-ticket-changed'
 import { translateFieldNames } from '@/lib/constants/ticket-labels'
 import { assertTechnicianActiveInFamily } from '@/lib/tickets/assignee-validation'
+import { applyTicketStatusChangeEffects } from '@/lib/tickets/apply-ticket-status-effects'
 import {
   assertTicketAccess,
   TicketAccessError,
@@ -479,6 +479,12 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
         where: { id: finalId },
         data: {
           ...filteredUpdates,
+          // Sincronizar resolvedAt igual que PATCH /api/tickets/[id]/status —
+          // sin esto, el escalar en `tickets` nunca se setea por esta ruta
+          // (solo `ticket_sla_metrics.resolvedAt`, vía SLAService más abajo).
+          ...(filteredUpdates.status === 'RESOLVED' && existingTicket.status !== 'RESOLVED'
+            ? { resolvedAt: new Date() }
+            : {}),
           updatedAt: new Date(),
         },
         include: {
@@ -551,12 +557,7 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
           request: request,
         })
 
-        // ⭐ NUEVO: Registrar resolución en SLA si el estado cambió a RESOLVED
         if (filteredUpdates.status === 'RESOLVED') {
-          await SLAService.recordResolution(finalId).catch(err => {
-            console.error('[SLA] Error registrando resolución:', err)
-          })
-
           // ⭐ AUDITORÍA: Registrar resolución de ticket
           await AuditServiceComplete.log({
             action: AuditActionsComplete.TICKET_RESOLVED,
@@ -570,78 +571,17 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
             },
             request: request,
           })
-
-          // Disparar webhook de ticket resuelto
-          await WebhookService.trigger(WebhookService.EVENTS.TICKET_RESOLVED, {
-            ticketId: finalId,
-            resolvedBy: session.user.name,
-            ticket: {
-              id: updatedTicket.id,
-              title: updatedTicket.title,
-              client: updatedTicket.users_tickets_clientIdTousers?.name,
-              resolvedAt: new Date(),
-            },
-          }).catch(err => {
-            console.error('[WEBHOOK] Error disparando evento TICKET_RESOLVED:', err)
-          })
-
-          // Email + notificación a quien debe calificar
-          // (PATROL → createdById / supervisor; WEB → clientId / solicitante)
-          const isPatrolResolved =
-            existingTicket.source === 'PATROL' && !!existingTicket.createdById
-          const raterId = isPatrolResolved ? existingTicket.createdById! : existingTicket.clientId
-          if (raterId) {
-            const rater = await prisma.users.findUnique({
-              where: { id: raterId },
-              select: { name: true, email: true, role: true },
-            })
-            if (rater?.email) {
-              const { queueTicketResolvedRaterEmail } =
-                await import('@/lib/notifications/ticket-resolved-email')
-              await queueTicketResolvedRaterEmail({
-                ticketId: finalId,
-                title: updatedTicket.title,
-                raterId,
-                raterName: rater.name,
-                raterEmail: rater.email,
-                raterRole: rater.role,
-                technicianName: session.user.name,
-                actorUserId: session.user.id,
-                isPatrolEscalation: isPatrolResolved,
-              }).catch(err => {
-                console.error('[EMAIL] Error enviando email de ticket resuelto:', err)
-              })
-            }
-          }
-
-          await NotificationService.notifyTicketResolved(finalId).catch(err => {
-            console.error('[NOTIFICATION] Error enviando notificación de ticket resuelto:', err)
-          })
-
-          // ⭐ NUEVO: Notificar al administrador que el ticket fue resuelto
-          const { triggerTicketResolvedToAdminEmail } = await import('@/lib/email-triggers')
-          void triggerTicketResolvedToAdminEmail(finalId, session.user.id)
         }
 
-        // ⭐ NUEVO: Disparar webhook de ticket reabierto
-        if (existingTicket.status === 'CLOSED' && filteredUpdates.status === 'OPEN') {
-          await WebhookService.trigger(WebhookService.EVENTS.TICKET_REOPENED, {
-            ticketId: finalId,
-            reopenedBy: session.user.name,
-            ticket: {
-              id: updatedTicket.id,
-              title: updatedTicket.title,
-            },
-          }).catch(err => {
-            console.error('[WEBHOOK] Error disparando evento TICKET_REOPENED:', err)
-          })
-        }
-
-        const { TicketEvents } = await import('@/lib/ticket-events')
-        TicketEvents.emit(finalId, {
-          type: 'status_changed',
-          status: filteredUpdates.status,
+        // SLA, webhook, email/notificación de "califica el servicio" y SSE —
+        // ver src/lib/tickets/apply-ticket-status-effects.ts (compartido con
+        // la rama ADMIN, que antes no ejecutaba ninguno de estos efectos).
+        await applyTicketStatusChangeEffects({
+          ticketId: finalId,
+          newStatus: filteredUpdates.status,
           previousStatus: existingTicket.status,
+          actorUserId: session.user.id,
+          actorName: session.user.name,
         })
       }
 
@@ -860,6 +800,16 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
         where: { id: finalId },
         data: {
           ...processedUpdates,
+          // Sincronizar resolvedAt/closedAt igual que PATCH /api/tickets/[id]/status
+          // — esta rama nunca los seteaba, así que un ticket resuelto/cerrado desde
+          // el formulario de edición general (en vez de los botones dedicados)
+          // quedaba con esos campos en null para siempre.
+          ...(processedUpdates.status === 'RESOLVED' && existingTicket.status !== 'RESOLVED'
+            ? { resolvedAt: new Date() }
+            : {}),
+          ...(processedUpdates.status === 'CLOSED' && existingTicket.status !== 'CLOSED'
+            ? { closedAt: new Date() }
+            : {}),
           updatedAt: new Date(),
         },
         include: {
@@ -916,6 +866,43 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
       if ('priority' in processedUpdates && processedUpdates.priority !== existingTicket.priority) {
         await SLAService.assignSLA(finalId).catch(err => {
           console.error('[SLA] Error recalculando SLA tras cambio de prioridad:', err)
+        })
+      }
+
+      // SLA de resolución, webhook, email/notificación de "califica el
+      // servicio" y SSE en vivo — antes esta rama no ejecutaba ninguno de
+      // estos efectos al cambiar `status` (a diferencia de la rama
+      // TECHNICIAN y de PATCH /api/tickets/[id]/status), así que un admin
+      // resolviendo/cerrando desde el formulario de edición lo hacía en
+      // silencio: el cliente nunca se enteraba y el modal de calificación
+      // no aparecía. Ver src/lib/tickets/apply-ticket-status-effects.ts.
+      if (processedUpdates.status && processedUpdates.status !== existingTicket.status) {
+        await auditTicketChange(finalId, session.user.id, 'status_changed', {
+          oldValue: existingTicket.status,
+          newValue: processedUpdates.status,
+        })
+
+        if (processedUpdates.status === 'RESOLVED') {
+          await AuditServiceComplete.log({
+            action: AuditActionsComplete.TICKET_RESOLVED,
+            entityType: 'ticket',
+            entityId: finalId,
+            userId: session.user.id,
+            details: {
+              ticketTitle: updatedTicket.title,
+              resolvedBy: session.user.name,
+              clientName: updatedTicket.users_tickets_clientIdTousers?.name,
+            },
+            request: request,
+          })
+        }
+
+        await applyTicketStatusChangeEffects({
+          ticketId: finalId,
+          newStatus: processedUpdates.status,
+          previousStatus: existingTicket.status,
+          actorUserId: session.user.id,
+          actorName: session.user.name,
         })
       }
 
