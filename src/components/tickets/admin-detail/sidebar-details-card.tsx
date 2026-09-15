@@ -168,7 +168,14 @@ export function SidebarDetailsCard({
             <p className='text-xs text-muted-foreground'>SLA</p>
             {(() => {
               const sla = getSlaCountdown(ticket.slaDeadline, ticket.resolvedAt ?? ticket.closedAt)
-              return <p className={`text-xs ${SLA_URGENCY_CLASSES[sla.urgency]}`}>{sla.label}</p>
+              return (
+                <>
+                  <p className={`text-xs ${SLA_URGENCY_CLASSES[sla.urgency]}`}>{sla.label}</p>
+                  {sla.deadlineLabel && (
+                    <p className='text-xs text-muted-foreground'>Plazo: {sla.deadlineLabel}</p>
+                  )}
+                </>
+              )
             })()}
             {ticket.requestedPriority && ticket.requestedPriority !== ticket.priority && (
               <p className='text-xs text-muted-foreground mt-0.5'>

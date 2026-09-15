@@ -650,7 +650,14 @@ export default function TechnicianTicketDetailPage() {
                       ticket.resolvedAt ?? ticket.closedAt
                     )
                     return (
-                      <p className={`text-xs ${SLA_URGENCY_CLASSES[sla.urgency]}`}>{sla.label}</p>
+                      <>
+                        <p className={`text-xs ${SLA_URGENCY_CLASSES[sla.urgency]}`}>{sla.label}</p>
+                        {sla.deadlineLabel && (
+                          <p className='text-xs text-muted-foreground'>
+                            Plazo: {sla.deadlineLabel}
+                          </p>
+                        )}
+                      </>
                     )
                   })()}
                   {ticket.requestedPriority && ticket.requestedPriority !== ticket.priority && (
