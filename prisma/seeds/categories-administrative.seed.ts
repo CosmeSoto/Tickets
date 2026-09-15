@@ -4,8 +4,8 @@
  * Categorías completas para centro comercial: administración, contabilidad, compras, RRHH.
  */
 
-import { PrismaClient } from '@prisma/client'
-import { upsertCategory } from './category-upsert'
+import { PrismaClient, TicketPriority } from '@prisma/client'
+import { upsertCategory, type CategorySeedData } from './category-upsert'
 
 export async function seedCategoriesAdministrative(
   prisma: PrismaClient,
@@ -311,9 +311,30 @@ export async function seedCategoriesAdministrative(
   }
 
   // ==================== DEPARTAMENTO MENSAJERÍA ====================
+  // Mismo criterio aplicado antes a TI/Mantenimiento/Arquitectura: se pliega
+  // el nivel 3 de "un tipo de entrega por categoría" (Correspondencia,
+  // Documentos, Paquetes Pequeños, Envío a Cliente, Envío a Proveedor,
+  // Rastreo de Envío, Confirmación de Entrega) en la descripción de su
+  // padre de nivel 2 — el mismo mensajero atiende todos esos casos y el
+  // buscador de sugerencias ya indexa por name+description, no hace falta
+  // una categoría por síntoma para que sugiera bien.
+  //
+  // Se conservan como nivel 2 los 3 tipos de entrega (interna/externa/
+  // recepción) porque sí son flujos distintos en la práctica (entrega
+  // dentro del centro comercial vs. envío que sale a un cliente o
+  // proveedor vs. algo que llega de afuera y hay que recibir), y
+  // "Consulta o Seguimiento" pasa a ser una hoja única — sus 2 hijos
+  // (rastreo y confirmación) eran el mismo trámite visto en dos momentos.
   const deptMensajeria = deptMap.get('Mensajería')
   if (deptMensajeria) {
-    const solicitudMensajeria = await upsertCategory(prisma, {
+    const mensajeriaIds: string[] = []
+    async function createMensajeria(data: CategorySeedData) {
+      const category = await upsertCategory(prisma, data)
+      mensajeriaIds.push(category.id)
+      return category
+    }
+
+    const solicitudMensajeria = await createMensajeria({
       name: 'Solicitud de Mensajería',
       description: 'Solicitudes de servicio de mensajería y envíos',
       level: 1,
@@ -323,116 +344,67 @@ export async function seedCategoriesAdministrative(
       color: '#A855F7',
     })
 
-    const consultaMensajeria = await upsertCategory(prisma, {
+    await createMensajeria({
       name: 'Consulta o Seguimiento',
-      description: 'Consultas y seguimiento de envíos',
+      description:
+        'Consultas y seguimiento de envíos: rastreo de un envío en curso, confirmación de que una entrega ya se realizó',
       level: 1,
       parentId: null,
       departmentId: deptMensajeria,
       order: 2,
       color: '#10B981',
+      priorityCeiling: TicketPriority.LOW,
     })
 
-    const entregaInterna = await upsertCategory(prisma, {
+    await createMensajeria({
       name: 'Entrega Interna',
-      description: 'Entregas dentro del centro comercial',
+      description:
+        'Entregas dentro del centro comercial: correspondencia, documentos importantes o paquetes pequeños entre locales',
       level: 2,
       parentId: solicitudMensajeria.id,
       departmentId: deptMensajeria,
       order: 1,
       color: '#A855F7',
+      priorityCeiling: TicketPriority.LOW,
     })
 
-    const entregaExterna = await upsertCategory(prisma, {
+    await createMensajeria({
       name: 'Entrega Externa',
-      description: 'Envíos y entregas fuera del centro comercial',
+      description:
+        'Envíos y entregas fuera del centro comercial: envío de productos a clientes, devolución de mercancía o entrega de documentos a proveedores',
       level: 2,
       parentId: solicitudMensajeria.id,
       departmentId: deptMensajeria,
       order: 2,
       color: '#A855F7',
+      priorityCeiling: TicketPriority.MEDIUM,
     })
 
-    await upsertCategory(prisma, {
+    await createMensajeria({
       name: 'Recepción de Paquetes',
-      description: 'Recepción y gestión de paquetes',
+      description: 'Recepción y gestión de paquetes que llegan al centro comercial',
       level: 2,
       parentId: solicitudMensajeria.id,
       departmentId: deptMensajeria,
       order: 3,
       color: '#A855F7',
+      priorityCeiling: TicketPriority.LOW,
     })
 
-    await upsertCategory(prisma, {
-      name: 'Correspondencia',
-      description: 'Entrega de correspondencia entre locales',
-      level: 3,
-      parentId: entregaInterna.id,
-      departmentId: deptMensajeria,
-      order: 1,
-      color: '#A855F7',
+    const oldMensajeria = await prisma.categories.findMany({
+      where: { departmentId: deptMensajeria, isActive: true, id: { notIn: mensajeriaIds } },
+      select: { id: true },
     })
-
-    await upsertCategory(prisma, {
-      name: 'Documentos',
-      description: 'Entrega de documentos importantes',
-      level: 3,
-      parentId: entregaInterna.id,
-      departmentId: deptMensajeria,
-      order: 2,
-      color: '#A855F7',
-    })
-
-    await upsertCategory(prisma, {
-      name: 'Paquetes Pequeños',
-      description: 'Entrega de paquetes pequeños',
-      level: 3,
-      parentId: entregaInterna.id,
-      departmentId: deptMensajeria,
-      order: 3,
-      color: '#A855F7',
-    })
-
-    await upsertCategory(prisma, {
-      name: 'Envío a Cliente',
-      description: 'Envío de productos a clientes',
-      level: 3,
-      parentId: entregaExterna.id,
-      departmentId: deptMensajeria,
-      order: 1,
-      color: '#A855F7',
-    })
-
-    await upsertCategory(prisma, {
-      name: 'Envío a Proveedor',
-      description: 'Envío de devoluciones o documentos a proveedores',
-      level: 3,
-      parentId: entregaExterna.id,
-      departmentId: deptMensajeria,
-      order: 2,
-      color: '#A855F7',
-    })
-
-    await upsertCategory(prisma, {
-      name: 'Rastreo de Envío',
-      description: 'Consultar estado de un envío',
-      level: 3,
-      parentId: consultaMensajeria.id,
-      departmentId: deptMensajeria,
-      order: 1,
-      color: '#10B981',
-    })
-
-    await upsertCategory(prisma, {
-      name: 'Confirmación de Entrega',
-      description: 'Confirmar entrega realizada',
-      level: 3,
-      parentId: consultaMensajeria.id,
-      departmentId: deptMensajeria,
-      order: 2,
-      color: '#10B981',
-    })
+    if (oldMensajeria.length > 0) {
+      await prisma.categories.updateMany({
+        where: { id: { in: oldMensajeria.map(c => c.id) } },
+        data: { isActive: false, updatedAt: new Date() },
+      })
+    }
+    console.log(
+      `✅ Categorías Mensajería: ${mensajeriaIds.length} vigentes, ${oldMensajeria.length} retiradas`
+    )
   }
 
-  console.log('✅ Categorías ADMINISTRATIVE (Admin, Financiero, Compras, RRHH, Mensajería)')
+  console.log('✅ Categorías ADMINISTRATIVE (Admin, Financiero, Compras, RRHH)')
 }
