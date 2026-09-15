@@ -124,18 +124,26 @@ export class AssignmentService {
         }
       }
 
+      // Nota (2026-09-15): antes, si `hadAnyCategoryAssignments` era true (la
+      // categoría o alguna ancestro SÍ tiene técnicos configurados a mano)
+      // pero ninguno tenía capacidad, se tiraba un throw aquí mismo y el
+      // ticket quedaba sin asignar — sin intentar nunca el resto del
+      // departamento ni un admin de la familia, aunque sí hubiera alguien
+      // real con capacidad. Eso era el bug reportado: "si el técnico ya
+      // tiene el máximo de tickets, debería pasar al técnico más cercano
+      // dentro del departamento o a un admin de la familia". El flujo
+      // general de scoring de abajo (Prioridad 2/3) YA exige ese mismo
+      // departamento/familia — cascadear hacia él es seguro, nunca termina
+      // en alguien de otro departamento/familia como comodín.
       if (hadAnyCategoryAssignments) {
-        // Alguna categoría de la cadena (la del ticket o alguna ancestro) SÍ
-        // tiene técnicos configurados, pero ninguno pertenece al departamento
-        // (o familia) correcto, o ninguno tiene capacidad. No se asigna a
-        // alguien de otro departamento/familia como comodín: el ticket queda
-        // sin asignar para que un Admin lo asigne manualmente (pudiendo elegir
-        // de otro departamento dentro de su familia).
-        throw new Error('No hay técnico disponible en el departamento de la categoría')
+        console.log(
+          `[AUTO-ASSIGN] Categoría ${ticket.categoryId}: técnico(s) configurado(s) sin capacidad o fuera de departamento/familia — cae al flujo general (departamento → admin de familia)`
+        )
       }
 
       // ─────────────────────────────────────────────────────────────────────
-      // Sin técnicos configurados en la categoría → flujo general de scoring
+      // Sin técnicos configurados (o sin capacidad) en la categoría → flujo
+      // general de scoring
       // ─────────────────────────────────────────────────────────────────────
 
       // Obtener candidatos disponibles, excluyendo al solicitante
@@ -144,6 +152,11 @@ export class AssignmentService {
       if (availableTechnicians.length === 0) {
         throw new Error('No hay técnicos disponibles para este ticket')
       }
+
+      const { getMaxTicketsPerUser } = await import('@/lib/settings/runtime-settings')
+      const maxWorkloadTickets = await getMaxTicketsPerUser()
+      const hasCapacity = (t: { _count: { tickets_tickets_assigneeIdTousers: number } }) =>
+        t._count.tickets_tickets_assigneeIdTousers < maxWorkloadTickets
 
       // 🎯 PRIORIDAD 1: técnicos con familia NATIVA igual a la del ticket (si la config lo exige)
       if (ticket.familyId) {
@@ -164,7 +177,7 @@ export class AssignmentService {
         }
       }
 
-      // 🎯 PRIORIDAD 2: técnicos del departamento de la categoría
+      // 🎯 PRIORIDAD 2: técnicos del departamento de la categoría, CON capacidad
       // Requisito duro: si la categoría tiene departamento, SOLO un técnico de ese
       // departamento puede ganar por este camino (scoring general, categorías sin
       // technician_assignments configurados todavía). Antes era un filtro "blando"
@@ -172,36 +185,60 @@ export class AssignmentService {
       // configurado aún, terminaba asignando a cualquiera de la familia aunque
       // fuera de otro departamento (el bug reportado con Tania Guamán).
       //
+      // Nota (2026-09-15): "haber un candidato del departamento" ya no basta
+      // por sí solo — antes se quedaba con `techsFromDept` completo sin mirar
+      // carga, así que un único técnico del departamento ya al máximo de
+      // tickets se llevaba el ticket de todas formas (la carga solo bajaba su
+      // score un 30%, nunca lo descartaba). Ahora se exige capacidad real
+      // (`hasCapacity`) en cada paso de la cascada — alguien "al máximo" ya
+      // no cuenta como candidato disponible, exactamente igual que si no
+      // perteneciera al departamento.
+      //
       // 🎯 PRIORIDAD 3 (fallback dentro de este mismo bloque): si nadie del
-      // departamento exacto está disponible, "el admin más cercano" —un admin
+      // departamento exacto tiene capacidad, "el admin más cercano" —un admin
       // nativo de la FAMILIA del ticket (no necesariamente ese departamento
-      // puntual)— es mejor comodín que dejar el ticket sin asignar: sigue
-      // siendo alguien con responsabilidad real sobre esa área, a diferencia
-      // de un técnico de otro departamento sin ninguna relación. Solo si
-      // tampoco hay ningún admin de la familia, el ticket queda sin asignar
-      // para que un Admin lo asigne manualmente.
+      // puntual) que también tenga capacidad— es mejor comodín que dejar el
+      // ticket sin asignar o sobrecargar a alguien: sigue siendo alguien con
+      // responsabilidad real sobre esa área, a diferencia de un técnico de
+      // otro departamento sin ninguna relación. Solo si tampoco hay ningún
+      // admin de la familia con capacidad, el ticket queda sin asignar para
+      // que un Admin lo asigne manualmente (nunca se fuerza a alguien por
+      // encima de su máximo).
       if (ticket.categories.departmentId) {
         const techsFromDept = availableTechnicians.filter(
           t => t.departmentId === ticket.categories.departmentId
         )
-        if (techsFromDept.length > 0) {
-          availableTechnicians = techsFromDept
+        const techsFromDeptWithCapacity = techsFromDept.filter(hasCapacity)
+        if (techsFromDeptWithCapacity.length > 0) {
+          availableTechnicians = techsFromDeptWithCapacity
         } else if (ticket.familyId) {
           const { getAdminIdsNativeToFamily } = await import('@/lib/auth/family-scope')
           const nativeAdminIds = new Set(await getAdminIdsNativeToFamily(ticket.familyId))
-          const adminsInFamily = availableTechnicians.filter(t => nativeAdminIds.has(t.id))
-          if (adminsInFamily.length === 0) {
-            throw new Error('No hay técnico disponible en el departamento de la categoría')
+          const adminsInFamilyWithCapacity = availableTechnicians.filter(
+            t => nativeAdminIds.has(t.id) && hasCapacity(t)
+          )
+          if (adminsInFamilyWithCapacity.length === 0) {
+            throw new Error(
+              techsFromDept.length > 0
+                ? 'El departamento de la categoría y los admins de la familia están al máximo de tickets'
+                : 'No hay técnico disponible en el departamento de la categoría'
+            )
           }
-          availableTechnicians = adminsInFamily
+          availableTechnicians = adminsInFamilyWithCapacity
         } else {
           throw new Error('No hay técnico disponible en el departamento de la categoría')
         }
+      } else {
+        // Categoría sin departamento propio (caso raro): red de seguridad
+        // final — nunca elegir a alguien ya al máximo entre el resto del pool.
+        const withCapacity = availableTechnicians.filter(hasCapacity)
+        if (withCapacity.length === 0) {
+          throw new Error('No hay técnico con capacidad disponible para este ticket')
+        }
+        availableTechnicians = withCapacity
       }
 
       // Calcular el mejor técnico
-      const { getMaxTicketsPerUser } = await import('@/lib/settings/runtime-settings')
-      const maxWorkloadTickets = await getMaxTicketsPerUser()
       const bestTechnician = await this.calculateBestTechnician(
         ticket,
         availableTechnicians,
