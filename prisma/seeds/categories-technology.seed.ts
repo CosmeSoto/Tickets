@@ -218,7 +218,7 @@ export async function seedCategoriesTechnology(prisma: PrismaClient, deptMap: Ma
   await create({
     name: 'Equipos de Cómputo',
     description:
-      'Computadora, laptop, hardware: verificación de partes, preparación de equipos nuevos, revisión técnica, instalación de sistema operativo o software base, reparación de hardware o componentes',
+      'Computadora, laptop, hardware: verificación de partes (monitor, pantalla, video, teclado, mouse, sonido), preparación de equipos nuevos, revisión técnica, instalación de sistema operativo o software base, reparación de hardware o componentes',
     level: 1,
     parentId: null,
     departmentId: deptId,
