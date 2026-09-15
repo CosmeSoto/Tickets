@@ -21,7 +21,8 @@ const MINUTE_MS = 60 * 1000
 /** Umbral por debajo del cual se considera "por vencer" (ámbar) en vez de "en curso" (verde). */
 const WARNING_THRESHOLD_MS = 4 * HOUR_MS
 
-function formatDuration(ms: number): string {
+/** Formatea una duración en milisegundos como "3h 20min"/"45min" — reusado también por ticket-utils.ts (columna "Tiempo de respuesta"). */
+export function formatDuration(ms: number): string {
   const totalMinutes = Math.round(ms / MINUTE_MS)
   const hours = Math.floor(totalMinutes / 60)
   const minutes = totalMinutes % 60

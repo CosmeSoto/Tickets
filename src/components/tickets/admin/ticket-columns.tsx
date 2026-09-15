@@ -1,13 +1,13 @@
 'use client'
 
-import { User, Calendar, Clock, MessageSquare, Paperclip, Eye } from 'lucide-react'
+import { User, Calendar, Clock, MessageSquare, Paperclip, Eye, Star } from 'lucide-react'
 import { StatusBadge, PriorityBadge } from '@/components/ui/status-badge'
 import { Button } from '@/components/ui/button'
 import type { Column } from '@/components/ui/data-table'
 import type { TableColumnDef } from '@/components/common/table-columns-menu'
 import type { Ticket as TicketType } from '@/hooks/use-ticket-data'
 import { formatTimeAgo, getTicketDisplayCode } from '@/hooks/use-ticket-data'
-import { getSlaCountdown } from '@/lib/tickets/sla-countdown'
+import { getSlaCountdown, formatDuration } from '@/lib/tickets/sla-countdown'
 
 const SLA_URGENCY_CLASSES: Record<string, string> = {
   ok: 'text-muted-foreground',
@@ -32,8 +32,10 @@ export const ADMIN_TICKET_COLUMN_DEFS: TableColumnDef[] = [
   { key: 'category', label: 'Categoría' },
   { key: 'createdAt', label: 'Creado' },
   { key: 'updatedAt', label: 'Actividad' },
+  { key: 'firstResponseAt', label: 'Primera respuesta' },
   { key: 'resolvedAt', label: 'Resuelto' },
   { key: 'closedAt', label: 'Cerrado' },
+  { key: 'rating', label: 'Calificación' },
   { key: 'ticketCode', label: 'Código' },
 ]
 
@@ -214,6 +216,24 @@ export function createAdminTicketColumns(): Column<TicketType>[] {
       ),
     },
     {
+      key: 'firstResponseAt',
+      label: 'Primera respuesta',
+      sortable: true,
+      render: (ticket: TicketType) =>
+        ticket.firstResponseAt ? (
+          <div className='flex items-center gap-1 text-sm text-muted-foreground'>
+            <Clock className='h-3.5 w-3.5' />
+            <span>
+              {formatDuration(
+                new Date(ticket.firstResponseAt).getTime() - new Date(ticket.createdAt).getTime()
+              )}
+            </span>
+          </div>
+        ) : (
+          <span className='text-muted-foreground text-xs'>Sin respuesta aún</span>
+        ),
+    },
+    {
       key: 'resolvedAt',
       label: 'Resuelto',
       sortable: true,
@@ -239,6 +259,19 @@ export function createAdminTicketColumns(): Column<TicketType>[] {
           </div>
         ) : (
           <span className='text-muted-foreground text-xs'>—</span>
+        ),
+    },
+    {
+      key: 'rating',
+      label: 'Calificación',
+      render: (ticket: TicketType) =>
+        ticket.ticket_ratings?.rating ? (
+          <div className='flex items-center gap-1 text-sm'>
+            <Star className='h-3.5 w-3.5 fill-amber-400 text-amber-400' />
+            <span>{ticket.ticket_ratings.rating}/5</span>
+          </div>
+        ) : (
+          <span className='text-muted-foreground text-xs'>Sin calificar</span>
         ),
     },
     {

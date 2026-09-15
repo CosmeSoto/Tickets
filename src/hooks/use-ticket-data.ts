@@ -61,6 +61,10 @@ export interface Ticket {
   dueDate?: string
   /** Deadline de resolución del SLA (ver SLAService.assignSLA). null = sin política aplicable. */
   slaDeadline?: string | null
+  /** Cuándo un técnico/admin comentó por primera vez (ver SLAService.recordFirstResponse). null = aún sin respuesta. */
+  firstResponseAt?: string | null
+  /** Calificación del cliente, si ya calificó (1-1 con ticket_ratings). */
+  ticket_ratings?: { rating: number } | null
   knowledgeArticleId?: string | null
   tags?: string[]
   attachments?: Array<{

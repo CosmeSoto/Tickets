@@ -4,6 +4,8 @@
  */
 
 import { TICKET_PRIORITY_LABELS, TICKET_PRIORITY_COLORS } from '@/lib/constants/ticket-labels'
+import { formatDateTimeShort } from '@/lib/utils/date-utils'
+import { formatDuration } from '@/lib/tickets/sla-countdown'
 
 export type Priority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'
 export type Status = 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED' | 'ON_HOLD'
@@ -67,6 +69,23 @@ export const getStatusLabel = (status: Status | string): string => {
 
 import type { ExportColumn } from '@/lib/utils/export'
 
+/**
+ * Formatea una fecha para exportación con fecha Y hora (antes usaba
+ * `toLocaleDateString('es-ES')` sin `hour`/`minute` ni zona horaria —
+ * mostraba solo "14/9/2026", a diferencia de las tablas en pantalla que sí
+ * muestran hora vía formatTimeAgo).
+ */
+const formatExportDateTime = (v: any): string => (v ? formatDateTimeShort(v) : '')
+
+/** "2h 15min" desde que se creó el ticket hasta la primera respuesta; "Sin respuesta aún" si no la tiene. */
+const formatFirstResponseTime = (v: any, row: any): string => {
+  if (!v || !row?.createdAt) return 'Sin respuesta aún'
+  return formatDuration(new Date(v).getTime() - new Date(row.createdAt).getTime())
+}
+
+/** Calificación (1-5) que dejó el cliente, si ya calificó. */
+const formatRating = (v: any): string => (v?.rating ? `${v.rating}/5` : 'Sin calificar')
+
 /** Columnas base compartidas por todos los roles */
 const BASE_TICKET_EXPORT_COLUMNS: ExportColumn[] = [
   {
@@ -79,35 +98,48 @@ const BASE_TICKET_EXPORT_COLUMNS: ExportColumn[] = [
   { key: 'priority', label: 'Prioridad', format: (v: string) => getPriorityLabel(v) },
   { key: 'category', label: 'Categoría', format: (v: any) => v?.name ?? '' },
   { key: 'family', label: 'Área', format: (v: any) => v?.name ?? '' },
-  {
-    key: 'createdAt',
-    label: 'Creado',
-    format: (v: any) => (v ? new Date(v).toLocaleDateString('es-ES') : ''),
-  },
-  {
-    key: 'updatedAt',
-    label: 'Actualizado',
-    format: (v: any) => (v ? new Date(v).toLocaleDateString('es-ES') : ''),
-  },
+  { key: 'createdAt', label: 'Creado', format: formatExportDateTime },
+  { key: 'updatedAt', label: 'Actualizado', format: formatExportDateTime },
+  { key: 'firstResponseAt', label: 'Primera respuesta', format: formatFirstResponseTime },
+  { key: 'resolvedAt', label: 'Resuelto', format: formatExportDateTime },
+  { key: 'closedAt', label: 'Cerrado', format: formatExportDateTime },
+  { key: 'ticket_ratings', label: 'Calificación', format: formatRating },
 ]
+
+const BASE_BY_KEY: Record<string, ExportColumn> = Object.fromEntries(
+  BASE_TICKET_EXPORT_COLUMNS.map(c => [c.key, c])
+)
 
 /** Columnas de exportación para TECHNICIAN (incluye cliente, sin técnico asignado) */
 export const TECHNICIAN_TICKET_EXPORT_COLUMNS: ExportColumn[] = [
-  ...BASE_TICKET_EXPORT_COLUMNS.slice(0, 4),
+  BASE_BY_KEY.ticketCode,
+  BASE_BY_KEY.title,
+  BASE_BY_KEY.status,
+  BASE_BY_KEY.priority,
   { key: 'client', label: 'Cliente', format: (v: any) => v?.name ?? '' },
-  ...BASE_TICKET_EXPORT_COLUMNS.slice(4, -1), // sin updatedAt
-  {
-    key: 'resolvedAt',
-    label: 'Resuelto',
-    format: (v: any) => (v ? new Date(v).toLocaleDateString('es-ES') : ''),
-  },
+  BASE_BY_KEY.category,
+  BASE_BY_KEY.family,
+  BASE_BY_KEY.createdAt,
+  BASE_BY_KEY.firstResponseAt,
+  BASE_BY_KEY.resolvedAt,
+  BASE_BY_KEY.closedAt,
+  BASE_BY_KEY.ticket_ratings,
 ]
 
 /** Columnas de exportación para CLIENT (sin cliente, incluye técnico asignado) */
 export const CLIENT_TICKET_EXPORT_COLUMNS: ExportColumn[] = [
-  ...BASE_TICKET_EXPORT_COLUMNS.slice(0, 4),
+  BASE_BY_KEY.ticketCode,
+  BASE_BY_KEY.title,
+  BASE_BY_KEY.status,
+  BASE_BY_KEY.priority,
   { key: 'assignee', label: 'Técnico', format: (v: any) => v?.name ?? 'Sin asignar' },
-  ...BASE_TICKET_EXPORT_COLUMNS.slice(4),
+  BASE_BY_KEY.category,
+  BASE_BY_KEY.family,
+  BASE_BY_KEY.createdAt,
+  BASE_BY_KEY.updatedAt,
+  BASE_BY_KEY.resolvedAt,
+  BASE_BY_KEY.closedAt,
+  BASE_BY_KEY.ticket_ratings,
 ]
 
 /**
@@ -116,45 +148,24 @@ export const CLIENT_TICKET_EXPORT_COLUMNS: ExportColumn[] = [
  * exactamente las columnas visibles/ordenadas que el usuario eligió en el
  * selector de columnas ("lo que ves es lo que exportas").
  */
-export const ADMIN_TICKET_EXPORT_COLUMN_MAP: Record<string, ExportColumn> = {
-  title: { key: 'title', label: 'Título' },
-  family: { key: 'family', label: 'Área', format: (v: any) => v?.name ?? '' },
-  status: { key: 'status', label: 'Estado', format: (v: string) => getStatusLabel(v) },
-  priority: {
-    key: 'priority',
-    label: 'Prioridad',
-    format: (v: string) => getPriorityLabel(v),
-  },
+export const ADMIN_TICKET_EXPORT_COLUMN_MAP: Record<string, ExportColumn | null> = {
+  title: BASE_BY_KEY.title,
+  family: BASE_BY_KEY.family,
+  status: BASE_BY_KEY.status,
+  priority: BASE_BY_KEY.priority,
+  sla: null, // la cuenta regresiva de SLA no tiene sentido fuera de la pantalla en vivo
   client: { key: 'client', label: 'Cliente', format: (v: any) => v?.name ?? '' },
   assignee: {
     key: 'assignee',
     label: 'Técnico',
     format: (v: any) => v?.name ?? 'Sin asignar',
   },
-  category: { key: 'category', label: 'Categoría', format: (v: any) => v?.name ?? '' },
-  createdAt: {
-    key: 'createdAt',
-    label: 'Creado',
-    format: (v: any) => (v ? new Date(v).toLocaleDateString('es-ES') : ''),
-  },
-  updatedAt: {
-    key: 'updatedAt',
-    label: 'Actividad',
-    format: (v: any) => (v ? new Date(v).toLocaleDateString('es-ES') : ''),
-  },
-  resolvedAt: {
-    key: 'resolvedAt',
-    label: 'Resuelto',
-    format: (v: any) => (v ? new Date(v).toLocaleDateString('es-ES') : ''),
-  },
-  closedAt: {
-    key: 'closedAt',
-    label: 'Cerrado',
-    format: (v: any) => (v ? new Date(v).toLocaleDateString('es-ES') : ''),
-  },
-  ticketCode: {
-    key: 'ticketCode',
-    label: 'Código',
-    format: (v: any, r: any) => v ?? r?.id?.slice(-8)?.toUpperCase() ?? '',
-  },
+  category: BASE_BY_KEY.category,
+  createdAt: BASE_BY_KEY.createdAt,
+  updatedAt: { ...BASE_BY_KEY.updatedAt, label: 'Actividad' },
+  firstResponseAt: BASE_BY_KEY.firstResponseAt,
+  resolvedAt: BASE_BY_KEY.resolvedAt,
+  closedAt: BASE_BY_KEY.closedAt,
+  rating: BASE_BY_KEY.ticket_ratings,
+  ticketCode: BASE_BY_KEY.ticketCode,
 }

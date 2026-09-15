@@ -171,6 +171,7 @@ export async function GET(request: NextRequest) {
           resolvedAt: true,
           closedAt: true,
           slaDeadline: true,
+          firstResponseAt: true,
           users_tickets_clientIdTousers: {
             select: { id: true, name: true, email: true, departmentId: true },
           },
@@ -182,6 +183,9 @@ export async function GET(request: NextRequest) {
           },
           family: {
             select: { id: true, name: true, code: true, color: true },
+          },
+          ticket_ratings: {
+            select: { rating: true },
           },
           _count: {
             select: { comments: true, attachments: true },

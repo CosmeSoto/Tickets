@@ -30,6 +30,7 @@ import { useExport } from '@/hooks/common/use-export'
 import type { Ticket as TicketType } from '@/hooks/use-ticket-data'
 import { filterTicketsAdmin, filterTicketsCreatedBy } from '@/lib/utils/ticket-filters'
 import { ADMIN_TICKET_EXPORT_COLUMN_MAP } from '@/lib/utils/ticket-utils'
+import type { ExportColumn } from '@/lib/utils/export'
 import { useFamilies } from '@/contexts/families-context'
 import { useLiveTicketRefresh } from '@/hooks/use-live-ticket-refresh'
 
@@ -182,8 +183,9 @@ export default function AdminTicketsPage() {
   const exportColumns = useMemo(
     () =>
       columnOrder
-        .filter(k => visibleColumns.includes(k) && ADMIN_TICKET_EXPORT_COLUMN_MAP[k])
-        .map(k => ADMIN_TICKET_EXPORT_COLUMN_MAP[k]),
+        .filter(k => visibleColumns.includes(k))
+        .map(k => ADMIN_TICKET_EXPORT_COLUMN_MAP[k])
+        .filter((c): c is ExportColumn => Boolean(c)),
     [columnOrder, visibleColumns]
   )
 
