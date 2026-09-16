@@ -334,9 +334,17 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
       request: request,
     }).catch(err => console.error('[AUDIT] Error registrando calificación:', err))
 
-    // Notificar al administrador sobre la nueva calificación
-    const { triggerRatingToAdminEmail } = await import('@/lib/email-triggers')
-    triggerRatingToAdminEmail(ticketId, data.rating)
+    // Avisar al técnico de la nueva calificación: no correo individual, se agrupa
+    // en el digest cada 30 min (ver src/lib/cron/ticket-activity-digest.ts)
+    if (ticket.assigneeId) {
+      const { queueTicketDigestItem } = await import('@/lib/notifications/queue-ticket-digest-item')
+      void queueTicketDigestItem({
+        ticketId,
+        recipientId: ticket.assigneeId,
+        event: 'ticketUpdated',
+        summary: `El cliente calificó el servicio: ${data.rating}/5${data.feedback ? ` — "${String(data.feedback).slice(0, 100)}"` : ''}`,
+      }).catch(err => console.error('[API] Error queueing rating digest item:', err))
+    }
 
     // Formatear respuesta
     const formattedRating = {

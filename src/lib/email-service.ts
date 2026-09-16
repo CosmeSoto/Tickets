@@ -300,60 +300,178 @@ export async function sendTicketResolvedToAdminEmail(ticketId: string, actorUser
   }
 }
 
-export async function sendRatingToAdminEmail(ticketId: string, rating: number) {
+export async function sendTicketClosedEmail(ticketId: string, actorUserId?: string) {
   try {
     const ticket = await prisma.tickets.findUnique({
       where: { id: ticketId },
       include: {
-        users_tickets_clientIdTousers: { select: { name: true, email: true } },
+        users_tickets_clientIdTousers: { select: { id: true, name: true, email: true } },
         users_tickets_assigneeIdTousers: { select: { id: true, name: true, email: true } },
-        categories: { select: { name: true } },
       },
     })
-
     if (!ticket) return false
-
-    const technician = ticket.users_tickets_assigneeIdTousers
-    if (!technician?.email || !ticket.assigneeId) return false
-
-    const ratingData = await prisma.ticket_ratings.findUnique({
-      where: { ticketId },
-      select: { rating: true, feedback: true },
-    })
-    if (!ratingData) return false
 
     const branding = await getEmailBranding()
     const code = ticketCode(ticket as { id: string; ticketCode?: string | null })
-    const feedback = ratingData.feedback?.trim() || 'Sin comentario'
+    const isPatrol = ticket.source === 'PATROL' && !!ticket.createdById
+    let sentAny = false
 
-    const { html, text } = await buildOperationalEmail({
-      headline: 'Nueva calificación',
-      preheader: `Ticket #${code}: ${rating}/5 estrellas.`,
-      greetingName: technician.name,
-      introHtml: `<p style="margin:0 0 8px;">El cliente calificó el servicio de este ticket.</p>`,
-      infoRows: [
-        { label: 'Ticket', value: `#${code}` },
-        { label: 'Calificación', value: `${rating}/5` },
-        { label: 'Comentario', value: feedback.slice(0, 120) },
-      ],
-      cta: {
-        href: `${branding.baseUrl}/technician/tickets/${ticket.id}`,
-        label: 'Ver ticket',
+    if (
+      ticket.assigneeId &&
+      ticket.assigneeId !== actorUserId &&
+      ticket.users_tickets_assigneeIdTousers?.email
+    ) {
+      const { html, text } = await buildOperationalEmail({
+        headline: 'Ticket cerrado',
+        preheader: `Ticket #${code} fue cerrado.`,
+        greetingName: ticket.users_tickets_assigneeIdTousers.name,
+        introHtml: `<p style="margin:0 0 8px;">El ticket que atendiste fue cerrado.</p>`,
+        infoRows: [
+          { label: 'Ticket', value: `#${code}` },
+          { label: 'Título', value: ticket.title },
+        ],
+        cta: { href: `${branding.baseUrl}/technician/tickets/${ticket.id}`, label: 'Ver ticket' },
+      })
+      const ok = await sendEmail({
+        to: ticket.users_tickets_assigneeIdTousers.email,
+        recipientUserId: ticket.assigneeId,
+        subject: `Ticket #${code} cerrado`,
+        html,
+        text,
+        module: 'tickets',
+        event: 'statusChanged',
+        priority: 'important',
+      })
+      sentAny = sentAny || ok
+    }
+
+    const notifyUserId = isPatrol ? ticket.createdById : ticket.clientId
+    if (notifyUserId && notifyUserId !== actorUserId) {
+      const recipientUser = isPatrol
+        ? await prisma.users.findUnique({
+            where: { id: notifyUserId },
+            select: { id: true, name: true, email: true },
+          })
+        : ticket.users_tickets_clientIdTousers
+      if (recipientUser?.email) {
+        const { html, text } = await buildOperationalEmail({
+          headline: 'Ticket cerrado',
+          preheader: `Ticket #${code} fue cerrado.`,
+          greetingName: recipientUser.name,
+          introHtml: isPatrol
+            ? `<p style="margin:0 0 8px;">El ticket escalado desde rondas fue cerrado.</p>`
+            : `<p style="margin:0 0 8px;">Tu ticket fue cerrado.</p>`,
+          infoRows: [
+            { label: 'Ticket', value: `#${code}` },
+            { label: 'Título', value: ticket.title },
+          ],
+          cta: { href: `${branding.baseUrl}/client/tickets/${ticket.id}`, label: 'Ver ticket' },
+        })
+        const ok = await sendEmail({
+          to: recipientUser.email,
+          recipientUserId: recipientUser.id,
+          subject: `Ticket #${code} cerrado`,
+          html,
+          text,
+          module: 'tickets',
+          event: 'statusChanged',
+          priority: 'important',
+        })
+        sentAny = sentAny || ok
+      }
+    }
+
+    return sentAny
+  } catch (error) {
+    console.error('Error sending ticket closed email:', error)
+    return false
+  }
+}
+
+export async function sendTicketReopenedEmail(ticketId: string, actorUserId?: string) {
+  try {
+    const ticket = await prisma.tickets.findUnique({
+      where: { id: ticketId },
+      include: {
+        users_tickets_clientIdTousers: { select: { id: true, name: true, email: true } },
+        users_tickets_assigneeIdTousers: { select: { id: true, name: true, email: true } },
       },
     })
+    if (!ticket) return false
 
-    return await sendEmail({
-      to: technician.email,
-      recipientUserId: ticket.assigneeId,
-      subject: `Calificación ${rating}/5 — Ticket #${code}`,
-      html,
-      text,
-      module: 'tickets',
-      event: 'ticketUpdated',
-      priority: 'optional',
-    })
+    const branding = await getEmailBranding()
+    const code = ticketCode(ticket as { id: string; ticketCode?: string | null })
+    const isPatrol = ticket.source === 'PATROL' && !!ticket.createdById
+    let sentAny = false
+
+    const notifyUserId = isPatrol ? ticket.createdById : ticket.clientId
+    if (notifyUserId && notifyUserId !== actorUserId) {
+      const recipientUser = isPatrol
+        ? await prisma.users.findUnique({
+            where: { id: notifyUserId },
+            select: { id: true, name: true, email: true },
+          })
+        : ticket.users_tickets_clientIdTousers
+      if (recipientUser?.email) {
+        const { html, text } = await buildOperationalEmail({
+          headline: 'Ticket reabierto',
+          preheader: `Ticket #${code} fue reabierto.`,
+          greetingName: recipientUser.name,
+          introHtml: isPatrol
+            ? `<p style="margin:0 0 8px;">El ticket escalado desde rondas fue reabierto.</p>`
+            : `<p style="margin:0 0 8px;">Tu ticket fue reabierto y sigue en curso.</p>`,
+          infoRows: [
+            { label: 'Ticket', value: `#${code}` },
+            { label: 'Título', value: ticket.title },
+          ],
+          cta: { href: `${branding.baseUrl}/client/tickets/${ticket.id}`, label: 'Ver ticket' },
+        })
+        const ok = await sendEmail({
+          to: recipientUser.email,
+          recipientUserId: recipientUser.id,
+          subject: `Ticket #${code} reabierto`,
+          html,
+          text,
+          module: 'tickets',
+          event: 'statusChanged',
+          priority: 'important',
+        })
+        sentAny = sentAny || ok
+      }
+    }
+
+    if (
+      ticket.assigneeId &&
+      ticket.assigneeId !== actorUserId &&
+      ticket.users_tickets_assigneeIdTousers?.email
+    ) {
+      const { html, text } = await buildOperationalEmail({
+        headline: 'Ticket reabierto',
+        preheader: `Ticket #${code} fue reabierto.`,
+        greetingName: ticket.users_tickets_assigneeIdTousers.name,
+        introHtml: `<p style="margin:0 0 8px;">El ticket que atendiste fue reabierto.</p>`,
+        infoRows: [
+          { label: 'Ticket', value: `#${code}` },
+          { label: 'Título', value: ticket.title },
+        ],
+        cta: { href: `${branding.baseUrl}/technician/tickets/${ticket.id}`, label: 'Ver ticket' },
+      })
+      const ok = await sendEmail({
+        to: ticket.users_tickets_assigneeIdTousers.email,
+        recipientUserId: ticket.assigneeId,
+        subject: `Ticket #${code} reabierto`,
+        html,
+        text,
+        module: 'tickets',
+        event: 'statusChanged',
+        priority: 'important',
+      })
+      sentAny = sentAny || ok
+    }
+
+    return sentAny
   } catch (error) {
-    console.error('Error sending rating to technician email:', error)
+    console.error('Error sending ticket reopened email:', error)
     return false
   }
 }

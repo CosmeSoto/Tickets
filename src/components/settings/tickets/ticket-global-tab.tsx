@@ -2,7 +2,7 @@
  * Ticket Global Rules Tab Component
  */
 
-import { Save, Info, Layers, Users, Clock, Bell } from 'lucide-react'
+import { Save, Info, Layers, Users, Clock, Bell, Mail } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -145,6 +145,38 @@ export function TicketGlobalTab({
             <p className='text-sm text-muted-foreground'>
               días para calificar antes del cierre automático
             </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Ticket activity email digest */}
+      <Card>
+        <CardHeader>
+          <CardTitle className='text-base flex items-center gap-2'>
+            <Mail className='h-4 w-4' />
+            Correo agrupado de actividad de tickets
+          </CardTitle>
+          <CardDescription>
+            Comentarios y actualizaciones menores no generan un correo por evento — se agrupan en
+            uno solo por ticket cada este tiempo. La notificación dentro del sistema sigue siendo
+            instantánea; los eventos importantes (creación, asignación, resolución, cierre,
+            reapertura) siempre se envían de inmediato, sin pasar por este agrupado.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className='flex items-center gap-4'>
+            <Input
+              type='number'
+              min={5}
+              max={240}
+              value={globalSettings.ticketDigestIntervalMinutes}
+              onChange={e =>
+                onSetGlobal('ticketDigestIntervalMinutes', parseInt(e.target.value) || 30)
+              }
+              className='w-24 font-mono'
+              disabled={readOnly}
+            />
+            <p className='text-sm text-muted-foreground'>minutos entre cada correo agrupado</p>
           </div>
         </CardContent>
       </Card>

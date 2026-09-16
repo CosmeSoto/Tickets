@@ -212,6 +212,23 @@ model notification_mutes {
   @@index([userId, mutedUntil])
 }
 
+/// Cola efímera para el digest agrupado de comentarios/actualizaciones menores de
+/// tickets (ver src/lib/cron/ticket-activity-digest.ts). No es registro de auditoría:
+/// cada fila se borra en cuanto se incluye en el correo consolidado que la vacía.
+model ticket_email_digest_items {
+  id          String   @id
+  ticketId    String
+  recipientId String
+  event       String
+  summary     String
+  createdAt   DateTime @default(now())
+  tickets     tickets  @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  users       users    @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@index([recipientId, ticketId])
+  @@index([createdAt])
+}
+
 model oauth_accounts {
   id           String    @id
   provider     String
@@ -371,6 +388,7 @@ model tickets {
   resolution_plans                 resolution_plans[]
   sla_violations                   sla_violations[]
   ticket_collaborators             ticket_collaborators[]
+  ticket_email_digest_items        ticket_email_digest_items[]
   ticket_history                   ticket_history[]
   ticket_knowledge_articles        ticket_knowledge_articles[]
   ticket_ratings                   ticket_ratings?
@@ -567,6 +585,7 @@ model users {
   notification_preferences                          notification_preferences?
   notification_mutes                                notification_mutes[]
   notifications                                     notifications[]
+  ticket_email_digest_items                         ticket_email_digest_items[]
   oauth_accounts                                    oauth_accounts[]
   password_reset_tokens                             password_reset_tokens[]
   resolution_plans_created                          resolution_plans[]               @relation("ResolutionPlanCreator")

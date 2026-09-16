@@ -30,6 +30,7 @@ const settingsSchema = z.object({
   maxFileSize: z.coerce.number().min(1).max(100).optional(),
   maxPersonalImageSize: z.coerce.number().min(1).max(20).optional(),
   autoCloseDays: z.coerce.number().min(1).max(30).optional(),
+  ticketDigestIntervalMinutes: z.coerce.number().min(5).max(240).optional(),
   allowedFileTypes: z.array(z.string()).optional(),
   backupEnabled: z.boolean().optional(),
   backupFrequency: z.enum(['daily', 'weekly', 'monthly']).optional(),
@@ -76,6 +77,7 @@ const defaultSettings = {
   maxFileSize: 10, // MB
   maxPersonalImageSize: 5, // MB
   autoCloseDays: 3, // Días para auto-cierre de tickets resueltos sin calificación
+  ticketDigestIntervalMinutes: 30, // Cada cuánto se agrupan comentarios/actualizaciones en un correo
   allowedFileTypes: [
     'image/jpeg',
     'image/png',
@@ -119,6 +121,7 @@ function parseSystemSettingsFromRows(
         'maxPersonalImageSize',
         'backupRetention',
         'autoCloseDays',
+        'ticketDigestIntervalMinutes',
       ].includes(setting.key)
     ) {
       result[setting.key] = parseInt(value)

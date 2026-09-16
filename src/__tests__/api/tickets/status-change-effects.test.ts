@@ -65,6 +65,7 @@ jest.mock('@/lib/services/webhook-service', () => ({
     EVENTS: {
       TICKET_UPDATED: 'ticket.updated',
       TICKET_RESOLVED: 'ticket.resolved',
+      TICKET_CLOSED: 'ticket.closed',
       TICKET_REOPENED: 'ticket.reopened',
       TICKET_ASSIGNED: 'ticket.assigned',
     },
@@ -75,6 +76,7 @@ jest.mock('@/lib/services/notification-service', () => ({
   NotificationService: {
     notifyTicketResolved: jest.fn().mockResolvedValue(undefined),
     notifyTicketAssigned: jest.fn().mockResolvedValue(undefined),
+    push: jest.fn().mockResolvedValue(undefined),
   },
 }))
 
@@ -90,6 +92,8 @@ jest.mock('@/lib/email-triggers', () => ({
   triggerTicketResolvedToAdminEmail: jest.fn(),
   triggerTicketAssignedToTechnicianEmail: jest.fn(),
   triggerTicketAssignedToClientEmail: jest.fn(),
+  triggerTicketClosedEmail: jest.fn(),
+  triggerTicketReopenedEmail: jest.fn(),
 }))
 
 jest.mock('next/server', () => ({

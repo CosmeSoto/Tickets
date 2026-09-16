@@ -50,6 +50,7 @@ export interface SlaRow {
 export interface GlobalSettings {
   maxTicketsPerUser: number
   autoCloseDays: number
+  ticketDigestIntervalMinutes: number
   autoAssignmentEnabled: boolean
   defaultFamilyId: string
 }
@@ -114,6 +115,7 @@ export function useTicketSettings() {
   const [globalSettings, setGlobalSettings] = useState<GlobalSettings>({
     maxTicketsPerUser: 10,
     autoCloseDays: 3,
+    ticketDigestIntervalMinutes: 30,
     autoAssignmentEnabled: true,
     defaultFamilyId: '',
   })
@@ -195,6 +197,7 @@ export function useTicketSettings() {
           ...prev,
           maxTicketsPerUser: data.maxTicketsPerUser ?? 10,
           autoCloseDays: data.autoCloseDays ?? 3,
+          ticketDigestIntervalMinutes: data.ticketDigestIntervalMinutes ?? 30,
           autoAssignmentEnabled: data.autoAssignmentEnabled ?? true,
         }))
       }
@@ -337,6 +340,7 @@ export function useTicketSettings() {
           body: JSON.stringify({
             maxTicketsPerUser: globalSettings.maxTicketsPerUser,
             autoCloseDays: globalSettings.autoCloseDays,
+            ticketDigestIntervalMinutes: globalSettings.ticketDigestIntervalMinutes,
             autoAssignmentEnabled: globalSettings.autoAssignmentEnabled,
           }),
         }).then(parseSaveResponse),

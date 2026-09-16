@@ -6,7 +6,7 @@ import { randomUUID } from 'crypto'
 import { auditCommentCreated } from '@/lib/audit'
 import { WebhookService } from '@/lib/services/webhook-service'
 import { SLAService } from '@/lib/services/sla-service'
-import { EmailService } from '@/lib/services/email/email-service'
+import { queueTicketDigestItem } from '@/lib/notifications/queue-ticket-digest-item'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 import { NotificationService } from '@/lib/services/notification-service'
 import { FileService } from '@/lib/services/file-service'
@@ -275,35 +275,17 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             if (!recipient) return
             const authorName = newComment.users.name
             const authorRole = session.user.role === 'CLIENT' ? 'cliente' : 'técnico'
-            const emailBody = `
-            <h2>Nuevo Comentario en tu Ticket</h2>
-            <p>Hola ${recipient.name},</p>
-            <p>Se ha agregado un nuevo comentario en el ticket <strong>#${ticketId.substring(0, 8)}</strong>.</p>
-            <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
-              <p style="margin: 0 0 10px 0;"><strong>De:</strong> ${authorName} (${authorRole})</p>
-              <p style="margin: 0 0 10px 0;"><strong>Ticket:</strong> ${ticketWithUsers.title}</p>
-              <div style="background-color: white; padding: 15px; border-radius: 6px; margin-top: 15px;">
-                <p style="margin: 0; white-space: pre-wrap;">${newComment.content}</p>
-              </div>
-            </div>
-            <div style="margin-top: 30px;">
-              <a href="${process.env.NEXTAUTH_URL}/${session.user.role === 'CLIENT' ? 'technician' : 'client'}/tickets/${ticketId}"
-                 style="background-color: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
-                Ver Ticket y Responder
-              </a>
-            </div>
-          `
-            await EmailService.queueEmail(
-              {
-                to: recipient.email,
-                subject: `Nuevo comentario en Ticket #${ticketId.substring(0, 8)} - ${ticketWithUsers.title}`,
-                html: emailBody,
-                text: `Nuevo comentario de ${authorName} (${authorRole}) en ticket #${ticketId.substring(0, 8)}:\n\n${newComment.content}`,
-                recipientUserId: recipient.id,
-                ticketEmailEvent: 'newComments',
-              },
-              session.user.id
-            )
+            const preview = newComment.content.slice(0, 140)
+            // No se envía correo individual por cada comentario (satura la bandeja):
+            // se encola y un cron lo agrupa en un solo correo por ticket/destinatario
+            // cada 30 min (ver src/lib/cron/ticket-activity-digest.ts). La notificación
+            // in-app de arriba sigue siendo instantánea.
+            await queueTicketDigestItem({
+              ticketId,
+              recipientId: recipient.id,
+              event: 'newComments',
+              summary: `${authorName} (${authorRole}) comentó: "${preview}${newComment.content.length > 140 ? '…' : ''}"`,
+            })
           })
           .catch(err => {
             console.error('[API] Error sending email for new comment:', err)

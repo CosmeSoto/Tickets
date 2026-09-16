@@ -104,6 +104,50 @@ export async function applyTicketStatusChangeEffects({
     void triggerTicketResolvedToAdminEmail(ticketId, actorUserId)
   }
 
+  if (newStatus === 'CLOSED') {
+    const ticket = await prisma.tickets.findUnique({
+      where: { id: ticketId },
+      select: { title: true, source: true, createdById: true, clientId: true, assigneeId: true },
+    })
+
+    if (ticket) {
+      await WebhookService.trigger(WebhookService.EVENTS.TICKET_CLOSED, {
+        ticketId,
+        closedBy: actorName,
+        ticket: { id: ticketId, title: ticket.title },
+      }).catch(err => {
+        console.error('[WEBHOOK] Error disparando evento TICKET_CLOSED:', err)
+      })
+
+      const isPatrol = ticket.source === 'PATROL' && !!ticket.createdById
+      const notifyUserId = isPatrol ? ticket.createdById : ticket.clientId
+
+      if (ticket.assigneeId && ticket.assigneeId !== actorUserId) {
+        await NotificationService.push({
+          userId: ticket.assigneeId,
+          type: 'INFO',
+          title: 'Ticket cerrado',
+          message: `El ticket "${ticket.title}" ha sido cerrado`,
+          ticketId,
+        }).catch(() => {})
+      }
+      if (notifyUserId && notifyUserId !== actorUserId) {
+        await NotificationService.push({
+          userId: notifyUserId,
+          type: 'SUCCESS',
+          title: 'Ticket cerrado',
+          message: isPatrol
+            ? `El ticket escalado desde rondas "${ticket.title}" ha sido cerrado`
+            : `Tu ticket "${ticket.title}" ha sido cerrado`,
+          ticketId,
+        }).catch(() => {})
+      }
+
+      const { triggerTicketClosedEmail } = await import('@/lib/email-triggers')
+      void triggerTicketClosedEmail(ticketId, actorUserId)
+    }
+  }
+
   if (previousStatus === 'CLOSED' && newStatus === 'OPEN') {
     await WebhookService.trigger(WebhookService.EVENTS.TICKET_REOPENED, {
       ticketId,
@@ -112,6 +156,40 @@ export async function applyTicketStatusChangeEffects({
     }).catch(err => {
       console.error('[WEBHOOK] Error disparando evento TICKET_REOPENED:', err)
     })
+
+    const ticket = await prisma.tickets.findUnique({
+      where: { id: ticketId },
+      select: { title: true, source: true, createdById: true, clientId: true, assigneeId: true },
+    })
+
+    if (ticket) {
+      const isPatrol = ticket.source === 'PATROL' && !!ticket.createdById
+      const notifyUserId = isPatrol ? ticket.createdById : ticket.clientId
+
+      if (notifyUserId && notifyUserId !== actorUserId) {
+        await NotificationService.push({
+          userId: notifyUserId,
+          type: 'INFO',
+          title: 'Ticket reabierto',
+          message: isPatrol
+            ? `El ticket escalado desde rondas "${ticket.title}" fue reabierto`
+            : `Tu ticket "${ticket.title}" fue reabierto`,
+          ticketId,
+        }).catch(() => {})
+      }
+      if (ticket.assigneeId && ticket.assigneeId !== actorUserId) {
+        await NotificationService.push({
+          userId: ticket.assigneeId,
+          type: 'INFO',
+          title: 'Ticket reabierto',
+          message: `El ticket "${ticket.title}" fue reabierto`,
+          ticketId,
+        }).catch(() => {})
+      }
+
+      const { triggerTicketReopenedEmail } = await import('@/lib/email-triggers')
+      void triggerTicketReopenedEmail(ticketId, actorUserId)
+    }
   }
 
   TicketEvents.emit(ticketId, {

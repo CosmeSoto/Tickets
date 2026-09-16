@@ -402,6 +402,37 @@ curl -fsS -X POST "${NEXTAUTH_URL%/}/api/cron/weekly-digest" \
 Requiere que la cola de email esté activa (`/api/cron/process-email-queue`).  
 Log: `tail -f logs/weekly-digest-cron.log`
 
+### Digest de actividad de tickets (email agrupado)
+
+Comentarios no internos, planes de resolución creados y calificaciones recibidas ya **no**
+generan un correo por evento (satura la bandeja) — se encolan y este cron los consolida en
+un solo correo por (ticket, destinatario). La notificación in-app sigue siendo instantánea;
+solo cambia la cadencia del correo. Los eventos "importantes" (creación, asignación,
+resolución, cierre, reapertura) siguen enviándose de inmediato, sin pasar por este digest.
+
+El intervalo real de envío (**default 30 min**) se configura desde **Admin → Configuración
+→ Tickets → Reglas generales** (`ticketDigestIntervalMinutes`, 5-240 min) — no editando el
+crontab. El cron del servidor corre cada 5 min y solo consulta un valor de configuración en
+cada tick (consulta barata); el propio job decide si ya pasó el intervalo configurado antes
+de tocar la cola de comentarios/actualizaciones — ver `isDigestDue()` en
+`src/lib/cron/ticket-activity-digest.ts`. Si el admin baja el intervalo por debajo de 5 min,
+el mínimo real queda limitado por esta frecuencia de crontab.
+Endpoint: `POST /api/cron/ticket-activity-digest` (idempotente: si no hay nada pendiente, o
+si aún no toca según el intervalo configurado, no hace nada).
+
+```bash
+chmod +x ./docker/scripts/setup-ticket-digest-cron.sh
+./docker/scripts/setup-ticket-digest-cron.sh
+
+# Prueba manual
+source .env.production 2>/dev/null || export $(grep -E '^CRON_SECRET=' .env.production | xargs)
+curl -fsS -X POST "${NEXTAUTH_URL%/}/api/cron/ticket-activity-digest" \
+  -H "Authorization: Bearer $CRON_SECRET"
+```
+
+Requiere que la cola de email esté activa (`/api/cron/process-email-queue`).  
+Log: `tail -f logs/ticket-activity-digest-cron.log`
+
 ### Revisiones vencidas de Procesos y Procedimientos
 
 Ejecuta diariamente el control de procesos publicados cuya fecha `nextReviewAt` ya venció.

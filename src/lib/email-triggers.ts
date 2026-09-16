@@ -8,7 +8,8 @@ import {
   sendTicketAssignedToTechnicianEmail,
   sendTicketAssignedToClientEmail,
   sendTicketResolvedToAdminEmail,
-  sendRatingToAdminEmail,
+  sendTicketClosedEmail,
+  sendTicketReopenedEmail,
 } from './email-service'
 
 export function triggerTicketCreatedToAdminEmail(ticketId: string) {
@@ -36,9 +37,14 @@ export function triggerTicketResolvedToAdminEmail(ticketId: string, actorUserId?
   })
 }
 
-/** Digest admin de calificación (optional vía prefs ticketUpdated) */
-export function triggerRatingToAdminEmail(ticketId: string, rating: number) {
-  sendRatingToAdminEmail(ticketId, rating).catch(error => {
-    console.error('Failed to send rating to admin email:', error)
+export function triggerTicketClosedEmail(ticketId: string, actorUserId?: string) {
+  sendTicketClosedEmail(ticketId, actorUserId).catch(error => {
+    console.error('Failed to send ticket closed email:', error)
+  })
+}
+
+export function triggerTicketReopenedEmail(ticketId: string, actorUserId?: string) {
+  sendTicketReopenedEmail(ticketId, actorUserId).catch(error => {
+    console.error('Failed to send ticket reopened email:', error)
   })
 }

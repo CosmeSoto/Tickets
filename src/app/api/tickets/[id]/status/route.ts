@@ -340,6 +340,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           metadata: { link: `/client/tickets/${ticketId}` },
         }).catch(() => {})
       }
+
+      // Email de cierre a técnico y solicitante/supervisor (evento importante, no ruido)
+      const { triggerTicketClosedEmail } = await import('@/lib/email-triggers')
+      void triggerTicketClosedEmail(ticketId, session.user.id)
     }
 
     // Invalidar caché de tickets y dashboard
