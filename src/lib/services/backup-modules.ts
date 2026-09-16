@@ -31,7 +31,7 @@ export const BACKUP_MODULE_REGISTRY: Record<BackupModuleId, BackupModuleDefiniti
     id: 'tickets',
     label: 'Tickets',
     description:
-      'Tickets, comentarios, adjuntos, historial, colaboradores, calificaciones, planes de resolución, enlaces a conocimiento y notificaciones ligadas al ticket.',
+      'Tickets, comentarios, adjuntos, historial, colaboradores, calificaciones, planes de resolución, enlaces a conocimiento, notificaciones ligadas al ticket, cola pendiente del digest de correo agrupado, seguimiento de SLA por ticket (deadlines, cumplimiento, violaciones) y configuración de tickets por familia (prefijo de código, horario laboral, techo de prioridad). No incluye el catálogo de políticas SLA globales/por familia.',
   },
   news: {
     id: 'news',
@@ -77,7 +77,7 @@ export const BACKUP_MODULE_REGISTRY: Record<BackupModuleId, BackupModuleDefiniti
     id: 'credentials',
     label: 'Credenciales',
     description:
-      'Bóvedas, entradas y compartidos del módulo Credenciales. Los secretos se exportan cifrados (AES-GCM / secretEncrypted); nunca en claro. Tras restaurar hace falta la misma ENCRYPTION_KEY del entorno original para poder revelar.',
+      'Bóvedas, entradas y compartidos del módulo Credenciales. Los secretos se exportan cifrados (AES-GCM / secretEncrypted); nunca en claro. Tras restaurar hace falta la misma ENCRYPTION_KEY del entorno original para poder revelar. Las entradas vinculadas a un equipo o licencia (equipmentId/licenseId) requieren que el módulo Inventario también esté restaurado (o ya exista) en el destino — de lo contrario esa referencia queda huérfana.',
   },
   processes: {
     id: 'processes',
@@ -105,7 +105,13 @@ export function isBackupModuleId(value: unknown): value is BackupModuleId {
 
 export const DEFAULT_BACKUP_CRON_SCOPE: 'full' | BackupModuleId = 'full'
 
-/** Orden de inserción respetando FKs típicas del módulo tickets (sin SLA policies globales). */
+/**
+ * Orden de inserción respetando FKs típicas del módulo tickets. Incluye el
+ * seguimiento de SLA propio de cada ticket (ticket_sla_metrics,
+ * sla_violations) pero NO el catálogo de políticas SLA globales/por familia
+ * (sla_policies vive en el módulo configurations/families, es config
+ * compartida, no dato de un ticket puntual).
+ */
 export const TICKETS_MODULE_RESTORE_ORDER = [
   'tickets',
   'comments',
@@ -119,6 +125,10 @@ export const TICKETS_MODULE_RESTORE_ORDER = [
   'article_votes',
   'ticket_knowledge_articles',
   'notifications',
+  'ticket_email_digest_items',
+  'ticket_sla_metrics',
+  'sla_violations',
+  'ticket_family_config',
 ] as const
 
 export type TicketsModuleTable = (typeof TICKETS_MODULE_RESTORE_ORDER)[number]
@@ -136,17 +146,24 @@ const EMPTY_TICKETS_PAYLOAD: Record<TicketsModuleTable, unknown[]> = {
   article_votes: [],
   ticket_knowledge_articles: [],
   notifications: [],
+  ticket_email_digest_items: [],
+  ticket_sla_metrics: [],
+  sla_violations: [],
+  ticket_family_config: [],
 }
 
 /**
  * Exporta solo datos del módulo tickets (JSON). No incluye catálogos (usuarios, categorías, etc.).
  */
 export async function exportTicketsModuleData(): Promise<Record<TicketsModuleTable, unknown[]>> {
+  // Config por familia, independiente de que existan tickets — no se filtra por ticketIds.
+  const ticket_family_config = await prisma.ticket_family_config.findMany()
+
   const tickets = await prisma.tickets.findMany()
   const ticketIds = tickets.map(t => t.id)
 
   if (ticketIds.length === 0) {
-    return { ...EMPTY_TICKETS_PAYLOAD }
+    return { ...EMPTY_TICKETS_PAYLOAD, ticket_family_config: ticket_family_config as unknown[] }
   }
 
   const [
@@ -158,6 +175,9 @@ export async function exportTicketsModuleData(): Promise<Record<TicketsModuleTab
     resolution_plans,
     ticket_knowledge_articles,
     notifications,
+    ticket_email_digest_items,
+    ticket_sla_metrics,
+    sla_violations,
   ] = await Promise.all([
     prisma.comments.findMany({ where: { ticketId: { in: ticketIds } } }),
     prisma.attachments.findMany({ where: { ticketId: { in: ticketIds } } }),
@@ -169,6 +189,9 @@ export async function exportTicketsModuleData(): Promise<Record<TicketsModuleTab
     prisma.notifications.findMany({
       where: { ticketId: { in: ticketIds } },
     }),
+    prisma.ticket_email_digest_items.findMany({ where: { ticketId: { in: ticketIds } } }),
+    prisma.ticket_sla_metrics.findMany({ where: { ticketId: { in: ticketIds } } }),
+    prisma.sla_violations.findMany({ where: { ticketId: { in: ticketIds } } }),
   ])
 
   const planIds = resolution_plans.map(p => p.id)
@@ -214,6 +237,10 @@ export async function exportTicketsModuleData(): Promise<Record<TicketsModuleTab
     article_votes: article_votes as unknown[],
     ticket_knowledge_articles: ticket_knowledge_articles as unknown[],
     notifications: notifications as unknown[],
+    ticket_email_digest_items: ticket_email_digest_items as unknown[],
+    ticket_sla_metrics: ticket_sla_metrics as unknown[],
+    sla_violations: sla_violations as unknown[],
+    ticket_family_config: ticket_family_config as unknown[],
   } as Record<TicketsModuleTable, unknown[]>
 }
 
@@ -311,18 +338,6 @@ export const PATROLS_MODULE_RESTORE_ORDER = [
 
 export type PatrolsModuleTable = (typeof PATROLS_MODULE_RESTORE_ORDER)[number]
 
-const EMPTY_PATROLS_PAYLOAD: Record<PatrolsModuleTable, unknown[]> = {
-  patrol_family_config: [],
-  patrol_checkpoints: [],
-  patrol_routes: [],
-  patrol_route_checkpoints: [],
-  patrol_schedules: [],
-  patrols: [],
-  patrol_check_ins: [],
-  patrol_incidents: [],
-  patrol_photos: [],
-}
-
 /**
  * Exporta solo datos del módulo patrols (JSON). */
 export async function exportPatrolsModuleData(): Promise<Record<PatrolsModuleTable, unknown[]>> {
@@ -336,7 +351,6 @@ export async function exportPatrolsModuleData(): Promise<Record<PatrolsModuleTab
     ])
 
   const routeIds = patrol_routes.map(r => r.id)
-  const scheduleIds = patrol_schedules.map(s => s.id)
   const patrolIds = patrols.map(p => p.id)
 
   const [patrol_route_checkpoints, patrol_check_ins, patrol_incidents, patrol_photos] =
@@ -382,13 +396,6 @@ export const FAMILIES_MODULE_RESTORE_ORDER = [
 
 export type FamiliesModuleTable = (typeof FAMILIES_MODULE_RESTORE_ORDER)[number]
 
-const EMPTY_FAMILIES_PAYLOAD: Record<FamiliesModuleTable, unknown[]> = {
-  families: [],
-  departments: [],
-  categories: [],
-  technician_assignments: [],
-}
-
 export async function exportFamiliesModuleData(): Promise<Record<FamiliesModuleTable, unknown[]>> {
   const [families, departments, categories] = await Promise.all([
     prisma.families.findMany(),
@@ -420,10 +427,6 @@ export const AUDITS_MODULE_RESTORE_ORDER = ['audit_logs'] as const
 
 export type AuditsModuleTable = (typeof AUDITS_MODULE_RESTORE_ORDER)[number]
 
-const EMPTY_AUDITS_PAYLOAD: Record<AuditsModuleTable, unknown[]> = {
-  audit_logs: [],
-}
-
 export async function exportAuditsModuleData(): Promise<Record<AuditsModuleTable, unknown[]>> {
   const audit_logs = await prisma.audit_logs.findMany()
   return { audit_logs: audit_logs as unknown[] }
@@ -452,17 +455,6 @@ export const CONFIGURATIONS_MODULE_RESTORE_ORDER = [
 ] as const
 
 export type ConfigurationsModuleTable = (typeof CONFIGURATIONS_MODULE_RESTORE_ORDER)[number]
-
-const EMPTY_CONFIGURATIONS_PAYLOAD: Record<ConfigurationsModuleTable, unknown[]> = {
-  system_settings: [],
-  system_modules: [],
-  site_config: [],
-  pages: [],
-  oauth_configs: [],
-  landing_page_content: [],
-  landing_page_services: [],
-  landing_page_banners: [],
-}
 
 export async function exportConfigurationsModuleData(): Promise<
   Record<ConfigurationsModuleTable, unknown[]>

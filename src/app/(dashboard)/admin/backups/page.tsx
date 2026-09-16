@@ -207,10 +207,6 @@ export default function BackupsPage() {
               <Download className='h-4 w-4 mr-2' />
               Exportar .dump portable
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => createBackup({ mode: 'module', module: 'processes' })}>
-              <Download className='h-4 w-4 mr-2' />
-              Exportar módulo Procesos (JSON)
-            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
