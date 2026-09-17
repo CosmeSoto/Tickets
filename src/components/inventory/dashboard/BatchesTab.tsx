@@ -20,6 +20,8 @@ import {
   Plus,
   RefreshCw,
   AlertCircle,
+  KeyRound,
+  FileText,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -27,7 +29,7 @@ import { resolveBrandName } from '@/lib/utils/equipment-display'
 import { BatchUtilizationAlerts } from '@/components/inventory/batch/BatchUtilizationAlerts'
 import { BatchUtilizationDashboard } from '@/components/inventory/batch/BatchUtilizationDashboard'
 
-interface BatchMetrics {
+interface EquipmentBatchMetrics {
   total: number
   available: number
   assigned: number
@@ -36,7 +38,8 @@ interface BatchMetrics {
   utilizationRate: number
 }
 
-interface BatchItem {
+interface EquipmentBatchItem {
+  kind: 'EQUIPMENT'
   id: string
   batchCode: string
   description: string | null
@@ -45,11 +48,35 @@ interface BatchItem {
   totalPrice: number
   purchaseDate: string
   status: string
-  metrics: BatchMetrics
+  metrics: EquipmentBatchMetrics
   model: { brand: string | { name?: string }; model: string; type?: { name: string } | null }
   supplier?: { name: string } | null
   department?: { name: string } | null
 }
+
+interface LicenseBatchMetrics {
+  total: number
+  available: number
+  assigned: number
+  utilizationRate: number
+}
+
+interface LicenseBatchItem {
+  kind: 'LICENSE'
+  id: string
+  batchCode: string
+  quantity: number
+  unitCost: number
+  totalCost: number
+  purchaseDate: string
+  metrics: LicenseBatchMetrics
+  hasContractLink: boolean
+  licenseType: { name: string }
+  supplier?: { name: string } | null
+  department?: { name: string } | null
+}
+
+type BatchItem = EquipmentBatchItem | LicenseBatchItem
 
 interface BatchesTabProps {
   canCreate?: boolean
@@ -67,14 +94,34 @@ export function BatchesTab({ canCreate = false, embedded = false }: BatchesTabPr
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch('/api/inventory/batches?limit=100')
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data.error || 'Error al cargar lotes')
+      const [equipmentRes, licenseRes] = await Promise.all([
+        fetch('/api/inventory/batches?limit=100'),
+        fetch('/api/inventory/license-batches?limit=100'),
+      ])
+      if (!equipmentRes.ok) {
+        const data = await equipmentRes.json().catch(() => ({}))
+        throw new Error(data.error || 'Error al cargar lotes de equipos')
       }
-      const data = await res.json()
-      const list = Array.isArray(data) ? data : (data.batches ?? [])
-      setBatches(list)
+      const equipmentData = await equipmentRes.json()
+      const equipmentList: EquipmentBatchItem[] = (
+        Array.isArray(equipmentData) ? equipmentData : (equipmentData.batches ?? [])
+      ).map((b: Omit<EquipmentBatchItem, 'kind'>) => ({ ...b, kind: 'EQUIPMENT' as const }))
+
+      // Sin acceso a licencias (rol restringido a familias sin licencias) no
+      // debe tumbar la pestaña entera — se listan igual los lotes de equipos.
+      let licenseList: LicenseBatchItem[] = []
+      if (licenseRes.ok) {
+        const licenseData = await licenseRes.json()
+        licenseList = (licenseData.batches ?? []).map((b: Omit<LicenseBatchItem, 'kind'>) => ({
+          ...b,
+          kind: 'LICENSE' as const,
+        }))
+      }
+
+      const merged = [...equipmentList, ...licenseList].sort(
+        (a, b) => new Date(b.purchaseDate).getTime() - new Date(a.purchaseDate).getTime()
+      )
+      setBatches(merged)
     } catch (err) {
       setBatches([])
       setError(err instanceof Error ? err.message : 'Error al cargar lotes')
@@ -101,7 +148,7 @@ export function BatchesTab({ canCreate = false, embedded = false }: BatchesTabPr
     <div className='space-y-4'>
       <div className='flex items-center justify-between gap-3'>
         <p className='text-sm text-muted-foreground'>
-          Lotes agrupan equipos de la misma compra o ingreso masivo.
+          Lotes agrupan equipos o licencias de la misma compra o ingreso masivo.
         </p>
         <div className='flex items-center gap-2 shrink-0'>
           <Button variant='outline' size='sm' onClick={load} className='gap-1.5'>
@@ -110,7 +157,8 @@ export function BatchesTab({ canCreate = false, embedded = false }: BatchesTabPr
           </Button>
           {batches.length > 0 && (
             <Button variant='outline' size='sm' asChild>
-              <Link href='/inventory/batches'>Ver todos</Link>
+              {/* Vista completa con filtros/paginación — solo equipos por ahora */}
+              <Link href='/inventory/batches'>Ver todos (equipos)</Link>
             </Button>
           )}
           {canCreate && !embedded && (
@@ -159,14 +207,14 @@ export function BatchesTab({ canCreate = false, embedded = false }: BatchesTabPr
 
       <BatchUtilizationDashboard />
 
-      {/* Lista de lotes */}
+      {/* Lista de lotes — equipos y licencias mezclados, distinguidos por ícono/badge */}
       {batches.length === 0 ? (
         <div className='text-center py-16 text-muted-foreground'>
           <div className='space-y-3'>
             <Layers className='h-12 w-12 mx-auto opacity-30' />
             <p className='font-medium'>No hay lotes registrados</p>
             <p className='text-sm'>
-              Los lotes agrupan múltiples equipos de la misma compra.
+              Un lote agrupa varias unidades idénticas de la misma compra — equipos o licencias.
               {canCreate && embedded && ' Usa el botón «Nuevo Lote» en la parte superior.'}
             </p>
           </div>
@@ -174,31 +222,53 @@ export function BatchesTab({ canCreate = false, embedded = false }: BatchesTabPr
       ) : (
         <div className='space-y-3'>
           {batches.map(batch => {
-            const brandName = resolveBrandName(batch.model.brand)
+            const isLicense = batch.kind === 'LICENSE'
+            const unitPrice = isLicense ? batch.unitCost : batch.unitPrice
+            const totalPrice = isLicense ? batch.totalCost : batch.totalPrice
+            const title = isLicense ? batch.licenseType.name : undefined
+            const detailHref = isLicense
+              ? `/inventory/batches/license/${batch.id}`
+              : `/inventory/batches/${batch.id}`
+            const metrics = isLicense
+              ? { ...batch.metrics, maintenance: 0, retired: 0 }
+              : batch.metrics
+
             return (
               <Card
-                key={batch.id}
+                key={`${batch.kind}-${batch.id}`}
                 className='cursor-pointer hover:shadow-md transition-all hover:border-primary/30'
-                onClick={() => router.push(`/inventory/batches/${batch.id}`)}
+                onClick={() => router.push(detailHref)}
               >
                 <CardContent className='p-5'>
                   <div className='flex items-start justify-between gap-4'>
                     <div className='flex-1 min-w-0'>
                       <div className='flex items-center gap-2 flex-wrap mb-1'>
-                        <Package className='h-4 w-4 text-primary shrink-0' />
+                        {isLicense ? (
+                          <KeyRound className='h-4 w-4 text-primary shrink-0' />
+                        ) : (
+                          <Package className='h-4 w-4 text-primary shrink-0' />
+                        )}
                         <span className='font-semibold font-mono'>{batch.batchCode}</span>
                         <Badge variant='secondary' className='text-xs'>
-                          {batch.quantity} unidades
+                          {batch.quantity} {isLicense ? 'licencias' : 'unidades'}
                         </Badge>
-                        {batch.model.type?.name && (
+                        {!isLicense && batch.model.type?.name && (
                           <Badge variant='outline' className='text-xs'>
                             {batch.model.type.name}
+                          </Badge>
+                        )}
+                        {isLicense && batch.hasContractLink && (
+                          <Badge variant='outline' className='text-xs gap-1'>
+                            <FileText className='h-3 w-3' />
+                            Con contrato
                           </Badge>
                         )}
                       </div>
 
                       <p className='text-sm font-medium text-foreground mb-1'>
-                        {brandName} {batch.model.model}
+                        {isLicense
+                          ? title
+                          : `${resolveBrandName(batch.model.brand)} ${batch.model.model}`}
                       </p>
 
                       <div className='flex items-center gap-4 text-xs text-muted-foreground flex-wrap'>
@@ -208,12 +278,12 @@ export function BatchesTab({ canCreate = false, embedded = false }: BatchesTabPr
                           <Calendar className='h-3 w-3' />
                           {format(new Date(batch.purchaseDate), 'dd MMM yyyy', { locale: es })}
                         </span>
-                        {batch.unitPrice > 0 && (
+                        {unitPrice > 0 && (
                           <span className='flex items-center gap-1'>
-                            <DollarSign className='h-3 w-3' />${batch.unitPrice.toFixed(2)} c/u
+                            <DollarSign className='h-3 w-3' />${unitPrice.toFixed(2)} c/u
                             {batch.quantity > 1 && (
                               <span className='text-muted-foreground/70'>
-                                · Total ${batch.totalPrice.toFixed(2)}
+                                · Total ${totalPrice.toFixed(2)}
                               </span>
                             )}
                           </span>
@@ -230,7 +300,7 @@ export function BatchesTab({ canCreate = false, embedded = false }: BatchesTabPr
                         <UserCheck className='h-3.5 w-3.5' />
                         <span className='font-semibold'>{batch.metrics?.assigned ?? 0}</span>
                       </div>
-                      {(batch.metrics?.maintenance ?? 0) > 0 && (
+                      {!isLicense && batch.metrics.maintenance > 0 && (
                         <div
                           className='flex items-center gap-1 text-yellow-600'
                           title='Mantenimiento'
@@ -239,7 +309,7 @@ export function BatchesTab({ canCreate = false, embedded = false }: BatchesTabPr
                           <span className='font-semibold'>{batch.metrics.maintenance}</span>
                         </div>
                       )}
-                      {(batch.metrics?.retired ?? 0) > 0 && (
+                      {!isLicense && batch.metrics.retired > 0 && (
                         <div
                           className='flex items-center gap-1 text-muted-foreground'
                           title='Retirados'
@@ -251,27 +321,33 @@ export function BatchesTab({ canCreate = false, embedded = false }: BatchesTabPr
                     </div>
                   </div>
 
-                  {batch.metrics && batch.metrics.total > 0 && (
+                  {isLicense && batch.hasContractLink && (
+                    <p className='mt-2 text-xs text-muted-foreground'>
+                      Renovación gestionada por el contrato vinculado — no aplica «Renovar lote».
+                    </p>
+                  )}
+
+                  {metrics.total > 0 && (
                     <div className='mt-3 space-y-3'>
                       <div>
                         <div className='flex justify-between text-xs text-muted-foreground mb-1'>
                           <span>Utilización</span>
-                          <span>{batch.metrics.utilizationRate.toFixed(0)}%</span>
+                          <span>{metrics.utilizationRate.toFixed(0)}%</span>
                         </div>
                         <div className='h-1.5 bg-muted rounded-full overflow-hidden'>
                           <div
                             className={`h-full rounded-full transition-all ${
-                              batch.metrics.utilizationRate > 90
+                              metrics.utilizationRate > 90
                                 ? 'bg-red-500'
-                                : batch.metrics.utilizationRate > 70
+                                : metrics.utilizationRate > 70
                                   ? 'bg-yellow-500'
                                   : 'bg-green-500'
                             }`}
-                            style={{ width: `${Math.min(batch.metrics.utilizationRate, 100)}%` }}
+                            style={{ width: `${Math.min(metrics.utilizationRate, 100)}%` }}
                           />
                         </div>
                       </div>
-                      <BatchUtilizationAlerts metrics={batch.metrics} />
+                      <BatchUtilizationAlerts metrics={metrics} />
                     </div>
                   )}
                 </CardContent>

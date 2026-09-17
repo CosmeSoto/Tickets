@@ -13,8 +13,8 @@ import { ArrowLeft, Loader2 } from 'lucide-react'
  *
  * BulkEquipmentForm resuelve internamente el subtipo (equipo, licencia o suministro)
  * leyendo el config de la familia elegida — misma familia puede tener los tres. Para
- * LICENSE usa BulkLicenseForm puertas adentro, pensado para unidades que varían entre
- * sí (tipo/plan y colaborador asignado) en vez del modelo "unidades idénticas".
+ * LICENSE usa el mismo LicenseAssetForm de siempre (mode="batch"): N licencias
+ * idénticas (mismo tipo/costo/renovación), generadas y asignables después una por una.
  */
 export default function NewBulkEquipmentPage() {
   const { data: session, status } = useAuthReady()

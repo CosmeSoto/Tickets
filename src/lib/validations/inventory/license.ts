@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { INVOICE_NUMBER_PATTERN, INVOICE_NUMBER_ERROR } from '@/lib/inventory/invoice-number'
 
 /** '' → undefined (campos texto/fecha/dinero opcionales) */
-const emptyToUndef = (v: unknown) => (v === '' || v === null ? undefined : v)
+export const emptyToUndef = (v: unknown) => (v === '' || v === null ? undefined : v)
 
 /** '' → null para IDs opcionales (permite desasignar con null) */
 const emptyToNull = (v: unknown) => (v === '' ? null : v)

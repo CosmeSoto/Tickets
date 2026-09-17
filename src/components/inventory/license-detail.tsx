@@ -424,8 +424,9 @@ export function LicenseDetail({ licenseId, userRole, isSuperAdmin = false }: Pro
         </div>
       )}
 
-      {/* Parte de un lote (ver plan) — sin pantalla propia, todo desde acá:
-          info del lote + acción de renovarlo completo. */}
+      {/* Parte de un lote — resumen rápido acá + acción de renovarlo completo;
+          el detalle completo (todas las licencias del lote) vive en su propia
+          ficha, ver /inventory/batches/license/[id] (LicenseBatchDetail). */}
       {batchInfo && (
         <div className='rounded-lg border px-4 py-3 text-sm flex items-start justify-between gap-3 border-border bg-muted/30'>
           <div className='flex items-start gap-2'>
@@ -442,17 +443,27 @@ export function LicenseDetail({ licenseId, userRole, isSuperAdmin = false }: Pro
               </p>
             </div>
           </div>
-          {canEdit && !batchInfo.hasContractLink && (
+          <div className='flex items-center gap-2 shrink-0'>
             <Button
               type='button'
-              variant='outline'
+              variant='ghost'
               size='sm'
-              onClick={() => setShowRenewBatchDialog(true)}
+              onClick={() => router.push(`/inventory/batches/license/${batchInfo.batch.id}`)}
             >
-              <RefreshCw className='h-3.5 w-3.5 mr-1.5' />
-              Renovar lote completo
+              Ver lote completo
             </Button>
-          )}
+            {canEdit && !batchInfo.hasContractLink && (
+              <Button
+                type='button'
+                variant='outline'
+                size='sm'
+                onClick={() => setShowRenewBatchDialog(true)}
+              >
+                <RefreshCw className='h-3.5 w-3.5 mr-1.5' />
+                Renovar lote completo
+              </Button>
+            )}
+          </div>
         </div>
       )}
 

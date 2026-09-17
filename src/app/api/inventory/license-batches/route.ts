@@ -2,14 +2,70 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { z } from 'zod'
-import { createLicenseBatch } from '@/lib/services/license-batches.service'
+import { createLicenseBatch, listLicenseBatches } from '@/lib/services/license-batches.service'
 import {
   assertInventoryManageByFamily,
   InventoryAccessError,
   inventoryAccessToResponse,
   toInventoryAccessUser,
 } from '@/lib/inventory/inventory-resource-access'
+import { getInventorySessionContext } from '@/lib/inventory/inventory-session'
 import { isValidInvoiceNumber, INVOICE_NUMBER_ERROR } from '@/lib/inventory/invoice-number'
+import { emptyToUndef } from '@/lib/validations/inventory/license'
+
+/**
+ * GET /api/inventory/license-batches
+ * Lista lotes de licencias — misma restricción de acceso y el mismo criterio
+ * de scoping por familia que GET /api/inventory/batches (equipos).
+ */
+export async function GET(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
+    const role = session.user.role
+    const userId = session.user.id
+    const invCtx = await getInventorySessionContext(session.user)
+    const isSuperAdmin = invCtx.user.isSuperAdmin
+
+    if (role !== 'ADMIN' && !invCtx.canManageInventory) {
+      return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
+    }
+
+    let allowedFamilyIds: string[] | null = null
+
+    if (role === 'ADMIN' && !isSuperAdmin) {
+      const { getModuleFamilyIds } = await import('@/lib/auth/admin-scope')
+      const invFamilyIds = await getModuleFamilyIds(userId, 'inventory')
+      allowedFamilyIds = invFamilyIds.length > 0 ? invFamilyIds : []
+    } else if (role !== 'ADMIN' && invCtx.canManageInventory) {
+      const { resolveModuleFamilyScopeIds } = await import('@/lib/auth/user-family-access')
+      allowedFamilyIds = await resolveModuleFamilyScopeIds(userId, 'inventory', 'canOperate')
+    }
+
+    const searchParams = request.nextUrl.searchParams
+    const page = parseInt(searchParams.get('page') || '1', 10)
+    const limit = parseInt(searchParams.get('limit') || '50', 10)
+    const licenseTypeId = searchParams.get('licenseTypeId') || undefined
+    const supplierId = searchParams.get('supplierId') || undefined
+
+    const result = await listLicenseBatches({
+      page,
+      limit,
+      licenseTypeId,
+      supplierId,
+      allowedFamilyIds: allowedFamilyIds ?? undefined,
+    })
+
+    return NextResponse.json(result)
+  } catch (error) {
+    console.error('Error en GET /api/inventory/license-batches:', error)
+    const message = error instanceof Error ? error.message : 'Error al listar lotes de licencias'
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
+}
 
 const createLicenseBatchSchema = z.object({
   familyId: z.string().min(1),
@@ -34,11 +90,19 @@ const createLicenseBatchSchema = z.object({
     .optional()
     .transform(val => (val ? new Date(val) : undefined)),
   renewalCost: z.number().min(0).optional(),
-  renewalFrequency: z.enum(['MONTHLY', 'QUARTERLY', 'SEMIANNUAL', 'ANNUAL', 'CUSTOM']).optional(),
-  customFrequencyMonths: z.number().int().min(1).optional(),
-  acquisitionType: z
-    .enum(['SOFTWARE', 'SERVICE_EXTERNAL', 'MAINTENANCE', 'INSURANCE', 'SLA'])
-    .optional(),
+  // LicenseAssetForm (mismo formulario en modo lote) envía estos tres como
+  // `null` explícito cuando no aplican (contrato vinculado, hasRecurring,
+  // sin frecuencia) — igual que createLicenseSchema, se normaliza con
+  // emptyToUndef antes de validar en vez de solo .optional() (que rechaza null).
+  renewalFrequency: z.preprocess(
+    emptyToUndef,
+    z.enum(['MONTHLY', 'QUARTERLY', 'SEMIANNUAL', 'ANNUAL', 'CUSTOM']).optional()
+  ),
+  customFrequencyMonths: z.preprocess(emptyToUndef, z.number().int().min(1).optional()),
+  acquisitionType: z.preprocess(
+    emptyToUndef,
+    z.enum(['SOFTWARE', 'SERVICE_EXTERNAL', 'MAINTENANCE', 'INSURANCE', 'SLA']).optional()
+  ),
   notes: z.string().max(2000).optional(),
   /** Si viene, cada licencia generada se vincula a este contrato (una línea
    * por licencia) — ver createLicenseBatch. */

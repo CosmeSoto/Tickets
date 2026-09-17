@@ -58,6 +58,11 @@ interface LicenseAssetFormProps {
   isEditMode?: boolean
   initialLicense?: Record<string, unknown>
   licenseId?: string
+  /** 'individual' (default): una sola licencia, como siempre. 'batch': viene
+   * desde "Lote de activos" — pide Cantidad y genera N licencias idénticas
+   * (ver license-batches.service.ts). Nunca cambia dinámicamente durante el
+   * uso del formulario — lo decide la pantalla que lo invoca. */
+  mode?: 'individual' | 'batch'
 }
 
 type Scope = 'Individual' | 'Departamento' | 'Empresa'
@@ -144,6 +149,7 @@ export function LicenseAssetForm({
   isEditMode = false,
   initialLicense,
   licenseId,
+  mode = 'individual',
 }: LicenseAssetFormProps) {
   const { toast } = useToast()
   const { data: session } = useSession()
@@ -163,9 +169,9 @@ export function LicenseAssetForm({
   const [attributesReloadToken, setAttributesReloadToken] = useState(0)
   const [licenseKey, setLicenseKey] = useState('')
   const [scope, setScope] = useState<Scope>('Empresa')
-  /** Cantidad > 1 crea un lote (N licencias idénticas, sin asignar) en vez de
-   * una sola — mismo formulario, ver isBatchMode más abajo. */
-  const [quantity, setQuantity] = useState('1')
+  /** Solo se pide/usa cuando mode === 'batch' (ver isBatchMode más abajo) —
+   * genera N licencias idénticas, sin asignar, en vez de una sola. */
+  const [quantity, setQuantity] = useState(mode === 'batch' ? '2' : '1')
   const [userId, setUserId] = useState('')
   const [departmentId, setDepartmentId] = useState('')
   /** En edición: no guardar borrador hasta hidratar desde el servidor */
@@ -201,7 +207,7 @@ export function LicenseAssetForm({
 
   const isVisible = (section: string) => familyConfig.visibleSections.includes(section as never)
   const isRequired = (section: string) => familyConfig.requiredSections.includes(section as never)
-  const isBatchMode = !isEditMode && (parseInt(quantity, 10) || 1) > 1
+  const isBatchMode = mode === 'batch'
 
   const draftKey =
     isEditMode && licenseId
@@ -463,6 +469,10 @@ export function LicenseAssetForm({
       toast({ title: 'Selecciona el tipo de licencia', variant: 'destructive' })
       return
     }
+    if (isBatchMode && (parseInt(quantity, 10) || 0) < 2) {
+      toast({ title: 'La cantidad del lote debe ser 2 o más', variant: 'destructive' })
+      return
+    }
     // En alta: asignación obligatoria. En edición se puede completar luego con «Asignar».
     // En modo lote no aplica: las N licencias nacen sin asignar y se reparten
     // después, una por una, con el mismo botón «Asignar» de siempre.
@@ -492,7 +502,7 @@ export function LicenseAssetForm({
 
     const payload: Record<string, unknown> = {
       name: name.trim(),
-      quantity: isBatchMode ? parseInt(quantity, 10) || 1 : undefined,
+      quantity: isBatchMode ? parseInt(quantity, 10) || 2 : undefined,
       licenseTypeId: licenseTypeId || undefined,
       typeId: licenseTypeId || undefined,
       key: licenseKey || undefined,
@@ -665,20 +675,19 @@ export function LicenseAssetForm({
             </p>
           </div>
 
-          {!isEditMode && (
+          {isBatchMode && (
             <div className='space-y-1'>
               <Label>Cantidad</Label>
               <Input
                 type='number'
-                min={1}
+                min={2}
                 max={500}
                 value={quantity}
                 onChange={e => setQuantity(e.target.value)}
               />
               <p className='text-xs text-muted-foreground pt-1'>
-                {isBatchMode
-                  ? `Se crearán ${parseInt(quantity, 10) || 1} licencias idénticas, sin asignar — asígnalas después una por una.`
-                  : 'Más de 1 crea un lote (ej. "34 licencias de Microsoft 365") en vez de una sola licencia.'}
+                Se crearán {parseInt(quantity, 10) || 2} licencias idénticas, sin asignar —
+                asígnalas después una por una.
               </p>
             </div>
           )}
@@ -690,6 +699,64 @@ export function LicenseAssetForm({
           onChange={setCustomFieldValues}
           reloadToken={attributesReloadToken}
         />
+
+        {isVisible('CONTRACT') && (
+          <div className='rounded-lg border border-border p-4 space-y-3'>
+            <label className='flex items-center gap-3 cursor-pointer select-none'>
+              <button
+                type='button'
+                role='switch'
+                aria-checked={hasRecurring}
+                onClick={() => setHasRecurring(v => !v)}
+                className={`relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${hasRecurring ? 'bg-primary' : 'bg-muted'}`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-lg transition-transform ${hasRecurring ? 'translate-x-4' : 'translate-x-0'}`}
+                />
+              </button>
+              <div>
+                <span className='text-sm font-medium flex items-center gap-1.5'>
+                  <RefreshCw className='h-3.5 w-3.5 text-muted-foreground' />
+                  ¿Tiene contrato?
+                </span>
+                <p className='text-xs text-muted-foreground'>
+                  Activalo para vincular un contrato del módulo de Contratos.
+                </p>
+              </div>
+            </label>
+
+            {hasRecurring && (
+              <div className='space-y-2'>
+                <Label>
+                  Contrato vinculado{' '}
+                  <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
+                </Label>
+                <ContractPicker
+                  value={linkedContractId}
+                  onChange={handleContractChange}
+                  onLinkCost={setLinkCost}
+                  supplierId={supplierId || null}
+                  familyId={familyId}
+                  context='license'
+                  prefill={contractPrefill}
+                  draftParentKey={draftKey}
+                />
+                {linkedContract && contractFinancial && (
+                  <p className='text-xs text-muted-foreground'>
+                    Costo tomado del contrato:{' '}
+                    <span className='font-mono font-medium text-foreground'>
+                      {formatContractAmount(
+                        contractFinancial.displayAmount,
+                        contractFinancial.currency
+                      )}
+                    </span>{' '}
+                    — se usará como costo de renovación.
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         <div className='grid grid-cols-1 md:grid-cols-2 gap-3'>
           {!isBatchMode && (
@@ -744,7 +811,7 @@ export function LicenseAssetForm({
             <p className='text-xs text-muted-foreground'>
               {linkedContract
                 ? `Viene de la categoría del contrato vinculado${acquisitionType ? `: ${LICENSE_ACQUISITION_TYPE_LABELS[acquisitionType] ?? acquisitionType}` : ''}.`
-                : 'Es solo una clasificación de la licencia; no crea ni requiere un contrato formal. Para vincular un contrato real, usa la sección de abajo.'}
+                : 'Es solo una clasificación; no requiere contrato.'}
             </p>
           </div>
 
@@ -812,91 +879,6 @@ export function LicenseAssetForm({
             </div>
           )}
         </div>
-
-        {isVisible('CONTRACT') && (
-          <div className='rounded-lg border border-border p-4 space-y-3'>
-            <p className='text-xs text-muted-foreground'>
-              El contrato es la fuente de verdad para costos y vigencia. Los campos financieros
-              duplicados se ocultan al vincular. Use <strong>Completar</strong> para abrir el
-              formulario completo sin salir.
-            </p>
-            <label className='flex items-center gap-3 cursor-pointer select-none'>
-              <button
-                type='button'
-                role='switch'
-                aria-checked={hasRecurring}
-                onClick={() => setHasRecurring(v => !v)}
-                className={`relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${hasRecurring ? 'bg-primary' : 'bg-muted'}`}
-              >
-                <span
-                  className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-lg transition-transform ${hasRecurring ? 'translate-x-4' : 'translate-x-0'}`}
-                />
-              </button>
-              <div>
-                <span className='text-sm font-medium flex items-center gap-1.5'>
-                  <RefreshCw className='h-3.5 w-3.5 text-muted-foreground' />
-                  Tiene suscripción / pago recurrente
-                </span>
-                <p className='text-xs text-muted-foreground'>
-                  Activa si el software se paga mensual o anualmente (SaaS, arrendamiento)
-                </p>
-              </div>
-            </label>
-
-            {hasRecurring ? (
-              <>
-                <p className='text-xs text-muted-foreground rounded-md bg-muted/40 px-3 py-2'>
-                  {isBatchMode
-                    ? 'Las licencias de este lote tienen pago recurrente. Vincula el contrato del módulo de Contratos — quedará una línea del contrato por cada licencia generada, para mantener trazabilidad financiera y operativa.'
-                    : 'Esta licencia tiene pago recurrente. Vincula el contrato del módulo de Contratos para mantener trazabilidad financiera y operativa.'}
-                </p>
-
-                <div className='space-y-2'>
-                  <Label>
-                    Contrato vinculado{' '}
-                    <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
-                  </Label>
-                  <ContractPicker
-                    value={linkedContractId}
-                    onChange={handleContractChange}
-                    onLinkCost={setLinkCost}
-                    supplierId={supplierId || null}
-                    familyId={familyId}
-                    context='license'
-                    prefill={contractPrefill}
-                    draftParentKey={draftKey}
-                  />
-                </div>
-              </>
-            ) : (
-              <p className='text-xs text-muted-foreground rounded-md bg-muted/40 px-3 py-2'>
-                Sin pago recurrente no hay contrato que vincular — seguí completando los datos de
-                abajo (frecuencia de renovación, costo, fechas).
-              </p>
-            )}
-
-            {hasRecurring &&
-              (linkedContract && contractFinancial ? (
-                <div className='rounded-md border bg-muted/30 px-3 py-2.5 space-y-1'>
-                  <p className='text-xs text-muted-foreground'>{contractFinancial.amountLabel}</p>
-                  <p className='text-sm font-medium font-mono'>
-                    {formatContractAmount(
-                      contractFinancial.displayAmount,
-                      contractFinancial.currency
-                    )}
-                  </p>
-                  <p className='text-[11px] text-muted-foreground'>
-                    Tomado automáticamente del contrato vinculado. Se guardará como costo de
-                    renovación.
-                  </p>
-                </div>
-              ) : (
-                <p className='text-xs text-muted-foreground rounded-md bg-muted/40 px-3 py-2'>
-                  Vincula un contrato para cargar el costo automáticamente según el pago recurrente.
-                </p>
-              ))}
-          </div>
-        )}
 
         {isVisible('FINANCIAL') &&
           (() => {
@@ -970,7 +952,9 @@ export function LicenseAssetForm({
                     else if (field === 'purchaseDate') setPurchaseDate(value ?? '')
                     else if (field === 'expirationDate') {
                       setExpirationDate(value ?? '')
-                      setExpirationDateTouched(true)
+                      // Vaciar el campo (botón "X") reactiva el auto-cálculo — solo
+                      // elegir una fecha puntual cuenta como edición manual real.
+                      setExpirationDateTouched(!!value)
                     } else if (field === 'invoiceNumber') setInvoiceNumber(value ?? '')
                     else if (field === 'purchaseOrderNumber') setPurchaseOrderNumber(value ?? '')
                     else if (field === 'renewalCost')

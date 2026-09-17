@@ -116,31 +116,6 @@ export function UnifiedAssetForm({
     setSubmitting(true)
     setSubmitError(null)
     try {
-      // Lote de licencias: mismo formulario, endpoint distinto — el usuario
-      // solo ve un campo "Cantidad" más, no una pantalla separada.
-      if (selectedSubtype === 'LICENSE' && Number(payload.quantity) > 1) {
-        // El formulario usa "cost" (mismo nombre para alta individual y
-        // edición); el endpoint de lote lo llama "unitCost" (costo por
-        // licencia, ya que totalCost = unitCost × cantidad).
-        const { cost, ...batchPayload } = payload
-        const res = await fetch('/api/inventory/license-batches', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...batchPayload, unitCost: cost, familyId: selectedFamilyId }),
-        })
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}))
-          const errorMessage = data.error ?? 'Error al crear el lote de licencias.'
-          setSubmitError(errorMessage)
-          toast.error(errorMessage, { description: 'Inténtalo de nuevo' })
-          return
-        }
-        const result = await res.json()
-        toast.success(result.summary?.message ?? 'Lote de licencias creado exitosamente')
-        setTimeout(() => onSuccess?.(result.batch), 1500)
-        return
-      }
-
       const attachments = (payload.attachments as File[] | undefined) ?? []
       const jsonPayload: Record<string, unknown> = {
         ...payload,

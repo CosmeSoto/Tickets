@@ -23,9 +23,7 @@ import {
   SlidersHorizontal,
   Check,
   Printer,
-  Package,
 } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
 import { MetricsSection } from '@/components/inventory/dashboard/metrics-section'
 import { AlertsSection } from '@/components/inventory/dashboard/alerts-section'
 import { useInventoryList } from '@/hooks/inventory/use-inventory-list'
@@ -589,13 +587,11 @@ export function UnifiedInventoryList({
                           batchCode={asset.batchCode ?? undefined}
                         />
                       ) : asset.subtype === 'LICENSE' && asset.batchId ? (
-                        // Sin pantalla propia de lotes de licencias (ver plan) — el
-                        // badge es informativo, el detalle está en la ficha de la
-                        // licencia ("Parte del lote"), no una navegación aparte.
-                        <Badge variant='secondary' className='flex w-fit items-center gap-1'>
-                          <Package className='h-3 w-3' />
-                          {asset.batchCode}
-                        </Badge>
+                        <BatchBadge
+                          batchId={asset.batchId}
+                          batchCode={asset.batchCode ?? undefined}
+                          onClick={() => router.push(`/inventory/batches/license/${asset.batchId}`)}
+                        />
                       ) : (
                         <span className='text-xs text-muted-foreground'>—</span>
                       )}

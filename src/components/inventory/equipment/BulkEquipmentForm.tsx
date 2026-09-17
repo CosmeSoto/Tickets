@@ -39,7 +39,7 @@ import { StepHeader } from '@/components/inventory/shared/StepHeader'
 import { FinancialInfoSection } from '@/components/inventory/shared/FinancialInfoSection'
 import { SupplierSelect } from '@/components/inventory/suppliers/SupplierSelect'
 import { BulkMROForm } from '@/components/inventory/equipment/BulkMROForm'
-import { BulkLicenseForm } from '@/components/inventory/license/BulkLicenseForm'
+import { LicenseAssetForm } from '@/components/inventory/asset-forms/LicenseAssetForm'
 import { AccessoriesSection } from '@/components/inventory/shared/AccessoriesSection'
 import { TypeAttributesInput } from '@/components/inventory/custom-fields/type-attributes-input'
 import { WarehouseInlineForm } from '@/components/inventory/asset-forms/WarehouseInlineForm'
@@ -344,6 +344,40 @@ export function BulkEquipmentForm({
         setSelectedFamilyCode(null)
         setFamilyConfig(null)
       }
+    }
+  }
+
+  // Lote de licencias idénticas — mismo formulario de licencia de siempre
+  // (LicenseAssetForm mode="batch"), endpoint distinto. No hay pantalla de
+  // "Lotes" para licencias (ver plan), así que al terminar se navega directo
+  // al listado de Inventario en vez de a la pestaña "Lotes" (solo equipos).
+  const handleLicenseBatchSubmit = async (payload: Record<string, unknown>) => {
+    setIsSubmitting(true)
+    setError(null)
+    try {
+      // El formulario usa "cost" (mismo nombre para alta individual y
+      // edición); el endpoint de lote lo llama "unitCost".
+      const { cost, ...batchPayload } = payload
+      const res = await fetch('/api/inventory/license-batches', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...batchPayload, unitCost: cost, familyId: selectedFamilyId }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        const message = data.error ?? 'Error al crear el lote de licencias.'
+        setError(message)
+        toast.error(message, { description: 'Inténtalo de nuevo' })
+        return
+      }
+      const result = await res.json()
+      toast.success(result.summary?.message ?? 'Lote de licencias creado exitosamente')
+      setTimeout(() => router.push('/inventory'), 1500)
+    } catch {
+      setError('Error de conexión.')
+      toast.error('Error de conexión.')
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -709,28 +743,30 @@ export function BulkEquipmentForm({
     )
   }
 
-  // Para LICENSE: alta masiva de licencias (unidades que varían entre sí)
+  // Para LICENSE: lote de N licencias idénticas (mismo tipo/costo/renovación,
+  // generadas y asignables después una por una) — mismo formulario de
+  // licencia de siempre, con mode="batch" (ver LicenseAssetForm).
   if (step === 3 && selectedSubtype === 'LICENSE' && familyConfig) {
     return (
       <div className='space-y-6'>
         <StepHeader
           mode='bulk'
           step={3}
-          description='Cada licencia puede tener su propio plan y colaborador asignado.'
+          description='Todas las licencias del lote comparten tipo, costo y renovación.'
           familyName={selectedFamily?.name}
           familyColor={selectedFamily?.color}
           subtypeName={selectedSubtype}
           backLabel='Cambiar tipo'
           onBack={handleBack}
         />
-        <BulkLicenseForm
+        <LicenseAssetForm
+          mode='batch'
           familyId={selectedFamilyId!}
-          // A diferencia del lote de equipos, las licencias no crean un
-          // equipment_batches — el onSuccess del padre redirige (con delay) a
-          // la pestaña "Lotes" (?tab=batches), que no las mostraría. Por eso
-          // NO se reenvía el onSuccess del padre acá; se navega directo.
-          onSuccess={() => router.push('/inventory')}
-          onCancel={handleBack}
+          familyConfig={familyConfig}
+          submitting={isSubmitting}
+          submitError={error}
+          onBack={handleBack}
+          onSubmit={payload => void handleLicenseBatchSubmit(payload)}
         />
       </div>
     )

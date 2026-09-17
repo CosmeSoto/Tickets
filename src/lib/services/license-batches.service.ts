@@ -6,6 +6,7 @@
  * se crea desde el mismo formulario de licencia (campo "Cantidad").
  */
 import prisma from '@/lib/prisma'
+import { Prisma } from '@prisma/client'
 import { generateAssetCode } from '@/lib/inventory/asset-code-generator'
 import { applyLicenseRenewalUpdate } from '@/lib/inventory/license-renewal'
 import { linkLicenseToBusinessContract } from '@/lib/inventory/license-contract'
@@ -307,4 +308,109 @@ export async function renewLicenseBatch(
   }
 
   return { updatedCount: linkedLicenses.length }
+}
+
+/**
+ * Lista lotes de licencias con paginación — contraparte de listBatches()
+ * (equipment-batches.service.ts) para la pestaña "Lotes". Sin estados de
+ * equipo (MAINTENANCE/RETIRED): una licencia solo está asignada o disponible.
+ */
+export async function listLicenseBatches(params: {
+  page?: number
+  limit?: number
+  licenseTypeId?: string
+  supplierId?: string
+  /** Si se pasa, filtra solo lotes cuyo tipo de licencia pertenece a esas familias */
+  allowedFamilyIds?: string[]
+}) {
+  const { page = 1, limit = 50, licenseTypeId, supplierId, allowedFamilyIds } = params
+
+  const where: Prisma.license_batchesWhereInput = {
+    ...(licenseTypeId && { licenseTypeId }),
+    ...(supplierId && { supplierId }),
+    ...(allowedFamilyIds &&
+      allowedFamilyIds.length > 0 && {
+        licenseType: { familyId: { in: allowedFamilyIds } },
+      }),
+  }
+
+  const [batches, total] = await Promise.all([
+    prisma.license_batches.findMany({
+      where,
+      include: {
+        licenseType: { select: { id: true, name: true, familyId: true } },
+        supplier: { select: { id: true, name: true } },
+        department: { select: { id: true, name: true } },
+      },
+      orderBy: { purchaseDate: 'desc' },
+      skip: (page - 1) * limit,
+      take: limit,
+    }),
+    prisma.license_batches.count({ where }),
+  ])
+
+  if (batches.length === 0) {
+    return { batches: [], pagination: { page, limit, total: 0, totalPages: 0 } }
+  }
+
+  // Métricas + estado de contrato en una sola query (sin N+1 por lote).
+  const batchIds = batches.map(b => b.id)
+  const licenses = await prisma.software_licenses.findMany({
+    where: { batchId: { in: batchIds } },
+    select: {
+      batchId: true,
+      assignedToUser: true,
+      assignedToDepartment: true,
+      assignedToEquipment: true,
+      contractLines: { select: { id: true }, take: 1 },
+    },
+  })
+
+  const metricsMap = new Map<
+    string,
+    { total: number; assigned: number; available: number; hasContractLink: boolean }
+  >()
+  for (const license of licenses) {
+    if (!license.batchId) continue
+    if (!metricsMap.has(license.batchId)) {
+      metricsMap.set(license.batchId, {
+        total: 0,
+        assigned: 0,
+        available: 0,
+        hasContractLink: false,
+      })
+    }
+    const m = metricsMap.get(license.batchId)!
+    m.total += 1
+    if (license.assignedToUser || license.assignedToDepartment || license.assignedToEquipment) {
+      m.assigned += 1
+    } else {
+      m.available += 1
+    }
+    if (license.contractLines.length > 0) m.hasContractLink = true
+  }
+
+  const batchesWithMetrics = batches.map(batch => {
+    const m = metricsMap.get(batch.id) ?? {
+      total: 0,
+      assigned: 0,
+      available: 0,
+      hasContractLink: false,
+    }
+    return {
+      ...batch,
+      metrics: {
+        total: m.total,
+        assigned: m.assigned,
+        available: m.available,
+        utilizationRate: m.total > 0 ? (m.assigned / m.total) * 100 : 0,
+      },
+      hasContractLink: m.hasContractLink,
+    }
+  })
+
+  return {
+    batches: batchesWithMetrics,
+    pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+  }
 }
