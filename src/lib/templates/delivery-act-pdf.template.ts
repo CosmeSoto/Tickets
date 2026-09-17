@@ -9,7 +9,7 @@ import { getUploadDir } from '@/lib/upload-path'
 import { DEFAULT_SYSTEM_NAME } from '@/lib/branding-constants'
 import { getAppTimezone } from '@/lib/utils/date-utils'
 import { PAYMENT_METHOD_TYPE_LABELS, type PaymentMethodType } from '@/types/contracts'
-import { CONTRACT_TYPE_LABELS } from '@/lib/inventory/license-labels'
+import { LICENSE_ACQUISITION_TYPE_LABELS } from '@/lib/inventory/license-labels'
 
 async function readRawImageBuffer(url: string): Promise<Buffer | null> {
   if (url.startsWith('/')) {
@@ -292,9 +292,14 @@ export async function generateDeliveryActPDF(
       .fontSize(9)
       .font('Helvetica')
       .fillColor(C.text)
-      .text((snap.contractType && CONTRACT_TYPE_LABELS[snap.contractType]) || '—', ML, y, {
-        width: halfW,
-      })
+      .text(
+        (snap.acquisitionType && LICENSE_ACQUISITION_TYPE_LABELS[snap.acquisitionType]) || '—',
+        ML,
+        y,
+        {
+          width: halfW,
+        }
+      )
     doc
       .fontSize(9)
       .font('Helvetica')

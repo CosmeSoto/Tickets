@@ -150,6 +150,7 @@ model departments {
   categories         categories[]
   equipment          equipment[]
   equipmentBatches   equipment_batches[] // Nueva relación con lotes
+  licenseBatches     license_batches[]
   family             families?             @relation(fields: [familyId], references: [id])
   licenses           software_licenses[]
   licenseAssignments license_assignments[]
@@ -592,6 +593,7 @@ model users {
   tasks_assigned                                    resolution_tasks[]               @relation("TaskAssignee")
   sessions                                          sessions[]
   licensesAssigned                                  software_licenses[]              @relation("LicenseUser")
+  licenseRenewalChanges                             license_renewal_history[]
   stockMovementsAssigned                            stock_movements[]                @relation("StockMovementAssignedTo")
   stockMovements                                    stock_movements[]                @relation("StockMovementUser")
   supplierEvaluations                               supplier_evaluations[]
@@ -620,6 +622,7 @@ model users {
   assetRequestsReviewed                             asset_requests[]                 @relation("AssetRequestReviewer")
   assetRequestsFulfilled                            asset_requests[]                 @relation("AssetRequestFulfiller")
   batchesReceived                                   equipment_batches[]              @relation("BatchReceiver")
+  licenseBatchesReceived                            license_batches[]
   patrolsAsAgent                                    patrols[]                        @relation("PatrolAgentExecution")
   patrolSchedulesAsAgent                            patrol_schedules[]               @relation("PatrolAgent")
   patrolCheckIns                                    patrol_check_ins[]               @relation("PatrolCheckInAgent")
@@ -1144,8 +1147,8 @@ model equipment_batches {
 }
 
 model equipment {
-  id   String @id @default(uuid())
-  code String @unique
+  id           String @id @default(uuid())
+  code         String @unique
   // Único cuando no está vacío: no puede ser `@unique` plano porque muchos
   // equipos legítimamente no tienen número de serie (campo requerido, se
   // guarda como ''). Constraint real aplicada por migración raw SQL
@@ -1468,6 +1471,7 @@ model license_types {
   family      families?                 @relation(fields: [familyId], references: [id])
   licenses    software_licenses[]
   attributes  license_type_attributes[]
+  batches     license_batches[]
 
   @@index([isActive, order])
   @@index([familyId])
@@ -1475,47 +1479,117 @@ model license_types {
 }
 
 model software_licenses {
-  id                    String                  @id @default(uuid())
-  code                  String                  @unique
-  name                  String
-  typeId                String                  @map("type_id")
-  key                   String?
-  purchaseDate          DateTime?               @map("purchase_date")
-  expirationDate        DateTime?               @map("expiration_date")
-  cost                  Float?
-  vendor                String?
-  notes                 String?
-  assignedToEquipment   String?                 @map("assigned_to_equipment")
-  assignedToUser        String?                 @map("assigned_to_user")
-  assignedToDepartment  String?                 @map("assigned_to_department")
-  supplierId            String?                 @map("supplier_id")
-  renewalCost           Float?                  @map("renewal_cost")
-  renewalDate           DateTime?               @map("renewal_date")
-  invoiceNumber         String?                 @map("invoice_number") @db.VarChar(100)
-  purchaseOrderNumber   String?                 @map("purchase_order_number") @db.VarChar(100)
-  licenseScope          LicenseScope?           @map("license_scope")
-  contractType          ContractType?           @map("contract_type")
-  customValues          Json?                   @map("custom_values")
-  createdAt             DateTime                @default(now()) @map("created_at")
-  updatedAt             DateTime                @updatedAt @map("updated_at")
-  decommission_requests decommission_requests[]
-  linkedEquipment       equipment[]             @relation("EquipmentContract")
-  attachments           license_attachments[]
-  department            departments?            @relation(fields: [assignedToDepartment], references: [id])
-  equipment             equipment?              @relation(fields: [assignedToEquipment], references: [id])
-  user                  users?                  @relation("LicenseUser", fields: [assignedToUser], references: [id])
-  supplier              suppliers?              @relation(fields: [supplierId], references: [id])
-  licenseType           license_types           @relation(fields: [typeId], references: [id])
-  contractLines         contract_lines[]        @relation("ContractLineLicense")
-  credentialEntries     credential_entries[]
-  assignments           license_assignments[]
-  invoices              license_invoices[]
+  id                          String                    @id @default(uuid())
+  code                        String                    @unique
+  name                        String
+  typeId                      String                    @map("type_id")
+  key                         String?
+  purchaseDate                DateTime?                 @map("purchase_date")
+  expirationDate              DateTime?                 @map("expiration_date")
+  cost                        Float?
+  vendor                      String?
+  notes                       String?
+  assignedToEquipment         String?                   @map("assigned_to_equipment")
+  assignedToUser              String?                   @map("assigned_to_user")
+  assignedToDepartment        String?                   @map("assigned_to_department")
+  supplierId                  String?                   @map("supplier_id")
+  renewalCost                 Float?                    @map("renewal_cost")
+  renewalDate                 DateTime?                 @map("renewal_date")
+  invoiceNumber               String?                   @map("invoice_number") @db.VarChar(100)
+  purchaseOrderNumber         String?                   @map("purchase_order_number") @db.VarChar(100)
+  licenseScope                LicenseScope?             @map("license_scope")
+  acquisitionType             LicenseAcquisitionType?   @map("acquisition_type")
+  renewalFrequency            LicenseRenewalFrequency?  @map("renewal_frequency")
+  customFrequencyMonths       Int?                      @map("custom_frequency_months")
+  expirationAlertFirstSentAt  DateTime?                 @map("expiration_alert_first_sent_at")
+  expirationAlertSecondSentAt DateTime?                 @map("expiration_alert_second_sent_at")
+  paymentAlertFirstSentAt     DateTime?                 @map("payment_alert_first_sent_at")
+  paymentAlertSecondSentAt    DateTime?                 @map("payment_alert_second_sent_at")
+  batchId                     String?                   @map("batch_id")
+  batchRenewalLinked          Boolean                   @default(true) @map("batch_renewal_linked")
+  customValues                Json?                     @map("custom_values")
+  createdAt                   DateTime                  @default(now()) @map("created_at")
+  updatedAt                   DateTime                  @updatedAt @map("updated_at")
+  decommission_requests       decommission_requests[]
+  linkedEquipment             equipment[]               @relation("EquipmentContract")
+  attachments                 license_attachments[]
+  department                  departments?              @relation(fields: [assignedToDepartment], references: [id])
+  equipment                   equipment?                @relation(fields: [assignedToEquipment], references: [id])
+  user                        users?                    @relation("LicenseUser", fields: [assignedToUser], references: [id])
+  supplier                    suppliers?                @relation(fields: [supplierId], references: [id])
+  licenseType                 license_types             @relation(fields: [typeId], references: [id])
+  batch                       license_batches?          @relation(fields: [batchId], references: [id])
+  contractLines               contract_lines[]          @relation("ContractLineLicense")
+  credentialEntries           credential_entries[]
+  assignments                 license_assignments[]
+  invoices                    license_invoices[]
+  renewalHistory              license_renewal_history[]
 
   @@index([typeId, expirationDate])
   @@index([assignedToEquipment])
   @@index([assignedToUser])
   @@index([assignedToDepartment])
+  @@index([batchId])
   @@map("software_licenses")
+}
+
+// Historial de cambios de fecha/costo/frecuencia de renovación de una licencia SIN
+// contrato — hoy renewalDate/renewalCost se sobrescriben sin dejar rastro de cuál
+// era la renovación anterior (a diferencia de contracts, que tiene contract_amendments).
+model license_renewal_history {
+  id                  String                   @id @default(uuid())
+  licenseId           String                   @map("license_id")
+  previousRenewalDate DateTime?                @map("previous_renewal_date")
+  newRenewalDate      DateTime?                @map("new_renewal_date")
+  previousRenewalCost Float?                   @map("previous_renewal_cost")
+  newRenewalCost      Float?                   @map("new_renewal_cost")
+  previousFrequency   LicenseRenewalFrequency? @map("previous_frequency")
+  newFrequency        LicenseRenewalFrequency? @map("new_frequency")
+  changedById         String?                  @map("changed_by_id")
+  createdAt           DateTime                 @default(now()) @map("created_at")
+  license             software_licenses        @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+  changedBy           users?                   @relation(fields: [changedById], references: [id])
+
+  @@index([licenseId, createdAt])
+  @@map("license_renewal_history")
+}
+
+// Compra de N licencias idénticas de un mismo tipo (ej. "34 Microsoft 365
+// Business Premium" en una sola cotización) — mismo rol que equipment_batches
+// para equipos, pero sin sus campos de depreciación/condición física (no
+// aplican a una licencia). Las licencias generadas por un lote comparten
+// costo/proveedor/fecha de compra y, mientras batchRenewalLinked sea true en
+// cada una, también su renovación — ver license-batches.service.ts.
+model license_batches {
+  id                    String                   @id @default(uuid())
+  batchCode             String                   @unique @map("batch_code") @db.VarChar(50)
+  licenseTypeId         String                   @map("license_type_id")
+  licenseType           license_types            @relation(fields: [licenseTypeId], references: [id])
+  quantity              Int
+  supplierId            String?                  @map("supplier_id")
+  supplier              suppliers?               @relation(fields: [supplierId], references: [id])
+  purchaseDate          DateTime                 @map("purchase_date")
+  unitCost              Float                    @map("unit_cost")
+  totalCost             Float                    @map("total_cost")
+  invoiceNumber         String?                  @map("invoice_number") @db.VarChar(100)
+  purchaseOrderNumber   String?                  @map("purchase_order_number") @db.VarChar(100)
+  departmentId          String?                  @map("department_id")
+  department            departments?             @relation(fields: [departmentId], references: [id])
+  renewalDate           DateTime?                @map("renewal_date")
+  renewalCost           Float?                   @map("renewal_cost")
+  renewalFrequency      LicenseRenewalFrequency? @map("renewal_frequency")
+  customFrequencyMonths Int?                     @map("custom_frequency_months")
+  receivedBy            String                   @map("received_by")
+  receiver              users                    @relation(fields: [receivedBy], references: [id])
+  receivedAt            DateTime                 @default(now()) @map("received_at")
+  notes                 String?
+  createdAt             DateTime                 @default(now()) @map("created_at")
+  updatedAt             DateTime                 @updatedAt @map("updated_at")
+  licenses              software_licenses[]
+
+  @@index([licenseTypeId])
+  @@index([purchaseDate])
+  @@map("license_batches")
 }
 
 // Historial de asignaciones de una licencia — mismo patrón que equipment_assignments /
@@ -1761,6 +1835,7 @@ model suppliers {
   software_licenses      software_licenses[]
   contracts              contracts[]
   batches                equipment_batches[]
+  licenseBatches         license_batches[]
   maintenances           maintenance_records[]
   equipmentInvoices      equipment_invoices[]   @relation("EquipmentInvoiceSupplier")
   licenseInvoices        license_invoices[]     @relation("LicenseInvoiceSupplier")
@@ -2111,26 +2186,26 @@ model inventory_scheduled_reports {
 }
 
 model ticket_family_config {
-  id                         String   @id @default(uuid())
-  familyId                   String   @unique @map("family_id")
-  ticketsEnabled             Boolean  @default(true) @map("tickets_enabled")
-  codePrefix                 String?  @map("code_prefix") @db.VarChar(10)
-  isDefault                  Boolean  @default(false) @map("is_default")
-  autoAssignRespectsFamilies Boolean  @default(true) @map("auto_assign_respects_families")
-  alertVolumeThreshold       Int?     @map("alert_volume_threshold")
-  businessHoursStart         String   @default("09:00:00") @map("business_hours_start") @db.VarChar(8)
-  businessHoursEnd           String   @default("18:00:00") @map("business_hours_end") @db.VarChar(8)
-  businessDays               String   @default("MON,TUE,WED,THU,FRI") @map("business_days") @db.VarChar(50)
+  id                         String          @id @default(uuid())
+  familyId                   String          @unique @map("family_id")
+  ticketsEnabled             Boolean         @default(true) @map("tickets_enabled")
+  codePrefix                 String?         @map("code_prefix") @db.VarChar(10)
+  isDefault                  Boolean         @default(false) @map("is_default")
+  autoAssignRespectsFamilies Boolean         @default(true) @map("auto_assign_respects_families")
+  alertVolumeThreshold       Int?            @map("alert_volume_threshold")
+  businessHoursStart         String          @default("09:00:00") @map("business_hours_start") @db.VarChar(8)
+  businessHoursEnd           String          @default("18:00:00") @map("business_hours_end") @db.VarChar(8)
+  businessDays               String          @default("MON,TUE,WED,THU,FRI") @map("business_days") @db.VarChar(50)
   /// IDs de familias cuyos clientes pueden crear tickets aquí.
   /// Array vacío = acepta tickets de clientes de CUALQUIER familia.
-  allowedFromFamilies        String[] @default([]) @map("allowed_from_families")
+  allowedFromFamilies        String[]        @default([]) @map("allowed_from_families")
   /// Techo de prioridad para categorías de esta familia sin techo propio
   /// configurado (ver categories.priorityCeiling y src/lib/tickets/priority-triage.ts).
   /// null = sin techo a nivel de familia, se usa el default global (MEDIUM).
   priorityCeiling            TicketPriority? @map("priority_ceiling")
-  createdAt                  DateTime @default(now()) @map("created_at")
-  updatedAt                  DateTime @updatedAt @map("updated_at")
-  family                     families @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  createdAt                  DateTime        @default(now()) @map("created_at")
+  updatedAt                  DateTime        @updatedAt @map("updated_at")
+  family                     families        @relation(fields: [familyId], references: [id], onDelete: Cascade)
 
   @@index([familyId])
   @@index([ticketsEnabled])
@@ -2686,7 +2761,11 @@ enum LicenseScope {
   COMPANY
 }
 
-enum ContractType {
+// Clasificación informativa de una licencia (no crea ni requiere un Contract real
+// — para eso está la relación opcional software_licenses.contractLines / el picker
+// de "Contrato vinculado" en el formulario). Antes se llamaba `ContractType`, lo que
+// confundía porque sugería que elegir un valor acá implicaba tener un contrato.
+enum LicenseAcquisitionType {
   SOFTWARE
   SERVICE_EXTERNAL
   MAINTENANCE
@@ -2734,6 +2813,17 @@ enum ContractLineType {
   SERVICE
   CONSUMABLE
   OTHER
+}
+
+// Periodicidad de renovación de una licencia SIN contrato vinculado (cuando hay
+// contrato, la periodicidad real es BillingCycle del Contract). CUSTOM habilita
+// software_licenses.customFrequencyMonths para casos atípicos (ej. cada 2 años).
+enum LicenseRenewalFrequency {
+  MONTHLY
+  QUARTERLY
+  SEMIANNUAL
+  ANNUAL
+  CUSTOM
 }
 
 enum BillingCycle {

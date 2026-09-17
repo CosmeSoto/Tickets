@@ -8,7 +8,7 @@ import {
   getServiceSubtypeLabel,
   type PaymentMethodType,
 } from '@/types/contracts'
-import { CONTRACT_TYPE_LABELS } from '@/lib/inventory/license-labels'
+import { LICENSE_ACQUISITION_TYPE_LABELS } from '@/lib/inventory/license-labels'
 
 /**
  * Tarjeta del "activo" de un acta de entrega — única fuente de verdad para diferenciar
@@ -123,8 +123,9 @@ export function ActItemCard({ actType, snapshot: snap, accessories }: ActItemCar
             <Field
               label='Tipo de contrato'
               value={
-                snap.contractType
-                  ? (CONTRACT_TYPE_LABELS[snap.contractType as string] ?? snap.contractType)
+                snap.acquisitionType
+                  ? (LICENSE_ACQUISITION_TYPE_LABELS[snap.acquisitionType as string] ??
+                    snap.acquisitionType)
                   : undefined
               }
             />

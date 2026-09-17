@@ -23,7 +23,9 @@ import {
   SlidersHorizontal,
   Check,
   Printer,
+  Package,
 } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
 import { MetricsSection } from '@/components/inventory/dashboard/metrics-section'
 import { AlertsSection } from '@/components/inventory/dashboard/alerts-section'
 import { useInventoryList } from '@/hooks/inventory/use-inventory-list'
@@ -36,6 +38,7 @@ import {
 import type { AssetSubtype } from '@/lib/inventory/family-config'
 import { QRBulkPrintDialog } from '@/components/inventory/qr-bulk-print-dialog'
 import { BatchBadge } from '@/components/inventory/dashboard/BatchBadge'
+import { LICENSE_RENEWAL_FREQUENCY_LABELS } from '@/lib/inventory/license-labels'
 
 interface UnifiedInventoryListProps {
   initialFamilyId?: string
@@ -424,6 +427,16 @@ export function UnifiedInventoryList({
                   Lote
                 </th>
               )}
+              {col('vencimiento') && (
+                <th className='px-4 py-3 text-left font-medium text-muted-foreground select-none whitespace-nowrap'>
+                  Vencimiento
+                </th>
+              )}
+              {col('frecuenciaRenovacion') && (
+                <th className='px-4 py-3 text-left font-medium text-muted-foreground select-none whitespace-nowrap'>
+                  Frec. renovación
+                </th>
+              )}
               {col('asignado') && (
                 <th
                   className='px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap'
@@ -575,9 +588,32 @@ export function UnifiedInventoryList({
                           batchId={asset.batchId}
                           batchCode={asset.batchCode ?? undefined}
                         />
+                      ) : asset.subtype === 'LICENSE' && asset.batchId ? (
+                        // Sin pantalla propia de lotes de licencias (ver plan) — el
+                        // badge es informativo, el detalle está en la ficha de la
+                        // licencia ("Parte del lote"), no una navegación aparte.
+                        <Badge variant='secondary' className='flex w-fit items-center gap-1'>
+                          <Package className='h-3 w-3' />
+                          {asset.batchCode}
+                        </Badge>
                       ) : (
                         <span className='text-xs text-muted-foreground'>—</span>
                       )}
+                    </td>
+                  )}
+                  {col('vencimiento') && (
+                    <td className='px-4 py-3 text-muted-foreground text-xs'>
+                      {asset.expirationDate ? formatDate(asset.expirationDate) : '—'}
+                    </td>
+                  )}
+                  {col('frecuenciaRenovacion') && (
+                    <td className='px-4 py-3 text-muted-foreground text-xs'>
+                      {asset.renewalFrequency
+                        ? asset.renewalFrequency === 'CUSTOM' && asset.customFrequencyMonths
+                          ? `Cada ${asset.customFrequencyMonths} meses`
+                          : (LICENSE_RENEWAL_FREQUENCY_LABELS[asset.renewalFrequency] ??
+                            asset.renewalFrequency)
+                        : '—'}
                     </td>
                   )}
                   {col('asignado') && (

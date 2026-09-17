@@ -465,6 +465,9 @@ interface ExpiringRow extends Record<string, unknown> {
   fechaVencimiento: string
   diasRestantes: number
   urgencia: string
+  /** Solo se completan para licencias — el resto de tipos no tiene estos datos. */
+  fechaCompra?: string
+  fechaRenovacion?: string
 }
 
 async function runExpiringTemplate(
@@ -508,6 +511,8 @@ async function runExpiringTemplate(
       id: true,
       name: true,
       expirationDate: true,
+      purchaseDate: true,
+      renewalDate: true,
       licenseType: {
         select: { family: { select: { name: true } } },
       },
@@ -524,6 +529,8 @@ async function runExpiringTemplate(
       fechaVencimiento: formatDate(lic.expirationDate),
       diasRestantes: dias,
       urgencia: urgencyFor(dias, licenseHigh),
+      fechaCompra: lic.purchaseDate ? formatDate(lic.purchaseDate) : '—',
+      fechaRenovacion: lic.renewalDate ? formatDate(lic.renewalDate) : '—',
     })
   }
 

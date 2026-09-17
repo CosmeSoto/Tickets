@@ -22,6 +22,7 @@ import {
   MoreHorizontal,
   StickyNote,
   RotateCcw,
+  Layers,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -40,8 +41,12 @@ import { AcquisitionInvoicesCard } from '@/components/inventory/shared/Acquisiti
 import { RentalContractCard } from '@/components/inventory/shared/RentalContractCard'
 import { LicenseAssignDialog } from '@/components/inventory/license/license-assign-dialog'
 import { LicenseReturnDialog } from '@/components/inventory/license/license-return-dialog'
+import { RenewLicenseBatchDialog } from '@/components/inventory/license/renew-license-batch-dialog'
 import { inventoryToast as toast } from '@/lib/utils/inventory-toast'
-import { CONTRACT_TYPE_LABELS } from '@/lib/inventory/license-labels'
+import {
+  LICENSE_ACQUISITION_TYPE_LABELS,
+  LICENSE_RENEWAL_FREQUENCY_LABELS,
+} from '@/lib/inventory/license-labels'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -53,11 +58,13 @@ interface LicenseData {
   cost?: number | null
   notes?: string | null
   licenseScope?: string | null
-  contractType?: string | null
+  acquisitionType?: string | null
   purchaseDate?: string | null
   expirationDate?: string | null
   renewalDate?: string | null
   renewalCost?: number | null
+  renewalFrequency?: string | null
+  customFrequencyMonths?: number | null
   invoiceNumber?: string | null
   purchaseOrderNumber?: string | null
   assignedToUser?: string | null
@@ -66,6 +73,8 @@ interface LicenseData {
   linkedContractId?: string | null
   customValues?: Array<{ fieldName: string; fieldValue: string; fieldLabel?: string }> | null
   renewalAlertStatus?: 'ok' | 'warning' | 'critical' | 'expired' | null
+  missingPaymentReference?: boolean
+  batchId?: string | null
   licenseType?: {
     id: string
     name: string
@@ -157,6 +166,19 @@ export function LicenseDetail({ licenseId, userRole, isSuperAdmin = false }: Pro
   const [showTransferDialog, setShowTransferDialog] = useState(false)
   const [showAssignDialog, setShowAssignDialog] = useState(false)
   const [showReturnDialog, setShowReturnDialog] = useState(false)
+  const [showRenewBatchDialog, setShowRenewBatchDialog] = useState(false)
+  const [batchInfo, setBatchInfo] = useState<{
+    batch: {
+      id: string
+      batchCode: string
+      renewalDate: string | null
+      renewalCost: number | null
+      renewalFrequency: string | null
+      customFrequencyMonths: number | null
+    }
+    metrics: { total: number; assigned: number; available: number }
+    hasContractLink: boolean
+  } | null>(null)
 
   const canManageInventory =
     (session?.user as { canManageInventory?: boolean })?.canManageInventory === true
@@ -189,6 +211,21 @@ export function LicenseDetail({ licenseId, userRole, isSuperAdmin = false }: Pro
   useEffect(() => {
     void loadLicense()
   }, [loadLicense])
+
+  const loadBatchInfo = useCallback(async (batchId: string) => {
+    try {
+      const res = await fetch(`/api/inventory/license-batches/${batchId}`)
+      if (!res.ok) return
+      setBatchInfo(await res.json())
+    } catch {
+      /* la tarjeta de lote es informativa — un fallo acá no bloquea la ficha */
+    }
+  }, [])
+
+  useEffect(() => {
+    if (license?.batchId) void loadBatchInfo(license.batchId)
+    else setBatchInfo(null)
+  }, [license?.batchId, loadBatchInfo])
 
   if (loading) {
     return (
@@ -372,6 +409,53 @@ export function LicenseDetail({ licenseId, userRole, isSuperAdmin = false }: Pro
           </div>
         )}
 
+      {/* Licencia antigua sin ninguna factura registrada — dato faltante, no un
+          vencimiento; ver missingPaymentReference en GET /licenses/[id]. */}
+      {license.missingPaymentReference && (
+        <div className='rounded-lg border px-4 py-3 text-sm flex items-start gap-2 border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200'>
+          <AlertTriangle className='h-4 w-4 shrink-0 mt-0.5' />
+          <div>
+            <p className='font-medium'>Sin referencia de pago registrada</p>
+            <p className='text-xs opacity-90 mt-0.5'>
+              Esta licencia tiene más de un año y no tiene ninguna factura cargada en &quot;Facturas
+              / Pagos de adquisición&quot;. Verifica si falta documentar su compra.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Parte de un lote (ver plan) — sin pantalla propia, todo desde acá:
+          info del lote + acción de renovarlo completo. */}
+      {batchInfo && (
+        <div className='rounded-lg border px-4 py-3 text-sm flex items-start justify-between gap-3 border-border bg-muted/30'>
+          <div className='flex items-start gap-2'>
+            <Layers className='h-4 w-4 shrink-0 mt-0.5 text-muted-foreground' />
+            <div>
+              <p className='font-medium'>Parte del lote {batchInfo.batch.batchCode}</p>
+              <p className='text-xs text-muted-foreground mt-0.5'>
+                {batchInfo.metrics.assigned} de {batchInfo.metrics.total} asignadas
+                {batchInfo.hasContractLink
+                  ? ' · Renovación gestionada por el contrato vinculado'
+                  : batchInfo.batch.renewalDate
+                    ? ` · Renovación de lote: ${fmtDate(batchInfo.batch.renewalDate)}`
+                    : ''}
+              </p>
+            </div>
+          </div>
+          {canEdit && !batchInfo.hasContractLink && (
+            <Button
+              type='button'
+              variant='outline'
+              size='sm'
+              onClick={() => setShowRenewBatchDialog(true)}
+            >
+              <RefreshCw className='h-3.5 w-3.5 mr-1.5' />
+              Renovar lote completo
+            </Button>
+          )}
+        </div>
+      )}
+
       {/* Layout 2/3 + 1/3 como equipo */}
       <div className='grid gap-6 lg:grid-cols-3'>
         <div className='lg:col-span-2 space-y-6'>
@@ -395,10 +479,11 @@ export function LicenseDetail({ licenseId, userRole, isSuperAdmin = false }: Pro
                   }
                 />
                 <InfoRow
-                  label='Tipo contrato'
+                  label='Modalidad de adquisición'
                   value={
-                    license.contractType
-                      ? (CONTRACT_TYPE_LABELS[license.contractType] ?? license.contractType)
+                    license.acquisitionType
+                      ? (LICENSE_ACQUISITION_TYPE_LABELS[license.acquisitionType] ??
+                        license.acquisitionType)
                       : '—'
                   }
                 />
@@ -430,6 +515,17 @@ export function LicenseDetail({ licenseId, userRole, isSuperAdmin = false }: Pro
                   <InfoRow label='Fecha de compra' value={fmtDate(license.purchaseDate)} />
                   <InfoRow label='Vencimiento' value={fmtDate(license.expirationDate)} />
                   <InfoRow label='Renovación' value={fmtDate(license.renewalDate)} />
+                  <InfoRow
+                    label='Frecuencia de renovación'
+                    value={
+                      license.renewalFrequency
+                        ? license.renewalFrequency === 'CUSTOM' && license.customFrequencyMonths
+                          ? `Cada ${license.customFrequencyMonths} meses`
+                          : (LICENSE_RENEWAL_FREQUENCY_LABELS[license.renewalFrequency] ??
+                            license.renewalFrequency)
+                        : '—'
+                    }
+                  />
                   <InfoRow
                     label='Costo'
                     value={
@@ -624,6 +720,25 @@ export function LicenseDetail({ licenseId, userRole, isSuperAdmin = false }: Pro
         currentFamilyName={currentFamilyName}
         onSuccess={loadLicense}
       />
+
+      {batchInfo && !batchInfo.hasContractLink && (
+        <RenewLicenseBatchDialog
+          open={showRenewBatchDialog}
+          onOpenChange={setShowRenewBatchDialog}
+          batchId={batchInfo.batch.id}
+          batchCode={batchInfo.batch.batchCode}
+          linkedCount={batchInfo.metrics.total}
+          currentRenewalDate={batchInfo.batch.renewalDate}
+          currentRenewalCost={batchInfo.batch.renewalCost}
+          currentRenewalFrequency={batchInfo.batch.renewalFrequency}
+          currentCustomFrequencyMonths={batchInfo.batch.customFrequencyMonths}
+          onRenewed={() => {
+            toast({ title: 'Lote renovado' })
+            void loadLicense()
+            void loadBatchInfo(batchInfo.batch.id)
+          }}
+        />
+      )}
     </div>
   )
 }

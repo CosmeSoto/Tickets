@@ -43,6 +43,7 @@ const LICENSE_LIST_INCLUDE = {
       model: { select: { brand: { select: { name: true } }, model: true } },
     },
   },
+  batch: { select: { id: true, batchCode: true } },
 } as const
 
 export interface AssetsQueryParams {
@@ -88,6 +89,9 @@ export interface UnifiedAssetItem {
   assignedToName?: string
   assignedAt?: string
   assignedByName?: string
+  expirationDate?: string | null
+  renewalFrequency?: string | null
+  customFrequencyMonths?: number | null
 }
 
 export interface AssetsQueryResult {
@@ -250,17 +254,7 @@ export async function queryAssets(params: AssetsQueryParams): Promise<AssetsQuer
           where: effectiveFamilyIds
             ? { licenseType: { familyId: { in: effectiveFamilyIds } } }
             : undefined,
-          include: {
-            licenseType: { include: { family: true } },
-            user: { select: { name: true } },
-            department: { select: { name: true } },
-            equipment: {
-              select: {
-                code: true,
-                model: { select: { brand: { select: { name: true } }, model: true } },
-              },
-            },
-          },
+          include: LICENSE_LIST_INCLUDE,
           orderBy: { createdAt: 'desc' },
           take: dbLimit,
         }),
@@ -370,6 +364,11 @@ function mapLicenseItem(item: any): UnifiedAssetItem {
     purchaseOrderNumber: item.purchaseOrderNumber ?? undefined,
     assignedToName: assignment.assignedToName,
     assignedAt: assignment.assignedAt,
+    batchId: item.batch?.id ?? null,
+    batchCode: item.batch?.batchCode ?? null,
+    expirationDate: item.expirationDate ? new Date(item.expirationDate).toISOString() : null,
+    renewalFrequency: item.renewalFrequency ?? null,
+    customFrequencyMonths: item.customFrequencyMonths ?? null,
   }
 }
 

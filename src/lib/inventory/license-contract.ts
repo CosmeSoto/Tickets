@@ -4,6 +4,41 @@
  */
 import { prisma } from '@/lib/prisma'
 import { randomUUID } from 'crypto'
+import { CONTRACT_CATEGORY_TO_ACQUISITION_TYPE } from '@/lib/inventory/license-labels'
+
+/**
+ * Efectos que debe tener SIEMPRE vincular una licencia a un contrato, sin
+ * importar por qué camino se hizo (formulario de licencia, alta masiva, o
+ * edición de líneas desde el módulo de Contratos): el BillingCycle del
+ * contrato pasa a mandar sobre la renovación (se limpia renewalFrequency
+ * propio de la licencia), las alertas standalone dejan de tener sentido, y la
+ * categoría del contrato sincroniza la "Modalidad de adquisición" — sin esto,
+ * quedaban datos huérfanos/contradictorios cada vez que el vínculo se hacía
+ * desde un lugar que no fuera el PUT de licencia.
+ */
+export async function applyContractLinkSideEffects(
+  licenseId: string,
+  contractCategory: string | null | undefined,
+  _changedById: string
+): Promise<void> {
+  // EQUIPMENT_RENTAL/OTHER no tienen un LicenseAcquisitionType razonable — se
+  // limpia a "Sin especificar" en vez de dejar lo que hubiera antes, para no
+  // mostrar una modalidad que ya no corresponde al contrato vinculado.
+  const acquisitionType = contractCategory
+    ? (CONTRACT_CATEGORY_TO_ACQUISITION_TYPE[contractCategory] ?? null)
+    : null
+
+  await prisma.software_licenses.update({
+    where: { id: licenseId },
+    data: {
+      renewalFrequency: null,
+      customFrequencyMonths: null,
+      paymentAlertFirstSentAt: null,
+      paymentAlertSecondSentAt: null,
+      acquisitionType: acquisitionType as never,
+    },
+  })
+}
 
 export async function getLinkedBusinessContractIdForLicense(
   licenseId: string
@@ -27,11 +62,19 @@ export async function linkLicenseToBusinessContract(
   licenseId: string,
   contractId: string,
   licenseLabel: string,
-  additionalCost?: number | null
+  additionalCost?: number | null,
+  changedById?: string
 ): Promise<{ contractId: string }> {
   let businessContract = await prisma.contracts.findUnique({
     where: { id: contractId },
-    select: { id: true, status: true, monthlyCost: true, totalValue: true, billingCycle: true },
+    select: {
+      id: true,
+      status: true,
+      monthlyCost: true,
+      totalValue: true,
+      billingCycle: true,
+      category: true,
+    },
   })
 
   if (!businessContract) {
@@ -52,7 +95,14 @@ export async function linkLicenseToBusinessContract(
         businessContract.billingCycle === 'ONE_TIME'
           ? { totalValue: (businessContract.totalValue ?? 0) + additionalCost }
           : { monthlyCost: (businessContract.monthlyCost ?? 0) + additionalCost },
-      select: { id: true, status: true, monthlyCost: true, totalValue: true, billingCycle: true },
+      select: {
+        id: true,
+        status: true,
+        monthlyCost: true,
+        totalValue: true,
+        billingCycle: true,
+        category: true,
+      },
     })
   }
 
@@ -80,6 +130,10 @@ export async function linkLicenseToBusinessContract(
     })
   }
 
+  if (changedById) {
+    await applyContractLinkSideEffects(licenseId, businessContract.category, changedById)
+  }
+
   return { contractId: businessContract.id }
 }
 
@@ -88,14 +142,21 @@ export async function syncLicenseContractLink(
   licenseId: string,
   contractId: string | null | undefined,
   licenseLabel: string,
-  additionalCost?: number | null
+  additionalCost?: number | null,
+  changedById?: string
 ): Promise<void> {
   if (!contractId) {
     await prisma.contract_lines.deleteMany({ where: { licenseId } })
     return
   }
 
-  await linkLicenseToBusinessContract(licenseId, contractId, licenseLabel, additionalCost)
+  await linkLicenseToBusinessContract(
+    licenseId,
+    contractId,
+    licenseLabel,
+    additionalCost,
+    changedById
+  )
 }
 
 /** Mapea el alcance del formulario al enum Prisma. */

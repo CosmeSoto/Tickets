@@ -38,7 +38,13 @@ import { parseMoneyInput } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { AssignableUserSelect } from '@/components/inventory/shared/AssignableUserSelect'
 import { FinancialInfoSection } from '@/components/inventory/shared/FinancialInfoSection'
-import { CONTRACT_TYPE_OPTIONS } from '@/lib/inventory/license-labels'
+import {
+  LICENSE_ACQUISITION_TYPE_OPTIONS,
+  LICENSE_ACQUISITION_TYPE_LABELS,
+  LICENSE_RENEWAL_FREQUENCY_OPTIONS,
+  CONTRACT_CATEGORY_TO_ACQUISITION_TYPE,
+  addRenewalInterval,
+} from '@/lib/inventory/license-labels'
 import { KeyRound, RefreshCw } from 'lucide-react'
 
 interface LicenseAssetFormProps {
@@ -70,12 +76,13 @@ type LicenseDraft = {
   invoiceNumber: string
   purchaseOrderNumber: string
   renewalCost: string
-  renewalDate: string
+  renewalFrequency: string
+  customFrequencyMonths: string
   hasRecurring: boolean
   linkedContractId: string | null
   notes: string
   customFieldValues: Array<{ fieldName: string; fieldValue: string }>
-  contractType: string
+  acquisitionType: string
 }
 
 /** Borrador útil (evita que un draft solo con scope=Empresa vacíe el editar). */
@@ -156,6 +163,9 @@ export function LicenseAssetForm({
   const [attributesReloadToken, setAttributesReloadToken] = useState(0)
   const [licenseKey, setLicenseKey] = useState('')
   const [scope, setScope] = useState<Scope>('Empresa')
+  /** Cantidad > 1 crea un lote (N licencias idénticas, sin asignar) en vez de
+   * una sola — mismo formulario, ver isBatchMode más abajo. */
+  const [quantity, setQuantity] = useState('1')
   const [userId, setUserId] = useState('')
   const [departmentId, setDepartmentId] = useState('')
   /** En edición: no guardar borrador hasta hidratar desde el servidor */
@@ -173,8 +183,14 @@ export function LicenseAssetForm({
   const [invoiceNumber, setInvoiceNumber] = useState('')
   const [purchaseOrderNumber, setPurchaseOrderNumber] = useState('')
   const [renewalCost, setRenewalCost] = useState('')
-  const [renewalDate, setRenewalDate] = useState('')
-  const [contractType, setContractType] = useState('')
+  const [renewalFrequency, setRenewalFrequency] = useState('')
+  const [customFrequencyMonths, setCustomFrequencyMonths] = useState('')
+  /** "Fecha de próxima renovación" ya no se pide aparte — para una licencia sin
+   * contrato, vencimiento y próxima renovación son el mismo momento. Este flag
+   * evita que el auto-cálculo de vencimiento (a partir de fecha de compra +
+   * frecuencia) pise una fecha que el usuario ya editó a mano. */
+  const [expirationDateTouched, setExpirationDateTouched] = useState(isEditMode)
+  const [acquisitionType, setAcquisitionType] = useState('')
   const [hasRecurring, setHasRecurring] = useState(false)
   const [linkedContractId, setLinkedContractId] = useState<string | null>(null)
   /** Costo de renta capturado al vincular a un contrato YA EXISTENTE — ver el equivalente
@@ -185,6 +201,7 @@ export function LicenseAssetForm({
 
   const isVisible = (section: string) => familyConfig.visibleSections.includes(section as never)
   const isRequired = (section: string) => familyConfig.requiredSections.includes(section as never)
+  const isBatchMode = !isEditMode && (parseInt(quantity, 10) || 1) > 1
 
   const draftKey =
     isEditMode && licenseId
@@ -205,12 +222,13 @@ export function LicenseAssetForm({
       invoiceNumber,
       purchaseOrderNumber,
       renewalCost,
-      renewalDate,
+      renewalFrequency,
+      customFrequencyMonths,
       hasRecurring,
       linkedContractId,
       notes,
       customFieldValues,
-      contractType,
+      acquisitionType,
     }),
     [
       name,
@@ -225,12 +243,13 @@ export function LicenseAssetForm({
       invoiceNumber,
       purchaseOrderNumber,
       renewalCost,
-      renewalDate,
+      renewalFrequency,
+      customFrequencyMonths,
       hasRecurring,
       linkedContractId,
       notes,
       customFieldValues,
-      contractType,
+      acquisitionType,
     ]
   )
 
@@ -242,16 +261,20 @@ export function LicenseAssetForm({
     if (d.departmentId != null) setDepartmentId(String(d.departmentId))
     if (d.supplierId != null) setSupplierId(String(d.supplierId))
     if (d.purchaseDate != null) setPurchaseDate(String(d.purchaseDate))
-    if (d.expirationDate != null) setExpirationDate(String(d.expirationDate))
+    if (d.expirationDate != null) {
+      setExpirationDate(String(d.expirationDate))
+      setExpirationDateTouched(true)
+    }
     if (d.cost != null) setCost(String(d.cost))
     if (d.invoiceNumber != null) setInvoiceNumber(String(d.invoiceNumber))
     if (d.purchaseOrderNumber != null) setPurchaseOrderNumber(String(d.purchaseOrderNumber))
     if (d.renewalCost != null) setRenewalCost(String(d.renewalCost))
-    if (d.renewalDate != null) setRenewalDate(String(d.renewalDate))
+    if (d.renewalFrequency != null) setRenewalFrequency(String(d.renewalFrequency))
+    if (d.customFrequencyMonths != null) setCustomFrequencyMonths(String(d.customFrequencyMonths))
     if (typeof d.hasRecurring === 'boolean') setHasRecurring(d.hasRecurring)
     if (d.linkedContractId !== undefined) setLinkedContractId(d.linkedContractId)
     if (d.notes != null) setNotes(String(d.notes))
-    if (d.contractType != null) setContractType(String(d.contractType))
+    if (d.acquisitionType != null) setAcquisitionType(String(d.acquisitionType))
     if (Array.isArray(d.customFieldValues)) setCustomFieldValues(d.customFieldValues)
   }
 
@@ -324,15 +347,19 @@ export function LicenseAssetForm({
     setInvoiceNumber(String(initialLicense.invoiceNumber ?? ''))
     setPurchaseOrderNumber(String(initialLicense.purchaseOrderNumber ?? ''))
     setRenewalCost(initialLicense.renewalCost != null ? String(initialLicense.renewalCost) : '')
-    setRenewalDate(toLocalDateInputValue(initialLicense.renewalDate))
+    setRenewalFrequency(String(initialLicense.renewalFrequency ?? ''))
+    setCustomFrequencyMonths(
+      initialLicense.customFrequencyMonths != null
+        ? String(initialLicense.customFrequencyMonths)
+        : ''
+    )
     setHasRecurring(
       initialLicense.renewalCost != null ||
         initialLicense.renewalDate != null ||
-        initialLicense.contractType === 'RECURRING' ||
-        initialLicense.contractType === 'SOFTWARE'
+        initialLicense.acquisitionType === 'SOFTWARE'
     )
     setLinkedContractId((initialLicense.linkedContractId as string | null) ?? null)
-    setContractType(String(initialLicense.contractType ?? ''))
+    setAcquisitionType(String(initialLicense.acquisitionType ?? ''))
     setNotes(String(initialLicense.notes ?? ''))
     setCustomFieldValues(
       (initialLicense.customValues as Array<{ fieldName: string; fieldValue: string }>) ?? []
@@ -362,7 +389,7 @@ export function LicenseAssetForm({
       supplierId: supplierId || null,
       familyId,
       startDate: purchaseDate || undefined,
-      endDate: expirationDate || renewalDate || undefined,
+      endDate: expirationDate || undefined,
       cost: cost || renewalCost || undefined,
       monthlyCost: hasRecurring ? renewalCost || cost : undefined,
       totalValue: !hasRecurring ? cost : undefined,
@@ -370,17 +397,7 @@ export function LicenseAssetForm({
       suggestedLineDescription: name.trim() || undefined,
       category: 'SOFTWARE_LICENSE' as const,
     }),
-    [
-      name,
-      supplierId,
-      familyId,
-      purchaseDate,
-      expirationDate,
-      renewalDate,
-      cost,
-      renewalCost,
-      hasRecurring,
-    ]
+    [name, supplierId, familyId, purchaseDate, expirationDate, cost, renewalCost, hasRecurring]
   )
 
   useEffect(() => {
@@ -393,14 +410,41 @@ export function LicenseAssetForm({
       setRenewalCost(
         contractFinancial.renewalCost != null ? String(contractFinancial.renewalCost) : ''
       )
-      if (contractFinancial.renewalDate) setRenewalDate(contractFinancial.renewalDate)
-      if (contractFinancial.expirationDate) setExpirationDate(contractFinancial.expirationDate)
+      // La fecha de vencimiento del contrato ES la próxima renovación — un
+      // solo campo, sin pedirlo dos veces (ver expirationDateTouched).
+      if (contractFinancial.expirationDate) {
+        setExpirationDate(contractFinancial.expirationDate)
+        setExpirationDateTouched(true)
+      }
     } else {
       setRenewalCost('')
       if (contractFinancial.cost != null) setCost(String(contractFinancial.cost))
-      if (contractFinancial.expirationDate) setExpirationDate(contractFinancial.expirationDate)
+      if (contractFinancial.expirationDate) {
+        setExpirationDate(contractFinancial.expirationDate)
+        setExpirationDateTouched(true)
+      }
     }
   }, [linkedContract, linkedContractId, contractFinancial, hasRecurring])
+
+  // Auto-completa la fecha de vencimiento a partir de fecha de compra +
+  // frecuencia de renovación — solo mientras el usuario no la haya editado a
+  // mano (ver expirationDateTouched) y solo sin contrato vinculado (con
+  // contrato, la fecha viene de arriba). Vaciar el campo reactiva el cálculo.
+  useEffect(() => {
+    if (expirationDateTouched || linkedContract || !purchaseDate || !renewalFrequency) return
+    const computed = addRenewalInterval(purchaseDate, renewalFrequency, customFrequencyMonths)
+    if (computed) setExpirationDate(computed)
+  }, [expirationDateTouched, linkedContract, purchaseDate, renewalFrequency, customFrequencyMonths])
+
+  // Al vincular un contrato, su categoría manda sobre la "Modalidad de
+  // adquisición" de la licencia (ver applyContractLinkSideEffects, que hace lo
+  // mismo del lado del servidor) — evita que ambos campos puedan decir cosas
+  // distintas para el mismo vínculo.
+  useEffect(() => {
+    if (!linkedContract) return
+    const derived = CONTRACT_CATEGORY_TO_ACQUISITION_TYPE[linkedContract.category]
+    if (derived) setAcquisitionType(derived)
+  }, [linkedContract])
 
   const handleContractChange = (contractId: string | null) => {
     setLinkedContractId(contractId)
@@ -420,11 +464,13 @@ export function LicenseAssetForm({
       return
     }
     // En alta: asignación obligatoria. En edición se puede completar luego con «Asignar».
-    if (!isEditMode && scope === 'Individual' && !userId) {
+    // En modo lote no aplica: las N licencias nacen sin asignar y se reparten
+    // después, una por una, con el mismo botón «Asignar» de siempre.
+    if (!isEditMode && !isBatchMode && scope === 'Individual' && !userId) {
       toast({ title: 'Selecciona el usuario asignado', variant: 'destructive' })
       return
     }
-    if (!isEditMode && scope === 'Departamento' && !departmentId) {
+    if (!isEditMode && !isBatchMode && scope === 'Departamento' && !departmentId) {
       toast({ title: 'Selecciona el departamento asignado', variant: 'destructive' })
       return
     }
@@ -446,6 +492,7 @@ export function LicenseAssetForm({
 
     const payload: Record<string, unknown> = {
       name: name.trim(),
+      quantity: isBatchMode ? parseInt(quantity, 10) || 1 : undefined,
       licenseTypeId: licenseTypeId || undefined,
       typeId: licenseTypeId || undefined,
       key: licenseKey || undefined,
@@ -457,8 +504,15 @@ export function LicenseAssetForm({
       invoiceNumber: invoiceNumber || undefined,
       purchaseOrderNumber: purchaseOrderNumber || undefined,
       renewalCost: parsedRenewal,
-      renewalDate: renewalDate || undefined,
-      contractType: contractType || null,
+      // "Próxima renovación" ya no se pide aparte — es la misma fecha de
+      // vencimiento (ver expirationDateTouched más arriba).
+      renewalDate: expirationDate || undefined,
+      renewalFrequency: linkedContractId || hasRecurring ? null : renewalFrequency || null,
+      customFrequencyMonths:
+        !linkedContractId && !hasRecurring && renewalFrequency === 'CUSTOM' && customFrequencyMonths
+          ? parseInt(customFrequencyMonths, 10)
+          : null,
+      acquisitionType: acquisitionType || null,
       contractId: linkedContractId || undefined,
       contractLineCost: linkCost ?? undefined,
       notes: notes || undefined,
@@ -470,7 +524,7 @@ export function LicenseAssetForm({
     // pasa exclusivamente por el diálogo "Asignar" (deja historial + acta de entrega) —
     // este formulario de edición ya no reescribe el asignatario para no tener dos caminos
     // silenciosos hacia el mismo dato (ver LicenseAssignDialog / license-assignment.service).
-    if (!isEditMode) {
+    if (!isEditMode && !isBatchMode) {
       if (scope === 'Individual' && userId) {
         payload.assignedToUser = userId
         payload.assignedToDepartment = null
@@ -510,7 +564,7 @@ export function LicenseAssetForm({
       setInvoiceNumber('')
       setPurchaseOrderNumber('')
       setRenewalCost('')
-      setRenewalDate('')
+      setExpirationDateTouched(false)
       setHasRecurring(false)
       setLinkedContractId(null)
       setNotes('')
@@ -610,6 +664,24 @@ export function LicenseAssetForm({
               Clave de producto o serial de la licencia.
             </p>
           </div>
+
+          {!isEditMode && (
+            <div className='space-y-1'>
+              <Label>Cantidad</Label>
+              <Input
+                type='number'
+                min={1}
+                max={500}
+                value={quantity}
+                onChange={e => setQuantity(e.target.value)}
+              />
+              <p className='text-xs text-muted-foreground pt-1'>
+                {isBatchMode
+                  ? `Se crearán ${parseInt(quantity, 10) || 1} licencias idénticas, sin asignar — asígnalas después una por una.`
+                  : 'Más de 1 crea un lote (ej. "34 licencias de Microsoft 365") en vez de una sola licencia.'}
+              </p>
+            </div>
+          )}
         </div>
 
         <LicenseTypeAttributesSection
@@ -620,23 +692,25 @@ export function LicenseAssetForm({
         />
 
         <div className='grid grid-cols-1 md:grid-cols-2 gap-3'>
-          <div className='space-y-1'>
-            <Label>Alcance</Label>
-            <SimpleSelect
-              value={scope}
-              onChange={e => setScope(e.target.value as Scope)}
-              disabled={isEditMode}
-            >
-              <option value='Individual'>Individual</option>
-              <option value='Departamento'>Departamento</option>
-              <option value='Empresa'>Empresa</option>
-            </SimpleSelect>
-            {isEditMode && (
-              <p className='text-xs text-muted-foreground'>
-                Para cambiar el responsable usa el botón «Asignar» en el detalle de la licencia.
-              </p>
-            )}
-          </div>
+          {!isBatchMode && (
+            <div className='space-y-1'>
+              <Label>Alcance</Label>
+              <SimpleSelect
+                value={scope}
+                onChange={e => setScope(e.target.value as Scope)}
+                disabled={isEditMode}
+              >
+                <option value='Individual'>Individual</option>
+                <option value='Departamento'>Departamento</option>
+                <option value='Empresa'>Empresa</option>
+              </SimpleSelect>
+              {isEditMode && (
+                <p className='text-xs text-muted-foreground'>
+                  Para cambiar el responsable usa el botón «Asignar» en el detalle de la licencia.
+                </p>
+              )}
+            </div>
+          )}
 
           <div className='space-y-1'>
             <Label>
@@ -652,20 +726,68 @@ export function LicenseAssetForm({
 
           <div className='space-y-1'>
             <Label>
-              Tipo de contrato{' '}
+              Modalidad de adquisición{' '}
               <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
             </Label>
-            <SimpleSelect value={contractType} onChange={e => setContractType(e.target.value)}>
+            <SimpleSelect
+              value={acquisitionType}
+              onChange={e => setAcquisitionType(e.target.value)}
+              disabled={!!linkedContract}
+            >
               <option value=''>Sin especificar</option>
-              {CONTRACT_TYPE_OPTIONS.map(opt => (
+              {LICENSE_ACQUISITION_TYPE_OPTIONS.map(opt => (
                 <option key={opt.value} value={opt.value}>
                   {opt.label}
                 </option>
               ))}
             </SimpleSelect>
+            <p className='text-xs text-muted-foreground'>
+              {linkedContract
+                ? `Viene de la categoría del contrato vinculado${acquisitionType ? `: ${LICENSE_ACQUISITION_TYPE_LABELS[acquisitionType] ?? acquisitionType}` : ''}.`
+                : 'Es solo una clasificación de la licencia; no crea ni requiere un contrato formal. Para vincular un contrato real, usa la sección de abajo.'}
+            </p>
           </div>
 
-          {scope === 'Individual' && !isEditMode && (
+          {!linkedContractId && !hasRecurring && (
+            <div className='space-y-1'>
+              <Label>
+                Frecuencia de renovación{' '}
+                <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
+              </Label>
+              <SimpleSelect
+                value={renewalFrequency}
+                onChange={e => setRenewalFrequency(e.target.value)}
+              >
+                <option value=''>Sin especificar</option>
+                {LICENSE_RENEWAL_FREQUENCY_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </SimpleSelect>
+              {renewalFrequency === 'CUSTOM' && (
+                <div className='flex items-center gap-2 pt-1'>
+                  <Input
+                    type='number'
+                    min={1}
+                    value={customFrequencyMonths}
+                    onChange={e => setCustomFrequencyMonths(e.target.value)}
+                    placeholder='Ej. 24'
+                    className='w-24'
+                  />
+                  <span className='text-xs text-muted-foreground'>meses entre cada renovación</span>
+                </div>
+              )}
+              {renewalFrequency && (
+                <p className='text-xs text-muted-foreground pt-1'>
+                  Con fecha de compra, la fecha de vencimiento (más abajo, en Información
+                  Financiera) se calcula sola según esta frecuencia — la podés editar si hace falta.
+                </p>
+              )}
+            </div>
+          )}
+
+          {scope === 'Individual' && !isEditMode && !isBatchMode && (
             <div className='space-y-1 md:col-span-2'>
               <AssignableUserSelect
                 familyId={familyId}
@@ -676,7 +798,7 @@ export function LicenseAssetForm({
               />
             </div>
           )}
-          {scope === 'Departamento' && !isEditMode && (
+          {scope === 'Departamento' && !isEditMode && !isBatchMode && (
             <div className='space-y-1'>
               <Label>
                 Departamento Asignado <span className='text-destructive'>*</span>
@@ -722,56 +844,57 @@ export function LicenseAssetForm({
             </label>
 
             {hasRecurring ? (
-              <p className='text-xs text-muted-foreground rounded-md bg-muted/40 px-3 py-2'>
-                Esta licencia tiene pago recurrente. Vincula el contrato del módulo de Contratos
-                para mantener trazabilidad financiera y operativa.
-              </p>
+              <>
+                <p className='text-xs text-muted-foreground rounded-md bg-muted/40 px-3 py-2'>
+                  {isBatchMode
+                    ? 'Las licencias de este lote tienen pago recurrente. Vincula el contrato del módulo de Contratos — quedará una línea del contrato por cada licencia generada, para mantener trazabilidad financiera y operativa.'
+                    : 'Esta licencia tiene pago recurrente. Vincula el contrato del módulo de Contratos para mantener trazabilidad financiera y operativa.'}
+                </p>
+
+                <div className='space-y-2'>
+                  <Label>
+                    Contrato vinculado{' '}
+                    <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
+                  </Label>
+                  <ContractPicker
+                    value={linkedContractId}
+                    onChange={handleContractChange}
+                    onLinkCost={setLinkCost}
+                    supplierId={supplierId || null}
+                    familyId={familyId}
+                    context='license'
+                    prefill={contractPrefill}
+                    draftParentKey={draftKey}
+                  />
+                </div>
+              </>
             ) : (
               <p className='text-xs text-muted-foreground rounded-md bg-muted/40 px-3 py-2'>
-                Aunque no sea recurrente, puedes vincular el contrato de compra o soporte para
-                evitar datos huérfanos y duplicados.
+                Sin pago recurrente no hay contrato que vincular — seguí completando los datos de
+                abajo (frecuencia de renovación, costo, fechas).
               </p>
             )}
 
-            <div className='space-y-2'>
-              <Label>
-                Contrato vinculado{' '}
-                <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
-              </Label>
-              <ContractPicker
-                value={linkedContractId}
-                onChange={handleContractChange}
-                onLinkCost={setLinkCost}
-                supplierId={supplierId || null}
-                familyId={familyId}
-                context='license'
-                prefill={contractPrefill}
-                draftParentKey={draftKey}
-              />
-            </div>
-
-            {linkedContract && contractFinancial ? (
-              <div className='rounded-md border bg-muted/30 px-3 py-2.5 space-y-1'>
-                <p className='text-xs text-muted-foreground'>{contractFinancial.amountLabel}</p>
-                <p className='text-sm font-medium font-mono'>
-                  {formatContractAmount(
-                    contractFinancial.displayAmount,
-                    contractFinancial.currency
-                  )}
+            {hasRecurring &&
+              (linkedContract && contractFinancial ? (
+                <div className='rounded-md border bg-muted/30 px-3 py-2.5 space-y-1'>
+                  <p className='text-xs text-muted-foreground'>{contractFinancial.amountLabel}</p>
+                  <p className='text-sm font-medium font-mono'>
+                    {formatContractAmount(
+                      contractFinancial.displayAmount,
+                      contractFinancial.currency
+                    )}
+                  </p>
+                  <p className='text-[11px] text-muted-foreground'>
+                    Tomado automáticamente del contrato vinculado. Se guardará como costo de
+                    renovación.
+                  </p>
+                </div>
+              ) : (
+                <p className='text-xs text-muted-foreground rounded-md bg-muted/40 px-3 py-2'>
+                  Vincula un contrato para cargar el costo automáticamente según el pago recurrente.
                 </p>
-                <p className='text-[11px] text-muted-foreground'>
-                  Tomado automáticamente del contrato vinculado.{' '}
-                  {hasRecurring
-                    ? 'Se guardará como costo de renovación.'
-                    : 'Se guardará como costo de la licencia.'}
-                </p>
-              </div>
-            ) : (
-              <p className='text-xs text-muted-foreground rounded-md bg-muted/40 px-3 py-2'>
-                Vincula un contrato para cargar el costo automáticamente según el tipo de pago
-                {hasRecurring ? ' recurrente' : ' único'}.
-              </p>
-            )}
+              ))}
           </div>
         )}
 
@@ -784,8 +907,11 @@ export function LicenseAssetForm({
             // siguen editables aunque haya contrato vinculado.
             const hiddenFields = [
               'supplier' as const,
+              // "Fecha de próxima renovación" nunca se pide aparte — es la
+              // misma fecha de vencimiento, ver expirationDateTouched arriba.
+              'renewalDate' as const,
               ...(linkedContract
-                ? (['expirationDate', 'purchasePrice', 'renewalCost', 'renewalDate'] as const)
+                ? (['expirationDate', 'purchasePrice', 'renewalCost'] as const)
                 : []),
             ]
 
@@ -804,7 +930,7 @@ export function LicenseAssetForm({
                     invoiceNumber={invoiceNumber}
                     purchaseOrderNumber={purchaseOrderNumber}
                     renewalCost={renewalCost ? parseFloat(renewalCost) : null}
-                    renewalDate={renewalDate || null}
+                    renewalDate={expirationDate || null}
                     showExpiration
                     showRenewal
                     collapsible={false}
@@ -835,19 +961,20 @@ export function LicenseAssetForm({
                   invoiceNumber={invoiceNumber}
                   purchaseOrderNumber={purchaseOrderNumber}
                   renewalCost={renewalCost ? parseFloat(renewalCost) : null}
-                  renewalDate={renewalDate || null}
+                  renewalDate={expirationDate || null}
                   showExpiration
                   showRenewal
                   collapsible={false}
                   onChange={(field, value) => {
                     if (field === 'purchasePrice') setCost(value != null ? String(value) : '')
                     else if (field === 'purchaseDate') setPurchaseDate(value ?? '')
-                    else if (field === 'expirationDate') setExpirationDate(value ?? '')
-                    else if (field === 'invoiceNumber') setInvoiceNumber(value ?? '')
+                    else if (field === 'expirationDate') {
+                      setExpirationDate(value ?? '')
+                      setExpirationDateTouched(true)
+                    } else if (field === 'invoiceNumber') setInvoiceNumber(value ?? '')
                     else if (field === 'purchaseOrderNumber') setPurchaseOrderNumber(value ?? '')
                     else if (field === 'renewalCost')
                       setRenewalCost(value != null ? String(value) : '')
-                    else if (field === 'renewalDate') setRenewalDate(value ?? '')
                   }}
                 />
               </>

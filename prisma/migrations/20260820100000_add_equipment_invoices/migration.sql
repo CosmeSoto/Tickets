@@ -2,9 +2,13 @@
 CREATE TYPE "AcquisitionPaymentStatus" AS ENUM ('PENDING', 'PAID', 'OVERDUE', 'CANCELLED');
 
 -- CreateTable
+-- Nota: id/equipment_id/supplier_id/created_by son TEXT (no UUID nativo de Postgres)
+-- para ser consistentes con el resto del esquema — Prisma genera estos ids como
+-- String (uuid()) en el cliente, no con gen_random_uuid() en la base. El tipo
+-- nativo UUID original hacía fallar la FK contra equipment.id (TEXT).
 CREATE TABLE "equipment_invoices" (
-    "id"                   UUID         NOT NULL DEFAULT gen_random_uuid(),
-    "equipment_id"         UUID         NOT NULL,
+    "id"                   TEXT         NOT NULL,
+    "equipment_id"         TEXT         NOT NULL,
     "invoice_number"       VARCHAR(100),
     "purchase_order_number" VARCHAR(100),
     "amount"               DOUBLE PRECISION NOT NULL,
@@ -13,7 +17,7 @@ CREATE TABLE "equipment_invoices" (
     "paid_date"            TIMESTAMP(3),
     "status"               "AcquisitionPaymentStatus" NOT NULL DEFAULT 'PENDING',
     "payment_method"       "PaymentMethodType",
-    "supplier_id"          UUID,
+    "supplier_id"          TEXT,
     "supplier_name"        VARCHAR(200),
     "reference_number"     VARCHAR(200),
     "bank_entity"          VARCHAR(100),
@@ -21,7 +25,7 @@ CREATE TABLE "equipment_invoices" (
     "card_brand"           VARCHAR(50),
     "transaction_id"       VARCHAR(200),
     "notes"                TEXT,
-    "created_by"           UUID         NOT NULL,
+    "created_by"           TEXT         NOT NULL,
     "created_at"           TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at"           TIMESTAMP(3) NOT NULL,
 

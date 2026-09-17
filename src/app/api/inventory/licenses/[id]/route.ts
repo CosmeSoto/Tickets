@@ -21,6 +21,7 @@ import {
   syncLicenseContractLink,
   mapLicenseScope,
 } from '@/lib/inventory/license-contract'
+import { applyLicenseRenewalUpdate } from '@/lib/inventory/license-renewal'
 import { withAttributeLabels } from '@/lib/inventory/attribute-labels'
 import { isValidInvoiceNumber, INVOICE_NUMBER_ERROR } from '@/lib/inventory/invoice-number'
 
@@ -48,13 +49,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'Licencia no encontrada' }, { status: 404 })
     }
 
-    // Fetch supplier, licenseScope, contractType and family separately
+    // Fetch supplier, licenseScope, acquisitionType and family separately
     const licenseWithExtra = await prisma.software_licenses.findUnique({
       where: { id },
       select: {
         supplier: { select: { id: true, name: true, taxId: true } },
         licenseScope: true,
-        contractType: true,
+        acquisitionType: true,
         licenseType: { include: { family: true, attributes: true } },
       },
     })
@@ -68,22 +69,35 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     const warningDaysRaw = await getSetting('inventory.license_alert_days_first', 600, '30')
     const warningDays = Math.max(1, parseInt(warningDaysRaw ?? '30', 10) || 30)
+    // Si no cargaron renewalDate (frecuente en licencias importadas, ej. desde
+    // planilla), usamos expirationDate como referencia para que este banner
+    // coincida con la fecha que efectivamente vigila el cron de vencimiento
+    // (CheckLicenseExpirationJob), que siempre usa expirationDate.
+    const referenceDate = (license as any).renewalDate ?? (license as any).expirationDate ?? null
     const renewalAlertStatus = getRenewalAlertStatus(
-      (license as any).renewalDate ? new Date((license as any).renewalDate) : null,
+      referenceDate ? new Date(referenceDate) : null,
       warningDays
     )
 
     const linkedContractId = await getLinkedBusinessContractIdForLicense(id)
+    const invoiceCount = await prisma.license_invoices.count({ where: { licenseId: id } })
+    const purchaseReference = (license as any).purchaseDate ?? (license as any).createdAt
+    const isOlderThanOneYear =
+      !!purchaseReference &&
+      Date.now() - new Date(purchaseReference).getTime() > 365 * 24 * 60 * 60 * 1000
+    const hasInvoiceReference = invoiceCount > 0
 
     return NextResponse.json({
       ...license,
       customValues: customValuesWithLabels,
       supplier: licenseWithExtra?.supplier ?? null,
       licenseScope: licenseWithExtra?.licenseScope ?? null,
-      contractType: licenseWithExtra?.contractType ?? null,
+      acquisitionType: licenseWithExtra?.acquisitionType ?? null,
       licenseType: licenseWithExtra?.licenseType ?? null,
       renewalAlertStatus,
       linkedContractId,
+      hasInvoiceReference,
+      missingPaymentReference: isOlderThanOneYear && !hasInvoiceReference,
     })
   } catch (error) {
     console.error('Error en GET /api/inventory/licenses/[id]:', error)
@@ -114,10 +128,12 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       supplierId,
       renewalCost,
       renewalDate,
+      renewalFrequency,
+      customFrequencyMonths,
       invoiceNumber,
       purchaseOrderNumber,
       licenseScope,
-      contractType,
+      acquisitionType,
       contractId,
       contractLineCost,
       scope,
@@ -210,16 +226,21 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     const validatedData = updateLicenseSchema.parse(rest)
-    const updatePayload: any = { ...validatedData }
+    // expirationDate se maneja aparte, vía applyLicenseRenewalUpdate (junto con
+    // renewalDate/renewalCost/renewalFrequency), para no duplicar el reset de
+    // banderas de alerta + historial en dos lugares.
+    const { expirationDate: validatedExpirationDate, ...otherValidated } = validatedData as Record<
+      string,
+      unknown
+    >
+    const updatePayload: any = { ...otherValidated }
     if (licenseTypeId !== undefined) updatePayload.typeId = licenseTypeId
     if (scope !== undefined) updatePayload.licenseScope = mapLicenseScope(scope)
     if (supplierId !== undefined) updatePayload.supplierId = supplierId
-    if (renewalCost !== undefined) updatePayload.renewalCost = renewalCost
-    if (renewalDate !== undefined) updatePayload.renewalDate = renewalDate
     if (invoiceNumber !== undefined) updatePayload.invoiceNumber = invoiceNumber
     if (purchaseOrderNumber !== undefined) updatePayload.purchaseOrderNumber = purchaseOrderNumber
     if (licenseScope !== undefined) updatePayload.licenseScope = licenseScope
-    if (contractType !== undefined) updatePayload.contractType = contractType
+    if (acquisitionType !== undefined) updatePayload.acquisitionType = acquisitionType
     if (customValues !== undefined) {
       updatePayload.customValues = customValues.length > 0 ? customValues : null
     }
@@ -233,27 +254,62 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     const license = await LicenseService.updateLicense(id, updatePayload, session.user.id)
 
+    // Vencimiento/renovación — vía el helper compartido (ver license-renewal.ts),
+    // que resetea las banderas de "ya avisé" y escribe license_renewal_history.
+    // Misma lógica que usan la cascada de un lote y la sincronización de
+    // contrato, sin duplicarla acá.
+    const expirationTouched = rest.expirationDate !== undefined
+    const renewalTouched =
+      renewalDate !== undefined || renewalCost !== undefined || renewalFrequency !== undefined
+    let finalLicense: any = license
+    if (expirationTouched || renewalTouched) {
+      const renewed = await applyLicenseRenewalUpdate(
+        id,
+        {
+          ...(expirationTouched
+            ? { expirationDate: validatedExpirationDate as Date | undefined }
+            : {}),
+          ...(renewalDate !== undefined ? { renewalDate } : {}),
+          ...(renewalCost !== undefined ? { renewalCost } : {}),
+          ...(renewalFrequency !== undefined ? { renewalFrequency } : {}),
+          ...(customFrequencyMonths !== undefined ? { customFrequencyMonths } : {}),
+        },
+        session.user.id,
+        'direct'
+      )
+      finalLicense = { ...license, ...renewed }
+    }
+
     if (contractId !== undefined) {
       await syncLicenseContractLink(
         id,
         contractId || null,
-        license.name,
-        contractLineCost != null ? Number(contractLineCost) : undefined
+        finalLicense.name,
+        contractLineCost != null ? Number(contractLineCost) : undefined,
+        session.user.id
       )
     }
+
+    const renewalFieldsTouched = [
+      ...(expirationTouched ? ['expirationDate'] : []),
+      ...(renewalDate !== undefined ? ['renewalDate'] : []),
+      ...(renewalCost !== undefined ? ['renewalCost'] : []),
+      ...(renewalFrequency !== undefined ? ['renewalFrequency'] : []),
+      ...(customFrequencyMonths !== undefined ? ['customFrequencyMonths'] : []),
+    ]
 
     await AuditServiceComplete.log({
       action: AuditActionsComplete.LICENSE_UPDATED,
       entityType: 'inventory',
       entityId: id,
       userId: session.user.id,
-      details: { updatedFields: Object.keys(updatePayload) },
+      details: { updatedFields: [...Object.keys(updatePayload), ...renewalFieldsTouched] },
       ipAddress:
         request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
       userAgent: request.headers.get('user-agent') || 'unknown',
     }).catch(err => console.error('[AUDIT] Error registrando actualización de licencia:', err))
 
-    return NextResponse.json(license)
+    return NextResponse.json(finalLicense)
   } catch (error) {
     console.error('Error en PUT /api/inventory/licenses/[id]:', error)
     if (error instanceof ZodError) {

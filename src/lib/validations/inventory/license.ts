@@ -39,6 +39,11 @@ export const createLicenseSchema = z.object({
   ),
   renewalCost: optionalMoney,
   renewalDate: optionalDate,
+  renewalFrequency: z.preprocess(
+    emptyToUndef,
+    z.enum(['MONTHLY', 'QUARTERLY', 'SEMIANNUAL', 'ANNUAL', 'CUSTOM']).optional()
+  ),
+  customFrequencyMonths: z.preprocess(emptyToUndef, z.number().int().min(1).optional()),
   contractId: optionalNullableId,
   contractNumber: z.preprocess(emptyToUndef, z.string().max(100).optional()),
   notes: z.preprocess(emptyToUndef, z.string().max(2000).optional()),

@@ -488,11 +488,16 @@ export async function createAsset(
           : undefined,
         renewalCost: body.renewalCost ?? undefined,
         renewalDate: body.renewalDate ? new Date(body.renewalDate) : undefined,
+        renewalFrequency: (body.renewalFrequency ||
+          undefined) as CreateLicenseData['renewalFrequency'],
+        customFrequencyMonths: body.customFrequencyMonths
+          ? Number(body.customFrequencyMonths)
+          : undefined,
         licenseScope: mapLicenseScope(body.scope),
         // Prioriza el tipo de contrato elegido explícitamente en el formulario; si no se
         // especificó, se infiere de "pago recurrente" como respaldo (comportamiento previo).
-        contractType:
-          (body.contractType as CreateLicenseData['contractType']) ||
+        acquisitionType:
+          (body.acquisitionType as CreateLicenseData['acquisitionType']) ||
           (body.hasRecurring ? 'SOFTWARE' : undefined),
         notes: licenseNotes || undefined,
         assignedToUser: body.assignedToUser ? String(body.assignedToUser) : undefined,
@@ -509,7 +514,8 @@ export async function createAsset(
         license.id,
         bodyContractId,
         license.name,
-        bodyContractLineCost != null ? Number(bodyContractLineCost) : undefined
+        bodyContractLineCost != null ? Number(bodyContractLineCost) : undefined,
+        userId
       )
     } else if (cost != null && Number(cost) > 0) {
       // Espejo automático en el libro de facturas (license_invoices) — solo

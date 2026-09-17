@@ -160,7 +160,13 @@ export async function createBulkLicenses(
         // licencia se cuelga como línea del contrato y su costo se suma al total
         // recurrente — no genera factura individual, el pago queda representado
         // una sola vez en el calendario de cuotas del contrato.
-        await linkLicenseToBusinessContract(license.id, contractId, license.name, row.cost ?? null)
+        await linkLicenseToBusinessContract(
+          license.id,
+          contractId,
+          license.name,
+          row.cost ?? null,
+          userId
+        )
       } else if (row.cost != null && row.cost > 0) {
         // Mismo criterio que el alta individual sin contrato: si hay costo, se
         // refleja como factura PENDIENTE en el libro de pagos — evita que el

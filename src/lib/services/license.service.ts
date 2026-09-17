@@ -41,8 +41,10 @@ export class LicenseService {
         purchaseOrderNumber: data.purchaseOrderNumber || null,
         renewalCost: data.renewalCost ?? null,
         renewalDate: data.renewalDate || null,
+        renewalFrequency: data.renewalFrequency ?? null,
+        customFrequencyMonths: data.customFrequencyMonths ?? null,
         licenseScope: data.licenseScope ?? null,
-        contractType: data.contractType ?? null,
+        acquisitionType: data.acquisitionType ?? null,
         notes: data.notes,
         assignedToEquipment: data.assignedToEquipment || null,
         assignedToUser: data.assignedToUser || null,
@@ -266,7 +268,11 @@ export class LicenseService {
   }
 
   /**
-   * Obtiene licencias próximas a expirar
+   * Obtiene licencias próximas a expirar SIN contrato vinculado — para
+   * licencias con contrato, el vencimiento ya lo cubre
+   * ContractAlertService.checkExpirations contra la fecha del contrato; sin
+   * este filtro se manda un aviso duplicado (uno por licencia, otro por
+   * contrato) para la misma fecha.
    */
   static async getExpiringLicenses(daysBeforeExpiration: number): Promise<SoftwareLicense[]> {
     const now = new Date()
@@ -279,6 +285,29 @@ export class LicenseService {
           gte: now,
           lte: targetDate,
         },
+        contractLines: { none: {} },
+      },
+      include: licenseInclude,
+    })
+
+    return licenses as SoftwareLicense[]
+  }
+
+  /**
+   * Obtiene licencias SIN contrato vinculado (contractLines vacío) con un pago de
+   * renovación próximo — para licencias que sí tienen contrato, el aviso de pago
+   * ya lo cubre ContractPaymentService.checkPaymentAlerts contra contract_payments.
+   */
+  static async getLicensesWithUpcomingPayment(daysAhead: number): Promise<SoftwareLicense[]> {
+    const now = new Date()
+    const targetDate = new Date()
+    targetDate.setDate(targetDate.getDate() + daysAhead)
+
+    const licenses = await prisma.software_licenses.findMany({
+      where: {
+        renewalDate: { gte: now, lte: targetDate },
+        renewalCost: { not: null },
+        contractLines: { none: {} },
       },
       include: licenseInclude,
     })

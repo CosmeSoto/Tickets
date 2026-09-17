@@ -16,7 +16,10 @@ export class CheckLicenseExpirationJob {
   /**
    * Envía notificaciones para licencias próximas a expirar
    */
-  static async sendExpirationNotifications(daysBeforeExpiration: number): Promise<number> {
+  static async sendExpirationNotifications(
+    daysBeforeExpiration: number,
+    dedupeField: 'expirationAlertFirstSentAt' | 'expirationAlertSecondSentAt' | null = null
+  ): Promise<number> {
     try {
       console.log(
         `[CheckLicenseExpirationJob] Enviando alertas (${daysBeforeExpiration} días antes)...`
@@ -34,6 +37,12 @@ export class CheckLicenseExpirationJob {
       const { systemName } = await getSystemBranding()
 
       for (const license of expiringLicenses) {
+        // Ya se avisó para esta ventana y la fecha de vencimiento no cambió desde
+        // entonces (el PUT de la licencia resetea este campo a null si cambia) —
+        // sin esta guarda, una corrida diaria del cron reenvía la misma alerta
+        // todos los días mientras la licencia siga dentro de la ventana.
+        if (dedupeField && (license as any)[dedupeField]) continue
+
         const familyId = (license as any).licenseType?.familyId ?? null
 
         // In-app: superadmin + admin nativo (getFamilyScopedAdmins)
@@ -114,6 +123,17 @@ export class CheckLicenseExpirationJob {
               error
             )
           }
+        }
+
+        if (dedupeField && (pushAdmins.length > 0 || emailAdmins.length > 0)) {
+          await prisma.software_licenses
+            .update({ where: { id: license.id }, data: { [dedupeField]: new Date() } })
+            .catch((error: unknown) =>
+              console.error(
+                `[CheckLicenseExpirationJob] Error marcando ${dedupeField} para ${license.name}:`,
+                error
+              )
+            )
         }
       }
 
@@ -222,9 +242,17 @@ export class CheckLicenseExpirationJob {
       const daysFirst = firstSetting ? parseInt(firstSetting.value, 10) : 30
       const daysSecond = secondSetting ? parseInt(secondSetting.value, 10) : 7
 
-      // Enviar alertas para diferentes períodos
-      const alerts30DaysSent = await this.sendExpirationNotifications(daysFirst)
-      const alerts7DaysSent = await this.sendExpirationNotifications(daysSecond)
+      // Enviar alertas para diferentes períodos. El aviso de 1 día es la última
+      // llamada de atención antes del vencimiento — se manda sin dedupe a propósito,
+      // los otros dos sí usan dedupe para no reenviar el mismo aviso cada día.
+      const alerts30DaysSent = await this.sendExpirationNotifications(
+        daysFirst,
+        'expirationAlertFirstSentAt'
+      )
+      const alerts7DaysSent = await this.sendExpirationNotifications(
+        daysSecond,
+        'expirationAlertSecondSentAt'
+      )
       const alerts1DaySent = await this.sendExpirationNotifications(1)
 
       const result = {

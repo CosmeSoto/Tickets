@@ -331,9 +331,14 @@ export const REPORT_DATASETS: ReportDatasetDef[] = [
       { key: 'tipo', label: 'Tipo', defaultVisible: true },
       { key: 'proveedor', label: 'Proveedor', defaultVisible: true },
       { key: 'costo', label: 'Costo', defaultVisible: true },
+      { key: 'fechaCompra', label: 'Fecha compra', defaultVisible: false },
       { key: 'renovacion', label: 'Costo renovación', defaultVisible: false },
+      { key: 'fechaRenovacion', label: 'Próxima renovación', defaultVisible: true },
+      { key: 'frecuenciaRenovacion', label: 'Frecuencia renovación', defaultVisible: false },
+      { key: 'ultimaRenovacion', label: 'Última renovación registrada', defaultVisible: false },
       { key: 'vencimiento', label: 'Vencimiento', defaultVisible: true },
       { key: 'alcance', label: 'Alcance', defaultVisible: false },
+      { key: 'lote', label: 'Lote', defaultVisible: false },
     ],
   },
   {
@@ -558,6 +563,16 @@ export const REPORT_DATASETS: ReportDatasetDef[] = [
       { key: 'fechaVencimiento', label: 'Vencimiento', defaultVisible: true },
       { key: 'diasRestantes', label: 'Días restantes', defaultVisible: true },
       { key: 'urgencia', label: 'Urgencia', defaultVisible: true },
+      {
+        key: 'fechaCompra',
+        label: 'Fecha compra (solo licencias)',
+        defaultVisible: false,
+      },
+      {
+        key: 'fechaRenovacion',
+        label: 'Próxima renovación (solo licencias)',
+        defaultVisible: false,
+      },
     ],
   },
   {

@@ -33,8 +33,12 @@ export interface CreateLicenseData {
   purchaseOrderNumber?: string
   renewalCost?: number
   renewalDate?: Date
+  /** Solo aplica a licencias SIN contrato vinculado (ver LicenseRenewalFrequency) */
+  renewalFrequency?: 'MONTHLY' | 'QUARTERLY' | 'SEMIANNUAL' | 'ANNUAL' | 'CUSTOM'
+  /** Solo cuando renewalFrequency === 'CUSTOM' */
+  customFrequencyMonths?: number
   licenseScope?: 'INDIVIDUAL' | 'DEPARTMENT' | 'COMPANY'
-  contractType?: 'SOFTWARE' | 'SERVICE_EXTERNAL' | 'MAINTENANCE' | 'INSURANCE' | 'SLA'
+  acquisitionType?: 'SOFTWARE' | 'SERVICE_EXTERNAL' | 'MAINTENANCE' | 'INSURANCE' | 'SLA'
   notes?: string
   assignedToEquipment?: string
   assignedToUser?: string

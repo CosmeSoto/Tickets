@@ -81,6 +81,9 @@ export interface GlobalRules {
   licenseAlertEnabled: boolean
   licenseAlertDaysFirst: number
   licenseAlertDaysSecond: number
+  licensePaymentAlertEnabled: boolean
+  licensePaymentAlertDaysFirst: number
+  licensePaymentAlertDaysSecond: number
   warrantyAlertEnabled: boolean
   warrantyAlertDays: number
   contractAlertDays: number
@@ -102,6 +105,9 @@ const DEFAULT_GLOBAL_RULES: GlobalRules = {
   licenseAlertEnabled: true,
   licenseAlertDaysFirst: 30,
   licenseAlertDaysSecond: 7,
+  licensePaymentAlertEnabled: true,
+  licensePaymentAlertDaysFirst: 30,
+  licensePaymentAlertDaysSecond: 7,
   warrantyAlertEnabled: true,
   warrantyAlertDays: 30,
   contractAlertDays: 30,
@@ -134,6 +140,16 @@ function apiSettingsToGlobalRules(settings: Record<string, unknown>): GlobalRule
       Number(settings.license_alert_days_first) || DEFAULT_GLOBAL_RULES.licenseAlertDaysFirst,
     licenseAlertDaysSecond:
       Number(settings.license_alert_days_second) || DEFAULT_GLOBAL_RULES.licenseAlertDaysSecond,
+    licensePaymentAlertEnabled:
+      settings.license_payment_alert_enabled !== undefined
+        ? settings.license_payment_alert_enabled === true
+        : DEFAULT_GLOBAL_RULES.licensePaymentAlertEnabled,
+    licensePaymentAlertDaysFirst:
+      Number(settings.license_payment_alert_days_first) ||
+      DEFAULT_GLOBAL_RULES.licensePaymentAlertDaysFirst,
+    licensePaymentAlertDaysSecond:
+      Number(settings.license_payment_alert_days_second) ||
+      DEFAULT_GLOBAL_RULES.licensePaymentAlertDaysSecond,
     warrantyAlertEnabled:
       settings.warranty_alert_enabled !== undefined
         ? settings.warranty_alert_enabled === true
@@ -184,6 +200,9 @@ function globalRulesToApiPayload(rules: GlobalRules): Record<string, number | bo
     license_alert_enabled: rules.licenseAlertEnabled,
     license_alert_days_first: rules.licenseAlertDaysFirst,
     license_alert_days_second: rules.licenseAlertDaysSecond,
+    license_payment_alert_enabled: rules.licensePaymentAlertEnabled,
+    license_payment_alert_days_first: rules.licensePaymentAlertDaysFirst,
+    license_payment_alert_days_second: rules.licensePaymentAlertDaysSecond,
     warranty_alert_enabled: rules.warrantyAlertEnabled,
     warranty_alert_days: rules.warrantyAlertDays,
     contract_alert_days: rules.contractAlertDays,

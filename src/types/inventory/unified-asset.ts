@@ -30,6 +30,10 @@ export interface UnifiedAsset {
   assignedToName?: string
   assignedAt?: string
   assignedByName?: string
+  // Solo licencias
+  expirationDate?: string | null
+  renewalFrequency?: string | null
+  customFrequencyMonths?: number | null
 }
 
 export interface UnifiedAssetsResponse {
@@ -89,6 +93,8 @@ export type ColumnKey =
   | 'atributos'
   | 'accesorios'
   | 'lote'
+  | 'vencimiento'
+  | 'frecuenciaRenovacion'
 
 export const OPTIONAL_COLUMNS: { key: ColumnKey; label: string }[] = [
   { key: 'area', label: 'Área' },
@@ -97,6 +103,8 @@ export const OPTIONAL_COLUMNS: { key: ColumnKey; label: string }[] = [
   { key: 'condicion', label: 'Condición' },
   { key: 'propiedad', label: 'Propiedad' },
   { key: 'lote', label: 'Lote' },
+  { key: 'vencimiento', label: 'Vencimiento' },
+  { key: 'frecuenciaRenovacion', label: 'Frecuencia de renovación' },
   { key: 'asignado', label: 'Asignado a' },
   { key: 'fechaAsignacion', label: 'Fecha de asignación' },
   { key: 'asignadoPor', label: 'Asignado por' },
@@ -117,6 +125,7 @@ export const DEFAULT_VISIBLE_COLUMNS: ColumnKey[] = [
   'estado',
   'condicion',
   // 'lote',
+  'vencimiento',
   'asignado',
   'propiedad',
   'creado',
@@ -142,4 +151,6 @@ export const COLUMN_KEY_TO_ASSET_KEY: Record<ColumnKey, string> = {
   atributos: 'attributes',
   accesorios: 'accessories',
   lote: 'batchCode',
+  vencimiento: 'expirationDate',
+  frecuenciaRenovacion: 'renewalFrequency',
 }

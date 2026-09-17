@@ -19,11 +19,7 @@ export class ContractAmendmentService {
     })
   }
 
-  static async create(
-    contractId: string,
-    input: CreateContractAmendmentInput,
-    userId: string
-  ) {
+  static async create(contractId: string, input: CreateContractAmendmentInput, userId: string) {
     const contract = await prisma.contracts.findUnique({
       where: { id: contractId },
       select: {
@@ -51,8 +47,7 @@ export class ContractAmendmentService {
       input.newTotalValue != null && input.newTotalValue !== contract.totalValue
     const hasEndChange =
       input.newEndDate != null &&
-      contract.endDate?.toISOString().slice(0, 10) !==
-        input.newEndDate.toISOString().slice(0, 10)
+      contract.endDate?.toISOString().slice(0, 10) !== input.newEndDate.toISOString().slice(0, 10)
     const hasBillingChange =
       input.newBillingCycle != null && input.newBillingCycle !== contract.billingCycle
 
@@ -103,7 +98,7 @@ export class ContractAmendmentService {
     })
 
     if (input.applyToContract) {
-      await syncContractLicenseLines(contractId).catch(err =>
+      await syncContractLicenseLines(contractId, userId).catch(err =>
         console.error('[amendment] sync licenses:', err)
       )
       await syncContractEquipmentLines(contractId).catch(err =>
@@ -135,7 +130,7 @@ export class ContractAmendmentService {
       if (hasEndChange) changeParts.push(`vencimiento actualizado`)
       if (hasBillingChange) changeParts.push(`ciclo de facturación actualizado`)
       const summary =
-        changeParts.length > 0 ? changeParts.join('; ') : input.description ?? 'Ver detalle'
+        changeParts.length > 0 ? changeParts.join('; ') : (input.description ?? 'Ver detalle')
 
       const admins = await getFamilyScopedAdmins(contractMeta.familyId, { id: true })
       await Promise.all(

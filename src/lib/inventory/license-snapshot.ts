@@ -27,7 +27,7 @@ export async function buildLicenseSnapshot(
     typeName: license.licenseType?.name ?? null,
     vendor: license.vendor,
     supplier: license.supplier,
-    contractType: license.contractType,
+    acquisitionType: license.acquisitionType,
     licenseScope: license.licenseScope,
     cost: license.cost,
     renewalCost: license.renewalCost,

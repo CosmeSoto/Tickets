@@ -150,6 +150,64 @@ export function InventoryGlobalTab({
 
           <Separator />
 
+          {/* Alerta de pago de licencias sin contrato */}
+          <div className='space-y-3'>
+            <div className='flex items-center justify-between p-3 border rounded-lg'>
+              <div>
+                <p className='text-sm font-medium'>Alertas de pago de licencias sin contrato</p>
+                <p className='text-xs text-muted-foreground'>
+                  Notificar antes de la fecha de renovación de una licencia que no tiene un contrato
+                  vinculado (usa la fecha y el costo de renovación propios de la licencia)
+                </p>
+              </div>
+              <Switch
+                checked={globalRules.licensePaymentAlertEnabled}
+                onCheckedChange={v => onSetGlobal('licensePaymentAlertEnabled', v)}
+                disabled={readOnly}
+              />
+            </div>
+            {globalRules.licensePaymentAlertEnabled && (
+              <div className='grid grid-cols-1 sm:grid-cols-2 gap-4 pl-4 border-l-2 border-muted'>
+                <div>
+                  <Label className='text-xs'>Primera alerta (días antes)</Label>
+                  <div className='flex items-center gap-2 mt-1'>
+                    <Input
+                      type='number'
+                      min='1'
+                      max='90'
+                      value={globalRules.licensePaymentAlertDaysFirst}
+                      onChange={e =>
+                        onSetGlobal('licensePaymentAlertDaysFirst', parseInt(e.target.value) || 30)
+                      }
+                      className='w-24 h-8 text-sm font-mono'
+                      disabled={readOnly}
+                    />
+                    <span className='text-xs text-muted-foreground'>días</span>
+                  </div>
+                </div>
+                <div>
+                  <Label className='text-xs'>Segunda alerta (días antes)</Label>
+                  <div className='flex items-center gap-2 mt-1'>
+                    <Input
+                      type='number'
+                      min='1'
+                      max='90'
+                      value={globalRules.licensePaymentAlertDaysSecond}
+                      onChange={e =>
+                        onSetGlobal('licensePaymentAlertDaysSecond', parseInt(e.target.value) || 7)
+                      }
+                      className='w-24 h-8 text-sm font-mono'
+                      disabled={readOnly}
+                    />
+                    <span className='text-xs text-muted-foreground'>días</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <Separator />
+
           {/* Garantía */}
           <div className='space-y-3'>
             <div className='flex items-center justify-between p-3 border rounded-lg'>

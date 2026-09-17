@@ -26,6 +26,7 @@ import {
 } from '@/lib/contracts/billing-completeness'
 import { syncContractLicenseLines } from '@/lib/contracts/license-sync'
 import { syncContractEquipmentLines } from '@/lib/contracts/equipment-sync'
+import { linkLicenseToBusinessContract } from '@/lib/inventory/license-contract'
 
 // ── Guard helpers ─────────────────────────────────────────────────────────────
 
@@ -345,6 +346,12 @@ export class ContractService {
     } & BillingGovernanceInput
   ) {
     const { lines = [], createdBy, ...contractData } = data
+    // Las líneas con licenseId NO se crean acá — se vinculan después con
+    // linkLicenseToBusinessContract, el único camino que garantiza que una
+    // licencia no quede enganchada a dos contratos a la vez y que limpia sus
+    // campos de renovación standalone al vincularse (ver license-contract.ts).
+    const linesWithoutLicense = lines.filter(l => !l.licenseId)
+    const licenseLines = lines.filter((l): l is typeof l & { licenseId: string } => !!l.licenseId)
 
     const contract = await prisma.contracts.create({
       data: {
@@ -379,9 +386,9 @@ export class ContractService {
         }),
         createdBy,
         lines:
-          lines.length > 0
+          linesWithoutLicense.length > 0
             ? {
-                create: lines.map((l, i) => ({
+                create: linesWithoutLicense.map((l, i) => ({
                   id: randomUUID(),
                   type: toValidLineType(l.type),
                   description: l.description,
@@ -389,7 +396,6 @@ export class ContractService {
                   unitPrice: l.unitPrice ?? null,
                   totalPrice: l.unitPrice && l.quantity ? l.unitPrice * l.quantity : null,
                   equipmentId: l.equipmentId || null,
-                  licenseId: l.licenseId || null,
                   notes: l.notes || null,
                   serviceStartDate: l.serviceStartDate ? new Date(l.serviceStartDate) : null,
                   serviceEndDate: l.serviceEndDate ? new Date(l.serviceEndDate) : null,
@@ -400,6 +406,16 @@ export class ContractService {
       },
       include: CONTRACT_INCLUDE,
     })
+
+    for (const l of licenseLines) {
+      await linkLicenseToBusinessContract(
+        l.licenseId,
+        contract.id,
+        l.description,
+        undefined,
+        createdBy
+      ).catch(err => console.error('[contract] Error vinculando licencia al crear contrato:', err))
+    }
 
     // Auditoría
     await createAuditLog({
@@ -416,7 +432,7 @@ export class ContractService {
       },
     })
 
-    await syncContractLicenseLines(contract.id).catch(err =>
+    await syncContractLicenseLines(contract.id, createdBy).catch(err =>
       console.error('[contract] sync licenses on create:', err)
     )
     await syncContractEquipmentLines(contract.id).catch(err =>
@@ -519,7 +535,7 @@ export class ContractService {
       },
     })
 
-    await syncContractLicenseLines(id).catch(err =>
+    await syncContractLicenseLines(id, updatedBy).catch(err =>
       console.error('[contract] sync licenses on update:', err)
     )
     await syncContractEquipmentLines(id).catch(err =>
@@ -571,9 +587,15 @@ export class ContractService {
     // Eliminar líneas existentes y recrear (más simple que diff)
     await prisma.contract_lines.deleteMany({ where: { contractId } })
 
-    if (lines.length > 0) {
+    // Las líneas con licenseId se vinculan aparte con linkLicenseToBusinessContract
+    // (mismo motivo que en create(): único camino que evita que una licencia
+    // quede enganchada a dos contratos y limpia sus campos standalone).
+    const linesWithoutLicense = lines.filter(l => !l.licenseId)
+    const licenseLines = lines.filter((l): l is typeof l & { licenseId: string } => !!l.licenseId)
+
+    if (linesWithoutLicense.length > 0) {
       await prisma.contract_lines.createMany({
-        data: lines.map((l, i) => ({
+        data: linesWithoutLicense.map((l, i) => ({
           id: randomUUID(),
           contractId,
           type: toValidLineType(l.type),
@@ -582,13 +604,22 @@ export class ContractService {
           unitPrice: l.unitPrice ?? null,
           totalPrice: l.unitPrice && l.quantity ? l.unitPrice * l.quantity : null,
           equipmentId: l.equipmentId || null,
-          licenseId: l.licenseId || null,
           notes: l.notes || null,
           serviceStartDate: l.serviceStartDate ? new Date(l.serviceStartDate) : null,
           serviceEndDate: l.serviceEndDate ? new Date(l.serviceEndDate) : null,
           order: l.order ?? i,
         })),
       })
+    }
+
+    for (const l of licenseLines) {
+      await linkLicenseToBusinessContract(
+        l.licenseId,
+        contractId,
+        l.description,
+        undefined,
+        updatedBy
+      ).catch(err => console.error('[contract] Error vinculando licencia en líneas:', err))
     }
 
     await createAuditLog({
@@ -599,7 +630,7 @@ export class ContractService {
       changes: { linesCount: lines.length },
     })
 
-    await syncContractLicenseLines(contractId).catch(err =>
+    await syncContractLicenseLines(contractId, updatedBy).catch(err =>
       console.error('[contract] sync licenses on lines:', err)
     )
     await syncContractEquipmentLines(contractId).catch(err =>

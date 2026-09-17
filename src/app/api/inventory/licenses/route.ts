@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
     const supplierId = searchParams.get('supplierId') || undefined
     const orderByParam = searchParams.get('orderBy') || undefined
     const familyId = searchParams.get('familyId') || undefined
-    const contractType = searchParams.get('contractType') || undefined
+    const acquisitionType = searchParams.get('acquisitionType') || undefined
     const licenseScope = searchParams.get('licenseScope') || undefined
 
     const validatedFilters = licenseFiltersSchema.parse(filters)
@@ -71,8 +71,8 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    if (contractType) {
-      where.contractType = contractType
+    if (acquisitionType) {
+      where.acquisitionType = acquisitionType
     }
 
     if (licenseScope) {
@@ -122,7 +122,7 @@ export async function GET(request: NextRequest) {
       expired: validatedFilters.expired,
       supplierId,
       familyId,
-      contractType,
+      acquisitionType,
       licenseScope,
       orderByParam,
     })
@@ -151,8 +151,11 @@ export async function GET(request: NextRequest) {
     const warningDays = Math.max(1, parseInt(warningDaysRaw ?? '30', 10) || 30)
 
     const processedLicenses = rawLicenses.map((l: any) => {
+      // Igual criterio que en GET /licenses/[id]: si no hay renewalDate, cae a
+      // expirationDate para coincidir con la fecha que vigila el cron de vencimiento.
+      const referenceDate = l.renewalDate ?? l.expirationDate ?? null
       const renewalAlertStatus = getRenewalAlertStatus(
-        l.renewalDate ? new Date(l.renewalDate) : null,
+        referenceDate ? new Date(referenceDate) : null,
         warningDays
       )
       const base =

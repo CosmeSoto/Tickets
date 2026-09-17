@@ -8,6 +8,7 @@ import {
   toCSV,
 } from '@/lib/inventory/report-utils'
 import { ExcelGenerator } from '@/lib/services/export/excel-generator'
+import { LICENSE_RENEWAL_FREQUENCY_LABELS } from '@/lib/inventory/license-labels'
 import { ALL_FILTER } from './catalog'
 import type { ReportResponse, ReportRunParams, ReportSummaryItem } from './types'
 import {
@@ -93,11 +94,7 @@ function pickColumns(
   })
 }
 
-function summarizeCount(
-  label: string,
-  value: string | number,
-  detail: string
-): ReportSummaryItem {
+function summarizeCount(label: string, value: string | number, detail: string): ReportSummaryItem {
   return { title: label, value, description: detail }
 }
 
@@ -227,7 +224,8 @@ async function runEquipmentDataset(
       groupValues: {
         familia: eq.type?.family?.name ?? '—',
         estado: EQUIPMENT_STATUS_ES[eq.status] ?? eq.status,
-        modalidad: ACQUISITION_LABELS[eq.acquisitionMode ?? 'FIXED_ASSET'] ?? eq.acquisitionMode ?? '—',
+        modalidad:
+          ACQUISITION_LABELS[eq.acquisitionMode ?? 'FIXED_ASSET'] ?? eq.acquisitionMode ?? '—',
         tipo: eq.type?.name ?? '—',
         mesCompra: monthKey(eq.purchaseDate),
       },
@@ -372,19 +370,43 @@ async function runLicensesDataset(
       take: limit,
       orderBy: { expirationDate: 'asc' },
       select: {
+        id: true,
         name: true,
         cost: true,
+        purchaseDate: true,
         renewalCost: true,
+        renewalDate: true,
+        renewalFrequency: true,
+        customFrequencyMonths: true,
         expirationDate: true,
         licenseScope: true,
         supplier: { select: { name: true } },
         licenseType: {
           select: { name: true, family: { select: { name: true } } },
         },
+        batch: { select: { batchCode: true } },
       },
     }),
     prisma.software_licenses.count({ where }),
   ])
+
+  // Última renovación registrada por licencia — un solo query agregado en vez de
+  // N+1: para cada licencia, el previousRenewalDate de su historial más reciente
+  // (ver license_renewal_history, escrito desde PUT /licenses/[id]).
+  const licenseIds = records.map(lic => lic.id)
+  const lastRenewalByLicense = new Map<string, Date | null>()
+  if (licenseIds.length > 0) {
+    const histories = await prisma.license_renewal_history.findMany({
+      where: { licenseId: { in: licenseIds } },
+      orderBy: { createdAt: 'desc' },
+      select: { licenseId: true, previousRenewalDate: true },
+    })
+    for (const h of histories) {
+      if (!lastRenewalByLicense.has(h.licenseId)) {
+        lastRenewalByLicense.set(h.licenseId, h.previousRenewalDate)
+      }
+    }
+  }
 
   const SCOPE_ES: Record<string, string> = {
     INDIVIDUAL: 'Individual',
@@ -392,16 +414,28 @@ async function runLicensesDataset(
     COMPANY: 'Empresa',
   }
 
-  const data = records.map(lic => ({
-    nombre: lic.name,
-    familia: lic.licenseType?.family?.name ?? '—',
-    tipo: lic.licenseType?.name ?? '—',
-    proveedor: lic.supplier?.name ?? '—',
-    costo: lic.cost != null ? formatCurrency(lic.cost) : '—',
-    renovacion: lic.renewalCost != null ? formatCurrency(lic.renewalCost) : '—',
-    vencimiento: lic.expirationDate ? formatDate(lic.expirationDate) : '—',
-    alcance: lic.licenseScope ? (SCOPE_ES[lic.licenseScope] ?? lic.licenseScope) : '—',
-  }))
+  const data = records.map(lic => {
+    const lastRenewal = lastRenewalByLicense.get(lic.id)
+    return {
+      nombre: lic.name,
+      familia: lic.licenseType?.family?.name ?? '—',
+      tipo: lic.licenseType?.name ?? '—',
+      proveedor: lic.supplier?.name ?? '—',
+      costo: lic.cost != null ? formatCurrency(lic.cost) : '—',
+      fechaCompra: lic.purchaseDate ? formatDate(lic.purchaseDate) : '—',
+      renovacion: lic.renewalCost != null ? formatCurrency(lic.renewalCost) : '—',
+      fechaRenovacion: lic.renewalDate ? formatDate(lic.renewalDate) : '—',
+      frecuenciaRenovacion: lic.renewalFrequency
+        ? lic.renewalFrequency === 'CUSTOM' && lic.customFrequencyMonths
+          ? `Cada ${lic.customFrequencyMonths} meses`
+          : (LICENSE_RENEWAL_FREQUENCY_LABELS[lic.renewalFrequency] ?? lic.renewalFrequency)
+        : '—',
+      ultimaRenovacion: lastRenewal ? formatDate(lastRenewal) : '—',
+      vencimiento: lic.expirationDate ? formatDate(lic.expirationDate) : '—',
+      alcance: lic.licenseScope ? (SCOPE_ES[lic.licenseScope] ?? lic.licenseScope) : '—',
+      lote: lic.batch?.batchCode ?? '—',
+    }
+  })
 
   return buildDatasetResponse('licenses', data, total, page, limit, params)
 }
@@ -471,8 +505,7 @@ async function runConsumablesDataset(
     minimo: c.minStock,
     unidad: c.unitOfMeasure?.symbol ?? c.unitOfMeasure?.name ?? '—',
     costoUnitario: c.costPerUnit != null ? formatCurrency(c.costPerUnit) : '—',
-    valorTotal:
-      c.costPerUnit != null ? formatCurrency(c.costPerUnit * c.currentStock) : '—',
+    valorTotal: c.costPerUnit != null ? formatCurrency(c.costPerUnit * c.currentStock) : '—',
     estado: CONSUMABLE_STATUS_ES[c.status] ?? c.status,
   }))
 
@@ -785,8 +818,7 @@ async function runSalesDataset(
       },
     })
     const groupable: GroupableRow[] = records.map(s => {
-      const profit =
-        s.equipment.purchasePrice != null ? s.salePrice - s.equipment.purchasePrice : 0
+      const profit = s.equipment.purchasePrice != null ? s.salePrice - s.equipment.purchasePrice : 0
       return {
         groupValues: {
           estado: STATUS_ES[s.status] ?? s.status,
@@ -828,8 +860,7 @@ async function runSalesDataset(
 
   const data = records.map(s => {
     const bookValue = s.equipment.purchasePrice
-    const profit =
-      bookValue != null ? s.salePrice - bookValue : null
+    const profit = bookValue != null ? s.salePrice - bookValue : null
     return {
       codigo: s.equipment.code,
       equipo: `${s.equipment.brand} ${s.equipment.model}`,
