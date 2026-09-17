@@ -476,30 +476,19 @@ function foldLegacyFamilyAssignmentsIntoUnified(mappedData: Record<string, any[]
 
 function processRecordForRestore(record: any): any {
   const processed = { ...record }
-  for (const [key, value] of Object.entries(processed)) {
-    if (value !== null && typeof value === 'object' && !(value instanceof Date)) {
-      if (Array.isArray(value) || (typeof value === 'object' && !ArrayBuffer.isView(value))) {
-        const jsonFields = [
-          'details',
-          'metadata',
-          'config',
-          'settings',
-          'preferences',
-          'data',
-          'content',
-          'options',
-          'filters',
-          'headers',
-          'payload',
-          'response',
-          'context',
-        ]
-        if (!jsonFields.includes(key)) {
-          delete processed[key]
-        }
-      }
-    }
-  }
+  // Nota: antes acá se borraba cualquier campo objeto/array cuyo nombre no
+  // estuviera en una lista fija de ~13 nombres (details/metadata/config/...) —
+  // pensada para columnas Json genéricas, pero como los exportadores de cada
+  // módulo hacen `findMany()` sin relaciones (solo columnas escalares reales
+  // de la tabla), CUALQUIER objeto/array presente en un registro exportado es
+  // una columna Json o String[] legítima (accessories, customValues,
+  // equipmentSnapshot, delivererInfo/receiverInfo, missingAccessories,
+  // contractSnapshot, etc.) — la lista fija los borraba en silencio en cada
+  // restauración porque nunca se actualizó al agregar esos campos. Prisma ya
+  // acepta objetos/arrays JS tal cual para columnas Json/array, y si algún
+  // valor no correspondiera a la tabla, el create/upsert de abajo lo
+  // reportaría como error por registro (con savepoint) en vez de perder datos
+  // en silencio — así que no hace falta filtrar nada acá.
   const dateFields = [
     'createdAt',
     'updatedAt',

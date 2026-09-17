@@ -46,6 +46,50 @@ export async function checkSubscriptionGovernanceAlerts(): Promise<void> {
   await ContractAlertService.checkSubscriptionGovernance()
 }
 
+/**
+ * Dedup compartido de la alerta de stock bajo — mismo marcador de audit_logs
+ * (action=NOTIFICATION_SENT, alertType=LOW_STOCK_ALERT) usado tanto por el
+ * cron diario (checkStockAlerts) como por el aviso en tiempo real que dispara
+ * cada movimiento de stock (ver POST /api/inventory/consumables/[id]/movements)
+ * — antes el aviso en tiempo real no tenía ningún dedup y reenviaba el mismo
+ * correo/notificación en cada consumo o reposición del día mientras el
+ * material siguiera bajo el mínimo.
+ */
+export async function hasLowStockAlertBeenSentToday(consumableId: string): Promise<boolean> {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const alreadySent = await prisma.audit_logs.findFirst({
+    where: {
+      action: 'NOTIFICATION_SENT',
+      entityType: 'asset',
+      entityId: consumableId,
+      createdAt: { gte: today },
+      details: { path: ['alertType'], equals: 'LOW_STOCK_ALERT' },
+    },
+  })
+  return !!alreadySent
+}
+
+export async function markLowStockAlertSent(item: {
+  id: string
+  currentStock: number
+  minStock: number
+}): Promise<void> {
+  await prisma.audit_logs.create({
+    data: {
+      id: randomUUID(),
+      action: 'NOTIFICATION_SENT',
+      entityType: 'asset',
+      entityId: item.id,
+      details: {
+        alertType: 'LOW_STOCK_ALERT',
+        currentStock: item.currentStock,
+        minStock: item.minStock,
+      },
+    },
+  })
+}
+
 export async function checkStockAlerts(): Promise<void> {
   const consumables = await prisma.consumables.findMany({
     where: { status: 'ACTIVE' },
@@ -60,20 +104,8 @@ export async function checkStockAlerts(): Promise<void> {
 
   const lowStockItems = consumables.filter(item => item.currentStock <= item.minStock)
 
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-
   for (const item of lowStockItems) {
-    const alreadySent = await prisma.audit_logs.findFirst({
-      where: {
-        action: 'NOTIFICATION_SENT',
-        entityType: 'asset',
-        entityId: item.id,
-        createdAt: { gte: today },
-        details: { path: ['alertType'], equals: 'LOW_STOCK_ALERT' },
-      },
-    })
-    if (alreadySent) continue
+    if (await hasLowStockAlertBeenSentToday(item.id)) continue
 
     await notifyFamilyAdmins(item.consumableType?.familyId ?? null, {
       type: 'WARNING',
@@ -82,19 +114,7 @@ export async function checkStockAlerts(): Promise<void> {
       metadata: { link: '/inventory/consumables' },
     })
 
-    await prisma.audit_logs.create({
-      data: {
-        id: randomUUID(),
-        action: 'NOTIFICATION_SENT',
-        entityType: 'asset',
-        entityId: item.id,
-        details: {
-          alertType: 'LOW_STOCK_ALERT',
-          currentStock: item.currentStock,
-          minStock: item.minStock,
-        },
-      },
-    })
+    await markLowStockAlertSent(item)
   }
 }
 

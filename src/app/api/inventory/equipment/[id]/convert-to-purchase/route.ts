@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { randomUUID } from 'crypto'
 import { canManageInventory, canManageAsset } from '@/lib/inventory-access'
 import { isValidInvoiceNumber, INVOICE_NUMBER_ERROR } from '@/lib/inventory/invoice-number'
+import { notifyFamilyScopedAdminsExcept } from '@/lib/api/notify'
 
 /**
  * POST /api/inventory/equipment/[id]/convert-to-purchase
@@ -166,6 +167,17 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         },
       },
     })
+
+    // Evento financiero significativo (compra registrada) — no debe quedar
+    // visible solo en audit_logs.
+    await notifyFamilyScopedAdminsExcept(
+      assetFamilyId,
+      session.user.id,
+      'INVENTORY',
+      `Equipo comprado: ${equipment.code}`,
+      `${equipment.brand} ${equipment.model} (${equipment.code}) se convirtió de ${previousOwnershipType === 'RENTAL' ? 'arrendamiento' : 'activo de tercero'} a activo propio por $${purchasePrice.toFixed(2)}.`,
+      { metadata: { link: `/inventory/equipment/${id}` } }
+    ).catch(() => {})
 
     return NextResponse.json({
       success: true,

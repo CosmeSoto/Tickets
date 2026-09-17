@@ -10,6 +10,7 @@ import prisma from '@/lib/prisma'
 import { NotificationService } from '@/lib/services/notification-service'
 import { getFamilyScopedAdmins } from '@/lib/notifications/family-recipients'
 import { queueNotificationEmail } from '@/lib/notifications/queue-notification-email'
+import { hasLowStockAlertBeenSentToday, markLowStockAlertSent } from '@/lib/inventory/notifications'
 import {
   assertInventoryResourceManage,
   assertInventoryResourceRead,
@@ -130,6 +131,12 @@ async function checkLowStockAndNotify(consumableId: string) {
 
   if (!isLowStock) return
 
+  // Mismo dedup diario que el cron (checkStockAlerts) — sin esto, cada
+  // movimiento de stock del día (consumo o reposición) que dejara el
+  // material bajo el mínimo reenviaba la misma notificación/email a todos
+  // los admins de la familia.
+  if (await hasLowStockAlertBeenSentToday(consumable.id)) return
+
   // Super admins + admin nativo de la familia del consumible
   const admins = await getFamilyScopedAdmins(consumable.consumableType?.familyId ?? null, {
     id: true,
@@ -174,6 +181,8 @@ async function checkLowStockAndNotify(consumableId: string) {
       priority: isOutOfStock ? 'important' : 'optional',
     }).catch(() => {})
   }
+
+  await markLowStockAlertSent(consumable)
 }
 
 function generateLowStockEmail(

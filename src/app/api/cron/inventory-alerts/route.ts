@@ -11,6 +11,7 @@ import { CheckLicensePaymentJob } from '@/lib/jobs/check-license-payment.job'
 import { CheckRentalExpirationJob } from '@/lib/jobs/check-rental-expiration.job'
 import { CheckAssignmentExpirationJob } from '@/lib/jobs/check-assignment-expiration.job'
 import { checkPaymentAlerts } from '@/lib/cron/check-payment-alerts'
+import { BatchAlertService } from '@/lib/services/batch-alert.service'
 import { isInventoryAlertEnabled } from '@/lib/settings/runtime-settings'
 import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
@@ -30,8 +31,15 @@ export async function GET(request: NextRequest) {
         isInventoryAlertEnabled('inventory.warranty_alert_enabled'),
       ])
 
-    // Asignaciones siempre (no es alerta de vencimiento de catálogo).
-    const tasks: Promise<unknown>[] = [CheckAssignmentExpirationJob.run()]
+    // Asignaciones y utilización de lotes siempre — cada una respeta su propio
+    // toggle interno (por familia, ver getBatchAlertSettings), no el global de
+    // Reglas generales. Antes utilización de lotes vivía en /api/cron/batch-
+    // utilization, una ruta standalone que nunca se instaló en el crontab
+    // (mismo patrón de cron huérfano que el resto de esta auditoría).
+    const tasks: Promise<unknown>[] = [
+      CheckAssignmentExpirationJob.run(),
+      BatchAlertService.checkUtilizationAlerts(),
+    ]
 
     if (lowStockEnabled) tasks.push(checkStockAlerts())
     // Licencias + contratos comerciales + rentas: mismo toggle de Reglas generales

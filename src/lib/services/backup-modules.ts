@@ -600,6 +600,8 @@ export const INVENTORY_MODULE_RESTORE_ORDER = [
   'inventory_family_config',
   'supplier_types',
   'suppliers',
+  'supplier_evaluations',
+  'bank_entities',
   'units_of_measure',
   'equipment_types',
   'equipment_type_attributes',
@@ -610,6 +612,7 @@ export const INVENTORY_MODULE_RESTORE_ORDER = [
   'equipment_models',
   'equipment_brands',
   'equipment_code_counters',
+  'folio_counters',
   'warehouses',
   'equipment',
   'equipment_custom_values',
@@ -635,7 +638,10 @@ export const INVENTORY_MODULE_RESTORE_ORDER = [
   'decommission_requests',
   'decommission_acts',
   'decommission_attachments',
+  'license_batches',
   'software_licenses',
+  'license_assignments',
+  'license_renewal_history',
   'license_invoices',
   'license_invoice_installments',
   'license_attachments',
@@ -679,6 +685,8 @@ export async function exportInventoryModuleData(): Promise<Record<string, unknow
       creditLimit: s.creditLimit != null ? s.creditLimit.toString() : null,
     }))
   })
+  await fetchTable('supplier_evaluations', () => prisma.supplier_evaluations.findMany())
+  await fetchTable('bank_entities', () => prisma.bank_entities.findMany())
   await fetchTable('units_of_measure', () => prisma.units_of_measure.findMany())
   await fetchTable('equipment_types', () => prisma.equipment_types.findMany())
   await fetchTable('equipment_type_attributes', () => prisma.equipment_type_attributes.findMany())
@@ -689,6 +697,7 @@ export async function exportInventoryModuleData(): Promise<Record<string, unknow
   await fetchTable('equipment_models', () => prisma.equipment_models.findMany())
   await fetchTable('equipment_brands', () => prisma.equipment_brands.findMany())
   await fetchTable('equipment_code_counters', () => prisma.equipment_code_counters.findMany())
+  await fetchTable('folio_counters', () => prisma.folio_counters.findMany())
   await fetchTable('warehouses', () => prisma.warehouses.findMany())
 
   // Activos
@@ -722,7 +731,10 @@ export async function exportInventoryModuleData(): Promise<Record<string, unknow
   await fetchTable('decommission_requests', () => prisma.decommission_requests.findMany())
   await fetchTable('decommission_acts', () => prisma.decommission_acts.findMany())
   await fetchTable('decommission_attachments', () => prisma.decommission_attachments.findMany())
+  await fetchTable('license_batches', () => prisma.license_batches.findMany())
   await fetchTable('software_licenses', () => prisma.software_licenses.findMany())
+  await fetchTable('license_assignments', () => prisma.license_assignments.findMany())
+  await fetchTable('license_renewal_history', () => prisma.license_renewal_history.findMany())
   await fetchTable('license_invoices', () => prisma.license_invoices.findMany())
   await fetchTable('license_invoice_installments', () =>
     prisma.license_invoice_installments.findMany()
@@ -731,7 +743,7 @@ export async function exportInventoryModuleData(): Promise<Record<string, unknow
   await fetchTable('consumables', () => prisma.consumables.findMany())
   await fetchTable('stock_movements', () => prisma.stock_movements.findMany())
 
-  // Lotes ya exportados arriba; solicitudes
+  // Lotes de equipos y de licencias ya exportados arriba; solicitudes
   await fetchTable('asset_requests', () => prisma.asset_requests.findMany())
   await fetchTable('asset_request_sla_metrics', () => prisma.asset_request_sla_metrics.findMany())
 

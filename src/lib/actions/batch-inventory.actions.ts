@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth'
 import { canManageInventory } from '@/lib/inventory-access'
 import { BatchService } from '@/lib/services/batch-inventory.service'
 import { createAuditLog } from '@/lib/audit'
+import { notifyFamilyScopedAdminsExcept } from '@/lib/api/notify'
 import prisma from '@/lib/prisma'
 
 export async function deleteBatch(
@@ -23,7 +24,11 @@ export async function deleteBatch(
 
     const batch = await prisma.equipment_batches.findUnique({
       where: { id: batchId },
-      select: { batchCode: true, quantity: true },
+      select: {
+        batchCode: true,
+        quantity: true,
+        model: { select: { type: { select: { familyId: true } } } },
+      },
     })
     if (!batch) {
       return { success: false, error: 'Lote no encontrado' }
@@ -42,6 +47,17 @@ export async function deleteBatch(
         retiredEquipmentCount: result.deletedCount,
       },
     })
+
+    // Acción irreversible que retira equipos y libera vínculos de contrato —
+    // avisamos a los admins de la familia, no solo queda en el audit log.
+    await notifyFamilyScopedAdminsExcept(
+      batch.model?.type?.familyId ?? null,
+      session.user.id,
+      'WARNING',
+      `Lote eliminado: ${batch.batchCode}`,
+      `Se eliminó el lote ${batch.batchCode} — ${result.deletedCount} equipo(s) quedaron retirados.`,
+      { metadata: { link: '/inventory?tab=batches' } }
+    ).catch(() => {})
 
     return { success: true, deletedCount: result.deletedCount }
   } catch (e: unknown) {
