@@ -331,10 +331,15 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if ('invoiceNumber' in body) financialFields.invoiceNumber = invoiceNumber ?? null
     if ('purchaseOrderNumber' in body)
       financialFields.purchaseOrderNumber = purchaseOrderNumber ?? null
-    if ('usefulLifeYears' in body) financialFields.usefulLifeYears = usefulLifeYears ?? null
-    if ('residualValue' in body) financialFields.residualValue = residualValue ?? null
     if ('warehouseId' in body) financialFields.warehouseId = warehouseId ?? null
-    if ('acquisitionMode' in body) financialFields.acquisitionMode = acquisitionMode ?? null
+    if ('acquisitionMode' in body) {
+      financialFields.acquisitionMode = acquisitionMode ?? null
+      // ownershipType es el campo legado que todavía usan RentalAlertService,
+      // los reportes y varios dashboards — sin este mirror, cambiar el modo
+      // desde el formulario de edición (que solo manda acquisitionMode) lo
+      // dejaba desincronizado en silencio (ver auditoría de ciclo de vida).
+      financialFields.ownershipType = acquisitionMode ?? null
+    }
     if ('contractStartDate' in body)
       financialFields.contractStartDate = contractStartDate ? new Date(contractStartDate) : null
     if ('contractEndDate' in body)
@@ -348,7 +353,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if ('rentalClientResponse' in body)
       financialFields.rentalClientResponse = rentalClientResponse ?? 'NOT_NOTIFIED'
 
-    // Campos de depreciación solo si la familia del activo los soporta
+    // Campos de depreciación/compra solo si la familia del activo los soporta
+    // Y el modo sigue siendo FIXED_ASSET — si no, se limpian explícitamente
+    // en vez de solo dejar de pedirlos (el cliente los omite del payload al
+    // cambiar de modo, pero eso el servidor lo interpreta como "no tocar",
+    // no como "ya no aplica", y el valor viejo quedaba pegado — ver auditoría).
     const currentEquipment = await prisma.equipment.findUnique({
       where: { id },
       select: {
@@ -368,11 +377,30 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       )
 
     if (depreciationAllowed) {
+      if ('usefulLifeYears' in body) financialFields.usefulLifeYears = usefulLifeYears ?? null
+      if ('residualValue' in body) financialFields.residualValue = residualValue ?? null
       if ('depreciationRate' in body) financialFields.depreciationRate = depreciationRate ?? null
       if ('depreciationMethod' in body)
         financialFields.depreciationMethod = depreciationMethod ?? null
       if ('totalUnits' in body) financialFields.totalUnits = totalUnits ?? null
       if ('usedUnits' in body) financialFields.usedUnits = usedUnits ?? null
+    } else if ('acquisitionMode' in body) {
+      // La familia sí permite depreciación pero el modo ya no es FIXED_ASSET
+      // (o viceversa) — limpiamos igual, son mutuamente excluyentes con
+      // RENTAL/LOAN sin importar la config de la familia.
+      financialFields.usefulLifeYears = null
+      financialFields.residualValue = null
+      financialFields.depreciationRate = null
+      financialFields.depreciationMethod = null
+      financialFields.totalUnits = null
+      financialFields.usedUnits = null
+    }
+
+    // El precio de compra (financialFields.purchasePrice) es del bloque
+    // FINANCIERO, no del de depreciación — depende solo del modo, no de si la
+    // familia además muestra depreciación (ver showFinancial en el formulario).
+    if ('acquisitionMode' in body && effectiveAcquisitionMode !== 'FIXED_ASSET') {
+      financialFields.purchasePrice = null
     }
 
     if (Object.keys(financialFields).length > 0) {
@@ -455,7 +483,12 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
           )
         }
       } else if (contractIdFromBody !== undefined) {
-        await syncEquipmentContractLink(id, contractIdFromBody, id)
+        // El modo ya no es RENTAL — nunca debe quedar vinculado a un contrato
+        // de arrendamiento, sin importar qué contractId (posiblemente
+        // obsoleto, de antes de cambiar de modalidad) siga mandando el
+        // formulario mientras el selector de contrato está oculto (ver
+        // auditoría de ciclo de vida: "contrato fantasma").
+        await syncEquipmentContractLink(id, null, id)
       }
     }
 

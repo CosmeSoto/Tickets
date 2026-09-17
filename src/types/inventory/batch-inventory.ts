@@ -82,6 +82,11 @@ export interface BatchDepreciationSummary {
   totalPurchaseValue: number
   totalBookValue: number
   totalAccumulatedDepreciation: number
+  /** true si algún equipo del lote quedó con método/vida útil/valor residual
+   * distinto al resto (p. ej. se editó individualmente después de crear el
+   * lote) — método/vida útil/valor residual de arriba son solo de un equipo
+   * de muestra, no representan a todo el lote. */
+  isMixed: boolean
 }
 
 /** Plantilla para crear un lote similar a uno existente */

@@ -13,6 +13,7 @@ import { getBatchUtilizationAlerts } from '@/lib/inventory/batch-alerts'
 import { getBatchAlertSettings } from '@/lib/inventory/batch-alert-settings'
 import { Prisma, EquipmentCondition } from '@prisma/client'
 import { resolveBrandName } from '@/lib/utils/equipment-display'
+import { releaseEquipmentFromContracts } from '@/lib/inventory/equipment-contract'
 import { calculateDepreciation, type DepreciationMethod } from '@/lib/inventory/depreciation'
 
 const DEPRECIATION_METHOD_LABELS: Record<string, string> = {
@@ -307,6 +308,19 @@ export class BatchService {
 
     if (withDepreciation === 0) return null
 
+    // Método/vida útil/valor residual de arriba son de UN equipo de muestra —
+    // si otro del lote quedó con valores distintos (se editó individualmente
+    // después de crear el lote), avisamos que dejaron de ser representativos
+    // del lote completo (los totales sí usan el valor real de cada uno).
+    const isMixed = equipment.some(
+      e =>
+        e.purchasePrice != null &&
+        e.usefulLifeYears != null &&
+        (e.depreciationMethod !== sample.depreciationMethod ||
+          e.usefulLifeYears !== sample.usefulLifeYears ||
+          (e.residualValue ?? 0) !== (sample.residualValue ?? 0))
+    )
+
     return {
       method: sample.depreciationMethod,
       methodLabel:
@@ -318,6 +332,7 @@ export class BatchService {
       totalPurchaseValue: totalPurchase,
       totalBookValue,
       totalAccumulatedDepreciation: totalAccumulated,
+      isMixed,
     }
   }
 
@@ -478,6 +493,23 @@ export class BatchService {
     if (!validation.canDelete) {
       throw new Error(validation.message)
     }
+
+    // Liberar vínculos de contrato ANTES de retirar — si no, un lote RENTAL
+    // eliminado deja contract_lines huérfanas apuntando a equipos ya RETIRED
+    // (mismo criterio que la baja/venta individual, ver
+    // decommission-acts/[id]/approve/route.ts). Best-effort: un fallo acá no
+    // debe bloquear la eliminación del lote en sí.
+    const batchEquipment = await prisma.equipment.findMany({
+      where: { batchId },
+      select: { id: true },
+    })
+    await Promise.all(
+      batchEquipment.map(eq =>
+        releaseEquipmentFromContracts(eq.id).catch(err => {
+          console.error('[batch/delete] Error liberando contrato del equipo:', eq.id, err)
+        })
+      )
+    )
 
     const result = await prisma.$transaction(async tx => {
       const equipmentUpdate = await tx.equipment.updateMany({

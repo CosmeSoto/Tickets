@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
 import { TrendingDown, Calculator } from 'lucide-react'
 import type { BatchDepreciationSummary as BatchDepreciationSummaryType } from '@/types/inventory/batch-inventory'
 
@@ -26,12 +27,24 @@ export function BatchDepreciationSummary({ summary }: BatchDepreciationSummaryPr
         <CardTitle className='text-base flex items-center gap-2'>
           <Calculator className='w-4 h-4' />
           Depreciación del Lote
+          {summary.isMixed && (
+            <Badge variant='outline' className='text-xs font-normal'>
+              Valores mixtos
+            </Badge>
+          )}
         </CardTitle>
+        {summary.isMixed && (
+          <p className='text-xs text-muted-foreground'>
+            Al menos un equipo del lote tiene método, vida útil o valor residual distinto al resto
+            (se editó individualmente) — método/vida útil/residual de abajo son de un equipo de
+            muestra, no de todo el lote. Los totales sí reflejan el valor real de cada equipo.
+          </p>
+        )}
       </CardHeader>
       <CardContent>
         <div className='grid grid-cols-2 md:grid-cols-4 gap-4 text-sm'>
           <div>
-            <p className='text-xs text-muted-foreground'>Método</p>
+            <p className='text-xs text-muted-foreground'>Método{summary.isMixed && ' (muestra)'}</p>
             <p className='font-medium'>{summary.methodLabel}</p>
           </div>
           <div>

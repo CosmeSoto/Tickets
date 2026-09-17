@@ -3,16 +3,16 @@
  *
  * Responsabilidades:
  *  - CRUD de contratos y líneas
- *  - Cálculo de estado (ACTIVE / EXPIRING / EXPIRED)
- *  - Notificaciones de vencimiento próximo
+ *  - Cálculo de estado derivado (ACTIVE / EXPIRING / EXPIRED) para lectura/UI
  *  - Registro de auditoría en cada operación
+ *
+ * Las notificaciones de vencimiento próximo NO viven acá — ver
+ * ContractAlertService.checkExpirations (cron maestro /api/cron/inventory-alerts).
  */
 
 import { prisma } from '@/lib/prisma'
 import { randomUUID } from 'crypto'
 import { createAuditLog } from '@/lib/audit'
-import { NotificationService } from '@/lib/services/notification-service'
-import { getFamilyScopedAdmins } from '@/lib/notifications/family-recipients'
 import { EXPIRING_DAYS, type ContractStatus } from '@/types/contracts'
 import { getSetting } from '@/lib/api-cache'
 import {
@@ -638,99 +638,11 @@ export class ContractService {
     )
   }
 
-  // ── Job: alertas de vencimiento ─────────────────────────────────────────────
-  // Llamado por el cron job de expiración. Envía notificaciones a los
-  // administradores cuando un contrato está próximo a vencer.
-
-  static async checkExpirations() {
-    const now = new Date()
-    const daysRaw = await getSetting('inventory.contract_alert_days', 600, String(EXPIRING_DAYS))
-    const expiringDays = Math.max(
-      1,
-      parseInt(daysRaw ?? String(EXPIRING_DAYS), 10) || EXPIRING_DAYS
-    )
-    const alertThreshold = new Date(now.getTime() + expiringDays * 24 * 60 * 60 * 1000)
-
-    // Contratos que vencen en la ventana configurada y no han sido alertados
-    const expiring = await prisma.contracts.findMany({
-      where: {
-        status: { in: ['ACTIVE', 'EXPIRING'] },
-        endDate: { lte: alertThreshold, gte: now },
-        expiryAlertSentAt: null,
-      },
-      include: {
-        supplier: { select: { name: true } },
-        family: { select: { name: true } },
-        creator: { select: { id: true, name: true } },
-      },
-    })
-
-    for (const contract of expiring) {
-      const { daysUntilExpiry } = computeContractStatus(contract.endDate, expiringDays)
-      const supplierName = contract.supplier?.name ?? 'Sin proveedor'
-      const familyName = contract.family?.name ?? ''
-
-      // Notificar al creador del contrato
-      await NotificationService.push({
-        userId: contract.createdBy,
-        type: 'WARNING',
-        title: `Contrato por vencer: ${contract.name}`,
-        message: `El contrato "${contract.name}" con ${supplierName}${familyName ? ` (${familyName})` : ''} vence en ${daysUntilExpiry} día(s).`,
-        metadata: {
-          contractId: contract.id,
-          contractName: contract.name,
-          daysUntilExpiry,
-          endDate: contract.endDate?.toISOString(),
-        },
-      })
-
-      // Super admins + admin nativo de la familia (excluir creador si ya fue notificado)
-      const familyAdmins = await getFamilyScopedAdmins(contract.familyId, { id: true })
-      await Promise.all(
-        familyAdmins
-          .filter(admin => admin.id !== contract.createdBy)
-          .map(admin =>
-            NotificationService.push({
-              userId: admin.id,
-              type: 'WARNING',
-              title: `Contrato por vencer: ${contract.name}`,
-              message: `El contrato "${contract.name}" con ${supplierName}${familyName ? ` (${familyName})` : ''} vence en ${daysUntilExpiry} día(s).`,
-              metadata: {
-                contractId: contract.id,
-                contractName: contract.name,
-                daysUntilExpiry,
-                endDate: contract.endDate?.toISOString(),
-              },
-            })
-          )
-      )
-
-      // Marcar como alertado
-      await prisma.contracts.update({
-        where: { id: contract.id },
-        data: { expiryAlertSentAt: now, status: 'EXPIRING' },
-      })
-
-      await createAuditLog({
-        entityType: 'contract',
-        entityId: contract.id,
-        action: 'contract_expiry_alert_sent',
-        userId: contract.createdBy,
-        changes: { daysUntilExpiry, endDate: contract.endDate?.toISOString() },
-      })
-    }
-
-    // Marcar como EXPIRED los que ya vencieron
-    const expired = await prisma.contracts.updateMany({
-      where: {
-        status: { in: ['ACTIVE', 'EXPIRING'] },
-        endDate: { lt: now },
-      },
-      data: { status: 'EXPIRED' },
-    })
-
-    return { alertsSent: expiring.length, markedExpired: expired.count }
-  }
+  // Nota: el envío de alertas de vencimiento de contratos vive en
+  // ContractAlertService.checkExpirations (usado por el cron maestro
+  // /api/cron/inventory-alerts vía checkContractAlerts) — este servicio tenía
+  // una segunda implementación completa del mismo job, sin ningún llamador
+  // real, que se retiró por auditoría de duplicidades (ver ContractAlertService).
 
   // ── Estadísticas por modelo ─────────────────────────────────────────────────
 

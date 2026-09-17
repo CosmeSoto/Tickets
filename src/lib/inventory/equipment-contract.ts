@@ -232,20 +232,9 @@ export async function getDecommissionContractImpact(
   }
 }
 
-/** Libera vínculos contrato ↔ equipo tras una baja. */
+/** Libera vínculos contrato ↔ equipo tras una baja — mismo camino que
+ * desvincular un contrato desde la edición (syncEquipmentContractLink con
+ * contractId null), sin duplicar la limpieza de campos. */
 export async function releaseEquipmentFromContracts(equipmentId: string): Promise<void> {
-  await prisma.contract_lines.deleteMany({ where: { equipmentId } })
-  await prisma.equipment.update({
-    where: { id: equipmentId },
-    data: {
-      contractId: null,
-      rentalContractNumber: null,
-      rentalStartDate: null,
-      rentalEndDate: null,
-      rentalMonthlyCost: null,
-      contractStartDate: null,
-      contractEndDate: null,
-      contractRenewalCost: null,
-    },
-  })
+  await syncEquipmentContractLink(equipmentId, null, equipmentId)
 }
