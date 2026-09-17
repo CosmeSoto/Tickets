@@ -36,6 +36,16 @@ export async function checkContractAlerts(): Promise<void> {
   await ContractAlertService.checkExpirations()
 }
 
+/**
+ * Gobernanza de suscripciones (custodio/pago/cliente incompletos) — vivía
+ * únicamente en la ruta de cron /api/cron/contracts, que nunca se instaló y
+ * se retiró por duplicidad con /api/cron/inventory-alerts (ver auditoría de
+ * ciclo de vida de contratos). Se mueve acá para no perder la función.
+ */
+export async function checkSubscriptionGovernanceAlerts(): Promise<void> {
+  await ContractAlertService.checkSubscriptionGovernance()
+}
+
 export async function checkStockAlerts(): Promise<void> {
   const consumables = await prisma.consumables.findMany({
     where: { status: 'ACTIVE' },

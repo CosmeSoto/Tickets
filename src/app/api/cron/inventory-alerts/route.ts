@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import {
   checkContractAlerts,
+  checkSubscriptionGovernanceAlerts,
   checkStockAlerts,
   checkMROExpiryAlerts,
   checkWarrantyAlerts,
@@ -37,6 +38,7 @@ export async function GET(request: NextRequest) {
     if (licenseEnabled) {
       tasks.push(CheckLicenseExpirationJob.run())
       tasks.push(checkContractAlerts())
+      tasks.push(checkSubscriptionGovernanceAlerts())
       tasks.push(CheckRentalExpirationJob.run())
       tasks.push(checkPaymentAlerts())
     }
