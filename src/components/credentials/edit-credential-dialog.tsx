@@ -19,6 +19,7 @@ import {
   formatCredentialVaultLabel,
   CREDENTIAL_ENTRY_TYPE_LABELS,
 } from '@/lib/credentials/constants'
+import { GeneratePasswordButton } from '@/components/shared/generate-password-button'
 
 export type EditableCredentialEntry = {
   id: string
@@ -235,6 +236,12 @@ export function EditCredentialDialog({ entry, onClose, onUpdated }: EditCredenti
                   >
                     {showSecret ? <EyeOff className='h-4 w-4' /> : <Eye className='h-4 w-4' />}
                   </Button>
+                  <GeneratePasswordButton
+                    onGenerate={secret => {
+                      setForm(p => ({ ...p, secret }))
+                      setShowSecret(true)
+                    }}
+                  />
                 </div>
               </div>
 

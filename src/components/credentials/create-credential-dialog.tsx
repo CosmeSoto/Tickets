@@ -24,6 +24,7 @@ import { SearchableSelect } from '@/components/ui/searchable-select'
 import { useToast } from '@/hooks/use-toast'
 import { CheckCircle2, Copy, Eye, EyeOff, ExternalLink, Loader2 } from 'lucide-react'
 import { formatCredentialVaultLabel } from '@/lib/credentials/constants'
+import { GeneratePasswordButton } from '@/components/shared/generate-password-button'
 import type { CredentialVaultOption as Vault } from '@/components/credentials/types'
 
 interface CreateCredentialDialogProps {
@@ -553,9 +554,15 @@ export function CreateCredentialDialog({
                   >
                     {showSecret ? <EyeOff className='h-4 w-4' /> : <Eye className='h-4 w-4' />}
                   </Button>
+                  <GeneratePasswordButton
+                    onGenerate={secret => {
+                      setForm(p => ({ ...p, secret }))
+                      setShowSecret(true)
+                    }}
+                  />
                 </div>
                 <p className='text-xs text-muted-foreground'>
-                  Usa el ojo para verificar tipeo antes de guardar.
+                  Usa el ojo para verificar tipeo antes de guardar, o genera una aleatoria.
                 </p>
               </div>
 
