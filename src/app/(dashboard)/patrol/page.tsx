@@ -2,7 +2,7 @@
 import { DEFAULT_TIMEZONE } from '@/lib/constants'
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { useSession } from 'next-auth/react'
+import { useAuthReady } from '@/hooks/auth/use-auth-ready'
 import { useRouter } from 'next/navigation'
 import { Shield, Clock, CalendarDays, History, Loader2, List } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
@@ -97,7 +97,7 @@ function bucketQuery(bucket: TimeBucket): URLSearchParams {
 }
 
 export default function PatrolListPage() {
-  const { data: session, status } = useSession()
+  const { data: session, status } = useAuthReady()
   const router = useRouter()
 
   const [patrols, setPatrols] = useState<PatrolListItem[]>([])

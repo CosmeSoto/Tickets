@@ -2,14 +2,14 @@
 
 // PÁGINA DEDICADA PARA LA CONFIGURACIÓN DE LA PÁGINA PÚBLICA
 // NO ES NECESARIO AGREGARLA NUEVAMENTE EN "CONFIGURACIÓN DEL SISTEMA"
-import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { LandingPageCMSTab } from '@/components/settings/landing-page-cms-tab'
+import { useAuthReady } from '@/hooks/auth/use-auth-ready'
 
 export default function HelpConfigPage() {
-  const { data: session, status } = useSession()
+  const { data: session, status } = useAuthReady()
   const router = useRouter()
 
   useEffect(() => {

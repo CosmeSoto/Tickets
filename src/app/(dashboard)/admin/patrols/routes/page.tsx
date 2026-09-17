@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { useSession } from 'next-auth/react'
+import { useAuthReady } from '@/hooks/auth/use-auth-ready'
 import { useRouter } from 'next/navigation'
 import {
   Plus,
@@ -105,7 +105,7 @@ const EMPTY_FORM = {
 }
 
 export default function RoutesPage() {
-  const { data: session, status } = useSession()
+  const { data: session, status } = useAuthReady()
   const router = useRouter()
   const { toast } = useToast()
 

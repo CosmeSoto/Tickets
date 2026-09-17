@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
-import { useSession } from 'next-auth/react'
+import { useAuthReady } from '@/hooks/auth/use-auth-ready'
 import { useRouter } from 'next/navigation'
 import { Plus, FileText, Trash2, Edit, Download, Star } from 'lucide-react'
 import { DocumentFormDialog, EMPTY_DOCUMENT_FORM } from '@/components/forms/DocumentFormDialog'
@@ -33,7 +33,7 @@ import type {
 } from '@/components/forms/types'
 
 export default function AdminFormsPage() {
-  const { data: session, status } = useSession()
+  const { data: session, status } = useAuthReady()
   const router = useRouter()
   const { toast } = useToast()
   const accessChecked = useRef(false)

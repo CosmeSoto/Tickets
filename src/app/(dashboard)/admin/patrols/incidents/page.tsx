@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { useSession } from 'next-auth/react'
+import { useAuthReady } from '@/hooks/auth/use-auth-ready'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/hooks/use-toast'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
@@ -30,7 +30,7 @@ const INITIAL_FILTERS = {
 }
 
 export default function AdminPatrolIncidentsPage() {
-  const { data: session, status } = useSession()
+  const { data: session, status } = useAuthReady()
   const router = useRouter()
   const { toast } = useToast()
 

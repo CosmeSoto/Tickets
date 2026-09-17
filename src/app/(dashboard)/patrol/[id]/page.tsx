@@ -8,7 +8,7 @@ import { DEFAULT_TIMEZONE } from '@/lib/constants'
  */
 
 import { useEffect } from 'react'
-import { useSession } from 'next-auth/react'
+import { useAuthReady } from '@/hooks/auth/use-auth-ready'
 import { useRouter, useParams } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 
@@ -34,7 +34,7 @@ import { usePatrolData } from '@/hooks/use-patrol-data'
 import { usePatrolExecution } from '@/hooks/use-patrol-execution'
 
 export default function PatrolExecutionPage() {
-  const { data: session, status } = useSession()
+  const { data: session, status } = useAuthReady()
   const router = useRouter()
   const params = useParams()
   const patrolId = params.id as string

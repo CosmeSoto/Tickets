@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { useSession } from 'next-auth/react'
+import { useAuthReady } from '@/hooks/auth/use-auth-ready'
 import { useSearchParams } from 'next/navigation'
 import { safeFetch } from '@/lib/auth-fetch'
 import {
@@ -120,7 +120,7 @@ interface UseInventoryListProps {
 }
 
 export function useInventoryList({ initialFamilyId, personalOnly = false }: UseInventoryListProps) {
-  const { status } = useSession()
+  const { status } = useAuthReady()
   const searchParams = useSearchParams()
   const { families } = useFamilyOptions()
 

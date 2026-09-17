@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { useSession } from 'next-auth/react'
+import { useAuthReady } from '@/hooks/auth/use-auth-ready'
 import { useRouter } from 'next/navigation'
 import { FileText, Download, Star, Plus, Edit, Trash2 } from 'lucide-react'
 
@@ -35,7 +35,7 @@ import type {
 } from '@/components/forms/types'
 
 export default function PublicFormsPage() {
-  const { data: session, status } = useSession()
+  const { data: session, status } = useAuthReady()
   const router = useRouter()
   const { toast } = useToast()
   const accessChecked = useRef(false)

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useSession } from 'next-auth/react'
+import { useAuthReady } from '@/hooks/auth/use-auth-ready'
 import { useRouter } from 'next/navigation'
 import { Plus, UsersIcon } from 'lucide-react'
 
@@ -33,7 +33,7 @@ import { useToast } from '@/hooks/use-toast'
 import { useActiveDepartments } from '@/contexts/departments-context'
 
 export default function AdminUsersPage() {
-  const { data: session, status } = useSession()
+  const { data: session, status } = useAuthReady()
   const router = useRouter()
   const { toast } = useToast()
 

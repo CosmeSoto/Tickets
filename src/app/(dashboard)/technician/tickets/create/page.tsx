@@ -1,6 +1,6 @@
 'use client'
 
-import { useSession } from 'next-auth/react'
+import { useAuthReady } from '@/hooks/auth/use-auth-ready'
 import { useRouter } from 'next/navigation'
 import { useEffect, useRef } from 'react'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
@@ -10,7 +10,7 @@ import Link from 'next/link'
 import { CreateTicketForm } from '@/components/tickets/create-ticket-form'
 
 export default function TechnicianCreateTicketPage() {
-  const { data: session, status } = useSession()
+  const { data: session, status } = useAuthReady()
   const router = useRouter()
   const hasAuthenticated = useRef(false)
 

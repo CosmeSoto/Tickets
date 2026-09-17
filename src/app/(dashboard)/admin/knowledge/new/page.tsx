@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState, useRef } from 'react'
 import { useSyncDashboardPageMeta } from '@/contexts/dashboard-shell-context'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useSession } from 'next-auth/react'
+import { useAuthReady } from '@/hooks/auth/use-auth-ready'
 import { useKnowledge } from '@/hooks/use-knowledge'
 import { useCategoriesData } from '@/hooks/use-categories'
 import { Button } from '@/components/ui/button'
@@ -35,7 +35,7 @@ type TicketAttachment = {
 function NewArticleContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { data: session, status } = useSession()
+  const { data: session, status } = useAuthReady()
   const { createFromTicket, getTicketSuggestions, loading } = useKnowledge()
   const { categories, loadCategories } = useCategoriesData()
 

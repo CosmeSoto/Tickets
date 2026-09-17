@@ -3,10 +3,11 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useSession, signOut } from 'next-auth/react'
+import { signOut } from 'next-auth/react'
 import { Wrench, LogIn, Loader2, LogOut, ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { SystemLogo } from '@/components/common/system-logo'
+import { useAuthReady } from '@/hooks/auth/use-auth-ready'
 
 type MaintenanceConfig = {
   enabled: boolean
@@ -31,7 +32,7 @@ function dashboardForRole(role?: string): string {
 
 export default function MaintenancePage() {
   const router = useRouter()
-  const { data: session, status } = useSession()
+  const { data: session, status } = useAuthReady()
   const [config, setConfig] = useState<MaintenanceConfig | null>(null)
   const [redirecting, setRedirecting] = useState(false)
 
@@ -50,8 +51,7 @@ export default function MaintenancePage() {
         } else {
           setConfig({
             enabled: true,
-            message:
-              'El sistema está en mantenimiento programado. Vuelve a intentarlo más tarde.',
+            message: 'El sistema está en mantenimiento programado. Vuelve a intentarlo más tarde.',
             allowAdmins: true,
           })
         }
@@ -59,9 +59,8 @@ export default function MaintenancePage() {
       .catch(() => {
         setConfig({
           enabled: true,
-          message:
-            'El sistema está en mantenimiento programado. Vuelve a intentarlo más tarde.',
-            allowAdmins: true,
+          message: 'El sistema está en mantenimiento programado. Vuelve a intentarlo más tarde.',
+          allowAdmins: true,
         })
       })
   }, [])
@@ -76,7 +75,9 @@ export default function MaintenancePage() {
       return
     }
 
-    const user = session?.user as { role?: string; isSuperAdmin?: boolean; name?: string } | undefined
+    const user = session?.user as
+      | { role?: string; isSuperAdmin?: boolean; name?: string }
+      | undefined
     if (canBypassMaintenance(user, config.allowAdmins)) {
       setRedirecting(true)
       router.replace('/admin')
@@ -86,8 +87,7 @@ export default function MaintenancePage() {
   const isAuthenticated = status === 'authenticated' && !!session?.user
   const user = session?.user as { name?: string; role?: string } | undefined
   const message =
-    config?.message ||
-    'El sistema está en mantenimiento programado. Vuelve a intentarlo más tarde.'
+    config?.message || 'El sistema está en mantenimiento programado. Vuelve a intentarlo más tarde.'
 
   if (status === 'loading' || !config || redirecting) {
     return (
@@ -139,7 +139,10 @@ export default function MaintenancePage() {
         {isAuthenticated && config.allowAdmins && (
           <p className='text-xs text-muted-foreground'>
             Si eres administrador y no fuiste redirigido,{' '}
-            <Link href='/admin' className='text-primary hover:underline inline-flex items-center gap-1'>
+            <Link
+              href='/admin'
+              className='text-primary hover:underline inline-flex items-center gap-1'
+            >
               continuar al panel
               <ArrowRight className='h-3 w-3' />
             </Link>

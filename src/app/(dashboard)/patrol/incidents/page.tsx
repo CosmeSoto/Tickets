@@ -11,7 +11,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react'
-import { useSession } from 'next-auth/react'
+import { useAuthReady } from '@/hooks/auth/use-auth-ready'
 import { useRouter } from 'next/navigation'
 import { FileWarning } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
@@ -95,7 +95,7 @@ const INITIAL_FILTERS = {
 // ── Componente principal ──────────────────────────────────────────────────────
 
 export default function MisNovedadesPage() {
-  const { data: session, status } = useSession()
+  const { data: session, status } = useAuthReady()
   const router = useRouter()
   const { toast } = useToast()
 

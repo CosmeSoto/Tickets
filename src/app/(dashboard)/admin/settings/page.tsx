@@ -3,7 +3,7 @@
 // NOTA: La configuración de la "Página Pública" YA EXISTE en su propia página
 // en el sidebar: /admin/help-config, NO ES NECESARIO AGREGARLA AQUÍ
 import { useState, useEffect, useRef, Suspense } from 'react'
-import { useSession } from 'next-auth/react'
+import { useAuthReady } from '@/hooks/auth/use-auth-ready'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -105,7 +105,7 @@ interface SystemSettings {
 const SETTINGS_PAGE_SUBTITLE = 'Administra la configuración global del sistema de tickets'
 
 function SettingsPage() {
-  const { data: session, status } = useSession()
+  const { data: session, status } = useAuthReady()
   const router = useRouter()
   const searchParams = useSearchParams()
   const isSuperAdmin =

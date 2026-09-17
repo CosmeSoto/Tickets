@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useSession } from 'next-auth/react'
+import { useAuthReady } from '@/hooks/auth/use-auth-ready'
 import { useRouter } from 'next/navigation'
 import { Loader2, Search } from 'lucide-react'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
@@ -54,7 +54,7 @@ function defaultTo() {
 }
 
 export default function PatrolReportsPage() {
-  const { data: session, status } = useSession()
+  const { data: session, status } = useAuthReady()
   const router = useRouter()
 
   // Tab state

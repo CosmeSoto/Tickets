@@ -7,7 +7,7 @@
  */
 
 import { use, useState, useEffect, useCallback } from 'react'
-import { useSession } from 'next-auth/react'
+import { useAuthReady } from '@/hooks/auth/use-auth-ready'
 import { useRouter } from 'next/navigation'
 import {
   ArrowLeft,
@@ -83,7 +83,7 @@ interface IncidentDetail {
 
 export default function IncidentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
-  const { data: session, status } = useSession()
+  const { data: session, status } = useAuthReady()
   const router = useRouter()
   const { toast } = useToast()
 

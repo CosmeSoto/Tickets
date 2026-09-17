@@ -1,7 +1,7 @@
 'use client'
 
 import { Suspense, useEffect, useRef } from 'react'
-import { useSession } from 'next-auth/react'
+import { useAuthReady } from '@/hooks/auth/use-auth-ready'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { Button } from '@/components/ui/button'
@@ -24,7 +24,7 @@ export default function CreateClientTicketPage() {
 }
 
 function CreateClientTicketContent() {
-  const { data: session, status } = useSession()
+  const { data: session, status } = useAuthReady()
   const router = useRouter()
   const searchParams = useSearchParams()
   const hasAuthenticated = useRef(false)

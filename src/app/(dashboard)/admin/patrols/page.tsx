@@ -2,7 +2,7 @@
 import { DEFAULT_TIMEZONE } from '@/lib/constants'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { useSession } from 'next-auth/react'
+import { useAuthReady } from '@/hooks/auth/use-auth-ready'
 import { useRouter } from 'next/navigation'
 import { addDays, endOfMonth, endOfWeek, startOfMonth, startOfWeek } from 'date-fns'
 import {
@@ -110,7 +110,7 @@ const BUCKET_FILTER: Record<DayBucket, (e: AgendaEvent) => boolean> = {
 }
 
 export default function PatrolDashboardPage() {
-  const { data: session, status } = useSession()
+  const { data: session, status } = useAuthReady()
   const router = useRouter()
 
   const [data, setData] = useState<DashboardData | null>(null)

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useSession } from 'next-auth/react'
+import { useAuthReady } from '@/hooks/auth/use-auth-ready'
 import { useRouter } from 'next/navigation'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { useToast } from '@/hooks/use-toast'
@@ -13,7 +13,7 @@ import { useUserSettings } from '@/hooks/use-user-settings'
 import type { NotificationPreferences } from '@/types/notification-preferences'
 
 export default function SettingsPage() {
-  const { data: session, status } = useSession()
+  const { data: session, status } = useAuthReady()
   const router = useRouter()
   const { toast } = useToast()
   const { settings, updateSettings } = useUserSettings()

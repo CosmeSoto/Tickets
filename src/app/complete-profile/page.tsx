@@ -1,7 +1,7 @@
 'use client'
 
 import { Suspense, useEffect, useState } from 'react'
-import { useSession } from 'next-auth/react'
+import { useAuthReady } from '@/hooks/auth/use-auth-ready'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { motion, useReducedMotion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
@@ -22,7 +22,7 @@ import { validatePhoneInput } from '@/lib/auth/profile-completion'
 import { Loader2, AlertCircle, Building2, CheckCircle, Phone, Send } from 'lucide-react'
 
 function CompleteProfileForm() {
-  const { data: session, status, update } = useSession()
+  const { data: session, status, update } = useAuthReady()
   const router = useRouter()
   const searchParams = useSearchParams()
   const { toast } = useToast()

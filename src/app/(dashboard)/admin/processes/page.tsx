@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useSession } from 'next-auth/react'
+import { useAuthReady } from '@/hooks/auth/use-auth-ready'
 import { useRouter } from 'next/navigation'
 import { GitBranch, Plus, RefreshCw } from 'lucide-react'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
@@ -104,7 +104,7 @@ const processExportColumns: ExportColumn[] = [
 ]
 
 export default function AdminProcessesPage() {
-  const { data: session, status } = useSession()
+  const { data: session, status } = useAuthReady()
   const router = useRouter()
   const { toast } = useToast()
   const [processes, setProcesses] = useState<ProcessItem[]>([])

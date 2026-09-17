@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { useSession } from 'next-auth/react'
+import { useAuthReady } from '@/hooks/auth/use-auth-ready'
 import { useRouter, useParams } from 'next/navigation'
 import { useSyncDashboardPageMeta } from '@/contexts/dashboard-shell-context'
 import { Button } from '@/components/ui/button'
@@ -58,7 +58,7 @@ interface FormData {
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function EditTicketPage() {
-  const { data: session, status } = useSession()
+  const { data: session, status } = useAuthReady()
   const router = useRouter()
   const params = useParams()
   const { toast } = useToast()

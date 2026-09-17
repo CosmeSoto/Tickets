@@ -17,9 +17,9 @@ import {
  * vía `getUploadDir` -> `path.join`). Antes venía sin validar directo del
  * formulario: un `type` como `../../../../tmp/x` escribía fuera de
  * `uploads/landing` (path traversal / escritura arbitraria). Debe ser
- * siempre uno de estos tres valores fijos.
+ * siempre uno de estos valores fijos.
  */
-const ALLOWED_TYPES = new Set(['logo-light', 'logo-dark', 'hero-bg'])
+const ALLOWED_TYPES = new Set(['logo-light', 'logo-dark', 'hero-bg', 'favicon'])
 
 const ALLOWED_IMAGE_MIMES: ReadonlySet<SafeUploadMime> = new Set([
   'image/jpeg',
@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
 
     if (!ALLOWED_TYPES.has(type)) {
       return NextResponse.json(
-        { error: 'Tipo de imagen inválido. Debe ser logo-light, logo-dark o hero-bg' },
+        { error: 'Tipo de imagen inválido. Debe ser logo-light, logo-dark, hero-bg o favicon' },
         { status: 400 }
       )
     }

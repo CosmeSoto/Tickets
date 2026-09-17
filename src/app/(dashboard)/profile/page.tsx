@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { useSession } from 'next-auth/react'
+import { useAuthReady } from '@/hooks/auth/use-auth-ready'
 import { useRouter } from 'next/navigation'
 import { useSyncDashboardPageMeta } from '@/contexts/dashboard-shell-context'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -59,7 +59,7 @@ import { UserModulesPanel } from '@/components/users/user-modules-panel'
 import { TelegramLinkCard } from '@/components/notifications/telegram-link-card'
 
 export default function ProfilePage() {
-  const { data: session, status, update } = useSession()
+  const { data: session, status, update } = useAuthReady()
   const router = useRouter()
   const { toast } = useToast()
   const { minLength: minPasswordLength } = usePasswordPolicy()

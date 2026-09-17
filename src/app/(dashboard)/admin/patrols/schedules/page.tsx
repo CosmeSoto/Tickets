@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { useSession } from 'next-auth/react'
+import { useAuthReady } from '@/hooks/auth/use-auth-ready'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Plus, CalendarClock, Pencil, PowerOff, Power, Trash2, CalendarDays } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -48,7 +48,7 @@ import { ScheduleFormDialog } from '@/components/patrols/schedule-form-dialog'
 import { ScheduleUpcomingDialog } from '@/components/patrols/schedule-upcoming-dialog'
 
 export default function SchedulesPage() {
-  const { data: session, status } = useSession()
+  const { data: session, status } = useAuthReady()
   const router = useRouter()
   const searchParams = useSearchParams()
   const { toast } = useToast()

@@ -16,12 +16,26 @@ export function GlobalFavicon() {
 
     const url = data.faviconUrl
 
+    // El `type` debe coincidir con el archivo real subido (png/webp/jpg/svg) —
+    // si se declara 'image/x-icon' para un PNG, algunos navegadores ignoran el link.
+    const MIME_BY_EXT: Record<string, string> = {
+      ico: 'image/x-icon',
+      png: 'image/png',
+      webp: 'image/webp',
+      jpg: 'image/jpeg',
+      jpeg: 'image/jpeg',
+      svg: 'image/svg+xml',
+    }
+    const ext = url.split('.').pop()?.toLowerCase().split('?')[0] ?? ''
+    const mimeType = MIME_BY_EXT[ext] ?? 'image/x-icon'
+
     const upsert = (rel: string, type?: string) => {
       let link = document.querySelector(`link[rel="${rel}"]`) as HTMLLinkElement | null
       if (link) {
         if (link.getAttribute('href') !== url) {
           link.setAttribute('href', url)
         }
+        if (type) link.type = type
         return
       }
       link = document.createElement('link')
@@ -31,7 +45,7 @@ export function GlobalFavicon() {
       document.head.appendChild(link)
     }
 
-    upsert('icon', 'image/x-icon')
+    upsert('icon', mimeType)
     upsert('apple-touch-icon')
   }, [data.faviconUrl, loading])
 

@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useSession } from 'next-auth/react'
+import { useAuthReady } from '@/hooks/auth/use-auth-ready'
 import { useCategoriesData } from '@/hooks/use-categories'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -72,7 +72,7 @@ async function createFromTicket(
 function NewArticleContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { data: session, status } = useSession()
+  const { data: session, status } = useAuthReady()
   const { categories, loadCategories } = useCategoriesData()
 
   const [title, setTitle] = useState('')

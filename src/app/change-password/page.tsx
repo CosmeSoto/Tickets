@@ -1,7 +1,8 @@
 'use client'
 
 import { Suspense, useEffect, useState } from 'react'
-import { useSession, signOut } from 'next-auth/react'
+import { signOut } from 'next-auth/react'
+import { useAuthReady } from '@/hooks/auth/use-auth-ready'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { motion, useReducedMotion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
@@ -20,7 +21,7 @@ import { useToast } from '@/hooks/use-toast'
 import { Loader2, Eye, EyeOff, AlertCircle, Lock, Shield, CheckCircle } from 'lucide-react'
 
 function ChangePasswordForm() {
-  const { data: session, status, update } = useSession()
+  const { data: session, status, update } = useAuthReady()
   const router = useRouter()
   const searchParams = useSearchParams()
   const { toast } = useToast()

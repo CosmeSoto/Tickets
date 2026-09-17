@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { useSession } from 'next-auth/react'
+import { useAuthReady } from '@/hooks/auth/use-auth-ready'
 import { useRouter } from 'next/navigation'
 import {
   Plus,
@@ -47,7 +47,7 @@ import {
 import type { Family } from '@/components/patrols/types'
 
 export default function CheckpointsPage() {
-  const { data: session, status } = useSession()
+  const { data: session, status } = useAuthReady()
   const router = useRouter()
 
   const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true

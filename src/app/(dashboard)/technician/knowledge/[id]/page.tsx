@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { useSession } from 'next-auth/react'
+import { useAuthReady } from '@/hooks/auth/use-auth-ready'
 import { useRouter, useParams } from 'next/navigation'
 import {
   ArrowLeft,
@@ -45,7 +45,7 @@ import { useToast } from '@/hooks/use-toast'
 import type { Article } from '@/hooks/use-knowledge'
 
 export default function TechnicianKnowledgeDetailPage() {
-  const { data: session, status } = useSession()
+  const { data: session, status } = useAuthReady()
   const router = useRouter()
   const params = useParams()
   const { toast } = useToast()

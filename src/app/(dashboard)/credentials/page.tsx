@@ -14,7 +14,7 @@ import {
   FileKey,
   Pencil,
 } from 'lucide-react'
-import { useSession } from 'next-auth/react'
+import { useAuthReady } from '@/hooks/auth/use-auth-ready'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
@@ -206,7 +206,7 @@ function toRow(entry: CredentialEntry): CredentialRow {
 }
 
 export default function CredentialsPage() {
-  const { data: session, status } = useSession()
+  const { data: session, status } = useAuthReady()
   const router = useRouter()
   const { toast } = useToast()
   const [vaults, setVaults] = useState<Vault[]>([])

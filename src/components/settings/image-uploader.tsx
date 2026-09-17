@@ -13,6 +13,21 @@ interface ImageUploaderProps {
   type: 'logo-light' | 'logo-dark' | 'hero-bg' | 'favicon'
 }
 
+// Varias instancias de ImageUploader se montan a la vez en la misma pantalla
+// (favicon, logo claro, logo oscuro, hero) — sin esta caché compartida cada
+// una dispara su propio GET /api/admin/settings al montar.
+let maxFileSizePromise: Promise<number> | null = null
+
+function fetchMaxFileSize(): Promise<number> {
+  if (!maxFileSizePromise) {
+    maxFileSizePromise = fetch('/api/admin/settings')
+      .then(res => res.json())
+      .then(data => (typeof data?.maxFileSize === 'number' ? data.maxFileSize : 10))
+      .catch(() => 10)
+  }
+  return maxFileSizePromise
+}
+
 export function ImageUploader({ label, currentUrl, onUpload, type }: ImageUploaderProps) {
   const [uploading, setUploading] = useState(false)
   const [preview, setPreview] = useState(currentUrl || '')
@@ -22,14 +37,7 @@ export function ImageUploader({ label, currentUrl, onUpload, type }: ImageUpload
 
   // Cargar configuración del sistema
   useEffect(() => {
-    fetch('/api/admin/settings')
-      .then(res => res.json())
-      .then(data => {
-        if (data.maxFileSize) {
-          setMaxFileSize(data.maxFileSize)
-        }
-      })
-      .catch(err => console.error('Error loading settings:', err))
+    fetchMaxFileSize().then(setMaxFileSize)
   }, [])
 
   // Actualizar preview cuando cambia currentUrl

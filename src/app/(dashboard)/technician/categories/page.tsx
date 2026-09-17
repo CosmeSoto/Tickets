@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect, useMemo } from 'react'
-import { useSession } from 'next-auth/react'
+import { useAuthReady } from '@/hooks/auth/use-auth-ready'
 import { useRouter } from 'next/navigation'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { BackToTickets } from '@/components/tickets/back-to-tickets'
@@ -96,7 +96,7 @@ function resolutionRate(cat: TechnicianCategory): number {
 // ── Componente ────────────────────────────────────────────────────────────────
 
 export default function TechnicianCategoriesPage() {
-  const { data: session, status } = useSession()
+  const { data: session, status } = useAuthReady()
   const router = useRouter()
 
   // ── Estados de UI ─────────────────────────────────────────────────────────
