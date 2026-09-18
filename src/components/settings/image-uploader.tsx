@@ -49,12 +49,22 @@ export function ImageUploader({ label, currentUrl, onUpload, type }: ImageUpload
     const file = e.target.files?.[0]
     if (!file) return
 
-    // Validar tipo
+    // Validar tipo. Los navegadores no siempre reportan un `file.type` para
+    // .ico (queda vacío en varios de ellos), así que para favicon también
+    // aceptamos por extensión — el servidor igual valida el contenido real
+    // (magic bytes) antes de guardarlo.
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/svg+xml']
-    if (!allowedTypes.includes(file.type)) {
+    if (type === 'favicon') {
+      allowedTypes.push('image/x-icon', 'image/vnd.microsoft.icon')
+    }
+    const isIcoByExtension = type === 'favicon' && file.name.toLowerCase().endsWith('.ico')
+    if (!allowedTypes.includes(file.type) && !isIcoByExtension) {
       toast({
         title: 'Error',
-        description: 'Solo se permiten imágenes JPG, PNG, WebP y SVG',
+        description:
+          type === 'favicon'
+            ? 'Solo se permiten imágenes JPG, PNG, WebP, SVG e ICO'
+            : 'Solo se permiten imágenes JPG, PNG, WebP y SVG',
         variant: 'destructive',
       })
       return
@@ -164,7 +174,7 @@ export function ImageUploader({ label, currentUrl, onUpload, type }: ImageUpload
             )}
           </Button>
           <span className='text-xs text-muted-foreground'>
-            JPG, PNG, WebP, SVG (máx. {maxFileSize}MB)
+            JPG, PNG, WebP, SVG{type === 'favicon' ? ', ICO' : ''} (máx. {maxFileSize}MB)
           </span>
         </div>
       )}
@@ -172,7 +182,11 @@ export function ImageUploader({ label, currentUrl, onUpload, type }: ImageUpload
       <input
         ref={fileInputRef}
         type='file'
-        accept='image/jpeg,image/jpg,image/png,image/webp,image/svg+xml'
+        accept={
+          type === 'favicon'
+            ? 'image/jpeg,image/jpg,image/png,image/webp,image/svg+xml,image/x-icon,image/vnd.microsoft.icon,.ico'
+            : 'image/jpeg,image/jpg,image/png,image/webp,image/svg+xml'
+        }
         onChange={handleFileSelect}
         className='hidden'
         disabled={uploading}

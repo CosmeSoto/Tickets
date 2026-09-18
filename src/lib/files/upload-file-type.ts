@@ -19,6 +19,7 @@ export type SafeUploadMime =
   | 'image/png'
   | 'image/webp'
   | 'image/gif'
+  | 'image/x-icon'
   | 'application/pdf'
   | 'text/plain'
   | 'application/msword'
@@ -34,6 +35,7 @@ export const EXT_BY_MIME: Record<SafeUploadMime, string> = {
   'image/png': 'png',
   'image/webp': 'webp',
   'image/gif': 'gif',
+  'image/x-icon': 'ico',
   'application/pdf': 'pdf',
   'text/plain': 'txt',
   'application/msword': 'doc',
@@ -69,7 +71,17 @@ export const INLINE_SAFE_MIMES: ReadonlySet<string> = new Set([
   'application/pdf',
 ])
 
-type SignatureFamily = 'jpeg' | 'png' | 'gif' | 'webp' | 'pdf' | 'zip' | 'ole' | 'text' | null
+type SignatureFamily =
+  | 'jpeg'
+  | 'png'
+  | 'gif'
+  | 'webp'
+  | 'ico'
+  | 'pdf'
+  | 'zip'
+  | 'ole'
+  | 'text'
+  | null
 
 /** Detecta la familia de archivo por sus primeros bytes (magic numbers). */
 function detectUploadSignature(buf: Buffer): SignatureFamily {
@@ -84,6 +96,10 @@ function detectUploadSignature(buf: Buffer): SignatureFamily {
     buf.toString('ascii', 8, 12) === 'WEBP'
   ) {
     return 'webp'
+  }
+  // ICO: reservado=0, tipo=1 (icono; 2 sería cursor .cur, no lo aceptamos).
+  if (buf.length >= 4 && buf[0] === 0x00 && buf[1] === 0x00 && buf[2] === 0x01 && buf[3] === 0x00) {
+    return 'ico'
   }
   if (buf.length >= 5 && buf.toString('ascii', 0, 5) === '%PDF-') return 'pdf'
   // ZIP local-file-header: contenedor de OOXML (docx/xlsx) — necesita el tipo
@@ -141,6 +157,8 @@ export function resolveSafeUploadMime(buf: Buffer, declaredType: string): SafeUp
       return 'image/gif'
     case 'webp':
       return 'image/webp'
+    case 'ico':
+      return 'image/x-icon'
     case 'pdf':
       return 'application/pdf'
     case 'zip':

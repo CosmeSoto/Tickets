@@ -13,6 +13,7 @@ const MIME_TYPES: Record<string, string> = {
   svg: 'image/svg+xml',
   gif: 'image/gif',
   pdf: 'application/pdf',
+  ico: 'image/x-icon',
 }
 
 // Prefijos de rutas que son públicas (no requieren autenticación)

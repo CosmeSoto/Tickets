@@ -27,6 +27,12 @@ const ALLOWED_IMAGE_MIMES: ReadonlySet<SafeUploadMime> = new Set([
   'image/webp',
 ])
 
+// .ico solo tiene sentido para favicon — no para logos ni el fondo del hero.
+const ALLOWED_FAVICON_MIMES: ReadonlySet<SafeUploadMime> = new Set([
+  ...ALLOWED_IMAGE_MIMES,
+  'image/x-icon',
+])
+
 const SVG_ROOT_PATTERN = /^\s*(<\?xml[^>]*\?>\s*)?(<!--[\s\S]*?-->\s*)*<svg[\s>]/i
 
 export async function POST(request: NextRequest) {
@@ -93,9 +99,11 @@ export async function POST(request: NextRequest) {
       responseType = 'image/svg+xml'
     } else {
       const detectedMime = resolveSafeUploadMime(buffer, file.type)
-      if (!detectedMime || !ALLOWED_IMAGE_MIMES.has(detectedMime)) {
+      const allowedMimes = type === 'favicon' ? ALLOWED_FAVICON_MIMES : ALLOWED_IMAGE_MIMES
+      if (!detectedMime || !allowedMimes.has(detectedMime)) {
+        const formats = type === 'favicon' ? 'JPG, PNG, WebP, SVG o ICO' : 'JPG, PNG, WebP o SVG'
         return NextResponse.json(
-          { error: 'El archivo no es una imagen válida (JPG, PNG, WebP o SVG)' },
+          { error: `El archivo no es una imagen válida (${formats})` },
           { status: 400 }
         )
       }
