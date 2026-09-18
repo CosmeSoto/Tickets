@@ -269,26 +269,20 @@ export default function AdminFormsPage() {
       const result = await res.json()
       const savedId = result.form?.id
 
-      // Subir archivos pendientes (FileDropZone) si los hay
+      // Subir archivo pendiente (FileDropZone), si lo hay. `fetch` no
+      // rechaza la promesa ante un 500 — solo ante un error de red — así que
+      // hay que revisar `res.ok` explícitamente o un fallo del servidor
+      // (tipo de archivo rechazado, etc.) se reportaba como éxito.
       if (pendingFiles.length > 0 && savedId) {
-        const uploadResults = await Promise.allSettled(
-          pendingFiles.map(pf => {
-            const uploadData = new FormData()
-            uploadData.append('file', pf.file)
-            return fetch(`/api/admin/forms/${savedId}/attachments`, {
-              method: 'POST',
-              body: uploadData,
-            })
-          })
-        )
-        const failed = uploadResults.filter(r => r.status === 'rejected').length
-        if (failed > 0) {
-          toast({
-            title: 'Documento guardado, pero algunos archivos fallaron',
-            description: `${pendingFiles.length - failed} subidos, ${failed} fallaron`,
-            variant: 'destructive',
-            duration: 6000,
-          })
+        const uploadData = new FormData()
+        uploadData.append('file', pendingFiles[0].file)
+        const uploadRes = await fetch(`/api/admin/forms/${savedId}/attachments`, {
+          method: 'POST',
+          body: uploadData,
+        })
+        if (!uploadRes.ok) {
+          const uploadErr = await uploadRes.json().catch(() => ({}))
+          throw new Error(uploadErr.error || 'Error al subir el archivo')
         }
       }
 

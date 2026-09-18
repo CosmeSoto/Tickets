@@ -45,6 +45,17 @@ export const EXT_BY_MIME: Record<SafeUploadMime, string> = {
 }
 
 /**
+ * Lista de mimes soportados a nivel de detección de contenido — única
+ * fuente de verdad reusada por `SecurityConfigService` y por el endpoint de
+ * configuración del admin (`/api/admin/settings`) para su `allowedFileTypes`
+ * por defecto. Antes cada uno mantenía su propia copia hardcodeada y
+ * desincronizada: al agregar PowerPoint/TXT aquí, una fila ya persistida en
+ * `system_settings` con la lista vieja seguía rechazando esos archivos sin
+ * que el código nuevo pudiera hacer nada al respecto.
+ */
+export const DEFAULT_ALLOWED_UPLOAD_MIMES: string[] = Object.keys(EXT_BY_MIME)
+
+/**
  * Solo estos tipos se muestran `inline` (imagen/PDF en el visor embebido).
  * Todo lo demás se fuerza a descarga (`Content-Disposition: attachment`),
  * y si el `mimeType` guardado en BD no está en esta lista tampoco se

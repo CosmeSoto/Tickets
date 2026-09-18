@@ -254,13 +254,16 @@ export default function PublicFormsPage() {
       const result = await res.json()
       const savedId = result.form?.id
       if (pendingFiles.length > 0 && savedId) {
-        await Promise.allSettled(
-          pendingFiles.map(pf => {
-            const fd = new FormData()
-            fd.append('file', pf.file)
-            return fetch(`/api/admin/forms/${savedId}/attachments`, { method: 'POST', body: fd })
-          })
-        )
+        const fd = new FormData()
+        fd.append('file', pendingFiles[0].file)
+        const uploadRes = await fetch(`/api/admin/forms/${savedId}/attachments`, {
+          method: 'POST',
+          body: fd,
+        })
+        if (!uploadRes.ok) {
+          const uploadErr = await uploadRes.json().catch(() => ({}))
+          throw new Error(uploadErr.error || 'Error al subir el archivo')
+        }
       }
       toast({ title: editingForm ? 'Documento actualizado' : 'Documento creado' })
       setShowCreateDialog(false)

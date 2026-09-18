@@ -6,6 +6,7 @@
 import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
 import { isPrismaUniqueViolation } from '@/lib/db/prisma-errors'
+import { DEFAULT_ALLOWED_UPLOAD_MIMES } from '@/lib/files/upload-file-type'
 
 export interface SecurityConfig {
   sessionTimeout: number // minutos
@@ -76,19 +77,13 @@ export class SecurityConfigService {
         passwordChangeIntervalDays: configMap.passwordChangeIntervalDays ?? 0,
         maxFileSize: configMap.maxFileSize || 10, // MB
         maxPersonalImageSize: configMap.maxPersonalImageSize || 5, // MB
-        allowedFileTypes: configMap.allowedFileTypes || [
-          'image/jpeg',
-          'image/png',
-          'image/gif',
-          'application/pdf',
-          'application/msword',
-          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-          'application/vnd.ms-excel',
-          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          'application/vnd.ms-powerpoint',
-          'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-          'text/plain',
-        ],
+        // Unión con lo persistido, nunca reemplazo: una fila vieja en
+        // `system_settings` (guardada antes de que este código soportara un
+        // tipo nuevo) no debe poder "congelar" la lista y volver a bloquear
+        // un tipo que el resto del pipeline ya sabe validar por contenido.
+        allowedFileTypes: Array.isArray(configMap.allowedFileTypes)
+          ? Array.from(new Set([...DEFAULT_ALLOWED_UPLOAD_MIMES, ...configMap.allowedFileTypes]))
+          : DEFAULT_ALLOWED_UPLOAD_MIMES,
       }
 
       // Actualizar caché

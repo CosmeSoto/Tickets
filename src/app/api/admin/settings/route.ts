@@ -5,6 +5,7 @@ import prisma from '@/lib/prisma'
 import { z } from 'zod'
 import { randomUUID } from 'crypto'
 import { logConfigAudit } from '@/lib/services/config-audit'
+import { DEFAULT_ALLOWED_UPLOAD_MIMES } from '@/lib/files/upload-file-type'
 
 const settingsSchema = z.object({
   systemName: z.string().max(100).optional(),
@@ -78,15 +79,7 @@ const defaultSettings = {
   maxPersonalImageSize: 5, // MB
   autoCloseDays: 3, // Días para auto-cierre de tickets resueltos sin calificación
   ticketDigestIntervalMinutes: 30, // Cada cuánto se agrupan comentarios/actualizaciones en un correo
-  allowedFileTypes: [
-    'image/jpeg',
-    'image/png',
-    'image/gif',
-    'application/pdf',
-    'text/plain',
-    'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  ],
+  allowedFileTypes: DEFAULT_ALLOWED_UPLOAD_MIMES,
   backupEnabled: false,
   backupFrequency: 'daily' as const,
   backupRetention: 30,
@@ -143,7 +136,13 @@ function parseSystemSettingsFromRows(
     ) {
       result[setting.key] = value === 'true'
     } else if (setting.key === 'allowedFileTypes') {
-      result[setting.key] = JSON.parse(value)
+      // Unión, no reemplazo: una fila persistida antes de que se agregara
+      // soporte para un tipo nuevo no debe congelar la lista para siempre
+      // (ver DEFAULT_ALLOWED_UPLOAD_MIMES).
+      const persisted = JSON.parse(value)
+      result[setting.key] = Array.isArray(persisted)
+        ? Array.from(new Set([...DEFAULT_ALLOWED_UPLOAD_MIMES, ...persisted]))
+        : DEFAULT_ALLOWED_UPLOAD_MIMES
     } else {
       result[setting.key] = value
     }
