@@ -19,6 +19,18 @@ export function SessionTimeoutMonitor() {
   const sessionTimeoutMinutes = useRef<number>(1440) // Default 24 horas
   const JWT_SYNC_THROTTLE_MS = 60_000
 
+  // `update` cambia de identidad cada vez que next-auth revalida la sesión
+  // (incluida cada llamada al propio `update()`). Si entra en las deps de
+  // `resetInactivityTimer`, ese callback cambia de identidad en cascada, lo
+  // que reinicia el efecto "Iniciar monitoreo" de abajo — y ese efecto vuelve
+  // a llamar `update()` en su primer render, cerrando un ciclo infinito que
+  // se repite cada ~60-90s en vez de solo cuando corresponde (actividad real
+  // o el backstop de 2 min). Por eso se lee vía ref en lugar de en las deps.
+  const updateRef = useRef(update)
+  useEffect(() => {
+    updateRef.current = update
+  }, [update])
+
   // Cerrar sesión si el servidor marcó error en el JWT (expirada, eliminada, desactivada)
   useEffect(() => {
     const sessionError = (session as { error?: string } | null)?.error
@@ -46,12 +58,12 @@ export function SessionTimeoutMonitor() {
     if (status !== 'authenticated') return
     const interval = setInterval(
       () => {
-        void update()
+        void updateRef.current()
       },
       2 * 60 * 1000
     )
     return () => clearInterval(interval)
-  }, [status, update])
+  }, [status])
 
   // Obtener configuración de timeout desde el servidor
   const fetchSessionTimeout = useCallback(async () => {
@@ -121,7 +133,7 @@ export function SessionTimeoutMonitor() {
       const now = Date.now()
       if (now - lastJwtSyncRef.current >= JWT_SYNC_THROTTLE_MS) {
         lastJwtSyncRef.current = now
-        void update({ lastActivityAt: now })
+        void updateRef.current({ lastActivityAt: now })
       }
     }
 
@@ -158,7 +170,7 @@ export function SessionTimeoutMonitor() {
     timeoutRef.current = setTimeout(() => {
       handleAutoLogout()
     }, timeoutMs)
-  }, [status, handleAutoLogout, showWarning, update])
+  }, [status, handleAutoLogout, showWarning])
 
   // Iniciar monitoreo cuando hay sesión activa
   useEffect(() => {
@@ -234,7 +246,7 @@ export function SessionTimeoutMonitor() {
       window.removeEventListener('mousemove', handleActivity)
       window.removeEventListener('settings-updated', handleSettingsUpdated)
     }
-  }, [status, resetInactivityTimer, fetchSessionTimeout, update])
+  }, [status, resetInactivityTimer, fetchSessionTimeout])
 
   // Este componente no renderiza nada
   return null

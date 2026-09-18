@@ -185,6 +185,14 @@ export function useNotificationSSE({
     onNotificationRef.current = onNotification
   }, [onNotification])
 
+  // `updateSession` cambia de identidad en cada revalidación de next-auth
+  // (SessionTimeoutMonitor, refetchInterval, etc.). Si estuviera en las deps
+  // de `connect`, cada revalidación cerraba y reabría el EventSource.
+  const updateSessionRef = useRef(updateSession)
+  useEffect(() => {
+    updateSessionRef.current = updateSession
+  }, [updateSession])
+
   const soundEnabled = useRef(sound)
   useEffect(() => {
     soundEnabled.current = sound
@@ -212,7 +220,7 @@ export function useNotificationSSE({
           if (data.type === 'session_refresh') {
             // Módulos (DB) + JWT: el dashboard/guards de asset-requests leen sesión
             window.dispatchEvent(new CustomEvent('modules-updated'))
-            void updateSession()
+            void updateSessionRef.current()
 
             // Solo forzar reload completo si la cuenta fue desactivada.
             if (data.reason === 'account_deactivated') {
@@ -267,7 +275,7 @@ export function useNotificationSSE({
       if (retryTimeout) clearTimeout(retryTimeout)
       es?.close()
     }
-  }, [session?.user?.id, updateSession])
+  }, [session?.user?.id])
 
   useEffect(() => {
     const cleanup = connect()

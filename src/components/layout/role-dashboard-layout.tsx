@@ -6,10 +6,10 @@
 'use client'
 
 import { ReactNode, useEffect, useRef, useState } from 'react'
-import { useSession } from 'next-auth/react'
 import { usePathname } from 'next/navigation'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { cn } from '@/lib/utils'
+import { useAuthReady } from '@/hooks/auth/use-auth-ready'
 import { useUserModules } from '@/hooks/use-user-modules'
 import { DashboardSidebar } from '@/components/layout/dashboard-sidebar'
 import { DashboardHeader } from '@/components/layout/dashboard-header'
@@ -29,7 +29,7 @@ export function RoleDashboardLayout({
   subtitle,
   headerActions,
 }: RoleDashboardLayoutProps) {
-  const { data: session, status } = useSession()
+  const { data: session, status } = useAuthReady()
   const pathname = usePathname()
   const reduceMotion = useReducedMotion()
   const [sidebarOpen, setSidebarOpen] = useState(false)

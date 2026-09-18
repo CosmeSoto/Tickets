@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useSession } from 'next-auth/react'
+import { useAuthReady } from '@/hooks/auth/use-auth-ready'
 
 interface UserModules {
   tickets: boolean
@@ -74,7 +74,7 @@ type ModulesMemoryEntry = { userId: string; data: UserModules; at: number }
 let modulesMemoryCache: ModulesMemoryEntry | null = null
 
 export function useUserModules() {
-  const { data: session, status } = useSession()
+  const { data: session, status } = useAuthReady()
   const [modules, setModules] = useState<UserModules>(DEFAULT)
   const [loading, setLoading] = useState(true)
   const userId = session?.user?.id
