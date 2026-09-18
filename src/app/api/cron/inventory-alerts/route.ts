@@ -5,6 +5,7 @@ import {
   checkStockAlerts,
   checkMROExpiryAlerts,
   checkWarrantyAlerts,
+  checkBatchIntegrityAlerts,
 } from '@/lib/inventory/notifications'
 import { CheckLicenseExpirationJob } from '@/lib/jobs/check-license-expiration.job'
 import { CheckLicensePaymentJob } from '@/lib/jobs/check-license-payment.job'
@@ -39,6 +40,7 @@ export async function GET(request: NextRequest) {
     const tasks: Promise<unknown>[] = [
       CheckAssignmentExpirationJob.run(),
       BatchAlertService.checkUtilizationAlerts(),
+      checkBatchIntegrityAlerts(),
     ]
 
     if (lowStockEnabled) tasks.push(checkStockAlerts())

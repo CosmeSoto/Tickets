@@ -27,6 +27,7 @@ import {
 import { syncContractLicenseLines } from '@/lib/contracts/license-sync'
 import { syncContractEquipmentLines } from '@/lib/contracts/equipment-sync'
 import { linkLicenseToBusinessContract } from '@/lib/inventory/license-contract'
+import { notifyFamilyScopedAdminsExcept } from '@/lib/api/notify'
 
 // ── Guard helpers ─────────────────────────────────────────────────────────────
 
@@ -439,6 +440,18 @@ export class ContractService {
       console.error('[contract] sync equipment on create:', err)
     )
 
+    // Antes solo quedaba en audit_logs — un contrato nuevo (compromiso
+    // financiero/legal) debe avisarse a los admins de la familia, igual que
+    // ya se hace al crear lotes de equipos/licencias.
+    await notifyFamilyScopedAdminsExcept(
+      contract.familyId,
+      createdBy,
+      'INVENTORY',
+      `Nuevo contrato: ${contract.name}`,
+      `Se registró el contrato "${contract.name}"${contract.contractNumber ? ` (${contract.contractNumber})` : ''}.`,
+      { metadata: { link: `/inventory/contracts/${contract.id}` } }
+    ).catch(() => {})
+
     return contract
   }
 
@@ -822,6 +835,15 @@ export class ContractService {
         newEndDate: newEndDate.toISOString(),
       },
     })
+
+    await notifyFamilyScopedAdminsExcept(
+      renewedContract.familyId,
+      userId,
+      'INVENTORY',
+      `Contrato renovado: ${originalContract.name}`,
+      `El contrato "${originalContract.name}" se renovó hasta el ${newEndDate.toLocaleDateString('es-EC')}.`,
+      { metadata: { link: `/inventory/contracts/${renewedContract.id}` } }
+    ).catch(() => {})
 
     return renewedContract
   }

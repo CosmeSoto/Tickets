@@ -10,6 +10,7 @@ import { Prisma } from '@prisma/client'
 import { generateAssetCode } from '@/lib/inventory/asset-code-generator'
 import { applyLicenseRenewalUpdate } from '@/lib/inventory/license-renewal'
 import { linkLicenseToBusinessContract } from '@/lib/inventory/license-contract'
+import { notifyFamilyScopedAdminsExcept } from '@/lib/api/notify'
 
 export interface CreateLicenseBatchInput {
   familyId: string
@@ -186,6 +187,18 @@ export async function createLicenseBatch(
     }
   }
 
+  // Compra en volumen — mismo criterio que la notificación de creación de
+  // lote de equipos (equipment-batches.service.ts): evento financiero, no
+  // solo un registro en audit_logs.
+  await notifyFamilyScopedAdminsExcept(
+    input.familyId,
+    input.receivedBy,
+    'INVENTORY',
+    `Nuevo lote de licencias: ${batchCode}`,
+    `Se registró el lote ${batchCode} con ${result.licenses.length} licencia(s) de "${input.name}" por $${totalCost.toFixed(2)}.`,
+    { metadata: { link: `/inventory/batches/license/${result.batch.id}` } }
+  ).catch(() => {})
+
   return {
     batch: {
       id: result.batch.id,
@@ -263,7 +276,10 @@ export async function renewLicenseBatch(
   input: RenewLicenseBatchInput,
   changedById: string
 ): Promise<{ updatedCount: number }> {
-  const batch = await prisma.license_batches.findUnique({ where: { id: batchId } })
+  const batch = await prisma.license_batches.findUnique({
+    where: { id: batchId },
+    include: { licenseType: { select: { familyId: true } } },
+  })
   if (!batch) throw new Error('Lote no encontrado')
 
   await prisma.license_batches.update({
@@ -306,6 +322,17 @@ export async function renewLicenseBatch(
       'batch-cascade'
     )
   }
+
+  // Renovación en volumen (costo × N licencias) — evento financiero que antes
+  // solo quedaba en audit_logs de cada licencia hija, sin aviso a la familia.
+  await notifyFamilyScopedAdminsExcept(
+    batch.licenseType?.familyId ?? null,
+    changedById,
+    'INVENTORY',
+    `Lote de licencias renovado: ${batch.batchCode}`,
+    `Se renovó el lote ${batch.batchCode} (${linkedLicenses.length} licencia(s))${input.renewalCost != null ? ` por $${input.renewalCost} cada una` : ''}.`,
+    { metadata: { link: `/inventory/batches/license/${batchId}` } }
+  ).catch(() => {})
 
   return { updatedCount: linkedLicenses.length }
 }

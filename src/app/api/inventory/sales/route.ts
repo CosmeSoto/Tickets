@@ -13,6 +13,7 @@ import {
   InventoryAccessError,
   inventoryAccessToResponse,
 } from '@/lib/inventory/inventory-resource-access'
+import { notifyFamilyScopedAdminsExcept } from '@/lib/api/notify'
 
 /**
  * GET /api/inventory/sales
@@ -205,6 +206,17 @@ export async function POST(req: NextRequest) {
       createdAt: new Date(),
     },
   })
+
+  // Solicitud pendiente de revisión — sin esto, quedaba visible solo en el
+  // listado de ventas y nadie se enteraba de que había algo por aprobar.
+  await notifyFamilyScopedAdminsExcept(
+    equipment.type?.familyId ?? null,
+    session.user.id,
+    'INVENTORY',
+    `Nueva solicitud de venta: ${equipment.code}`,
+    `${sale.requestedBy?.name ?? 'Un usuario'} solicitó vender ${sale.equipment.brand} ${sale.equipment.model} (${equipment.code}) a ${buyerName} por $${sale.salePrice.toFixed(2)}.`,
+    { metadata: { link: `/inventory/sales/${sale.id}` } }
+  ).catch(() => {})
 
   return NextResponse.json(sale, { status: 201 })
 }

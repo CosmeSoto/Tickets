@@ -278,6 +278,11 @@ export async function checkWarrantyAlerts(): Promise<void> {
       model: true,
       warrantyExpiration: true,
       type: { select: { familyId: true } },
+      assignments: {
+        where: { isActive: true },
+        select: { receiverId: true },
+        take: 1,
+      },
     },
   })
 
@@ -293,12 +298,27 @@ export async function checkWarrantyAlerts(): Promise<void> {
     })
     if (alreadySent) continue
 
+    const message = `Garantía por vencer: ${equip.brand} ${equip.model} (${equip.code}) vence el ${equip.warrantyExpiration?.toLocaleDateString('es-CL') ?? 'fecha desconocida'}.`
+
     await notifyFamilyAdmins(equip.type.familyId, {
       type: 'WARNING',
       title: 'Garantía de equipo por vencer',
-      message: `Garantía por vencer: ${equip.brand} ${equip.model} (${equip.code}) vence el ${equip.warrantyExpiration?.toLocaleDateString('es-CL') ?? 'fecha desconocida'}.`,
+      message,
       metadata: { link: `/inventory/equipment/${equip.id}` },
     })
+
+    // El usuario que tiene el equipo asignado también debe enterarse — antes
+    // la alerta solo llegaba a admins y quien lo usa a diario no se enteraba.
+    const receiverId = equip.assignments[0]?.receiverId
+    if (receiverId) {
+      await NotificationService.push({
+        userId: receiverId,
+        type: 'WARNING',
+        title: 'Garantía de tu equipo por vencer',
+        message,
+        metadata: { link: `/inventory/equipment/${equip.id}` },
+      }).catch(() => {})
+    }
 
     await prisma.audit_logs.create({
       data: {
@@ -307,6 +327,72 @@ export async function checkWarrantyAlerts(): Promise<void> {
         entityType: 'asset',
         entityId: equip.id,
         details: { alertType: 'WARRANTY_EXPIRY_ALERT', alertDays },
+      },
+    })
+  }
+}
+
+/**
+ * Antes la inconsistencia cantidad-registrada vs. equipos-vinculados
+ * (ValidationService.validateBatchIntegrity) solo se veía si alguien abría
+ * la ficha del lote — nadie se enteraba de un lote roto sin visitarlo. Se
+ * corre a diario junto al resto de alertas de inventario, con el mismo
+ * dedup por día que las demás (audit_logs, alertType=BATCH_INTEGRITY_ALERT).
+ */
+export async function checkBatchIntegrityAlerts(): Promise<void> {
+  const batches = await prisma.equipment_batches.findMany({
+    select: {
+      id: true,
+      batchCode: true,
+      quantity: true,
+      model: { select: { type: { select: { familyId: true } } } },
+    },
+  })
+  if (batches.length === 0) return
+
+  const counts = await prisma.equipment.groupBy({
+    by: ['batchId'],
+    where: { batchId: { in: batches.map(b => b.id) } },
+    _count: { _all: true },
+  })
+  const countByBatch = new Map(counts.map(c => [c.batchId, c._count._all]))
+
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  for (const batch of batches) {
+    const actualCount = countByBatch.get(batch.id) ?? 0
+    if (actualCount === batch.quantity) continue
+
+    const alreadySent = await prisma.audit_logs.findFirst({
+      where: {
+        action: 'NOTIFICATION_SENT',
+        entityType: 'asset',
+        entityId: batch.id,
+        createdAt: { gte: today },
+        details: { path: ['alertType'], equals: 'BATCH_INTEGRITY_ALERT' },
+      },
+    })
+    if (alreadySent) continue
+
+    await notifyFamilyAdmins(batch.model?.type?.familyId ?? null, {
+      type: 'WARNING',
+      title: 'Inconsistencia en lote de equipos',
+      message: `El lote ${batch.batchCode} registra ${batch.quantity} unidad(es) pero hay ${actualCount} equipo(s) vinculado(s).`,
+      metadata: { link: `/inventory/batches/${batch.id}` },
+    })
+
+    await prisma.audit_logs.create({
+      data: {
+        id: randomUUID(),
+        action: 'NOTIFICATION_SENT',
+        entityType: 'asset',
+        entityId: batch.id,
+        details: {
+          alertType: 'BATCH_INTEGRITY_ALERT',
+          recordedQuantity: batch.quantity,
+          actualEquipmentCount: actualCount,
+        },
       },
     })
   }

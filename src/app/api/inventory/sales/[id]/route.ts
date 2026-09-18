@@ -15,6 +15,7 @@ import {
   hasInventoryModuleAccess,
 } from '@/lib/inventory/inventory-session'
 import { releaseEquipmentFromContracts } from '@/lib/inventory/equipment-contract'
+import { notifyUser } from '@/lib/api/notify'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -161,6 +162,16 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       console.error('[sales/approve] Error liberando contrato del equipo:', err)
     })
 
+    if (sale.requestedById !== session.user.id) {
+      await notifyUser(
+        sale.requestedById,
+        'SUCCESS',
+        'Venta aprobada',
+        `Tu solicitud de venta de ${sale.equipment.code} fue aprobada.`,
+        { metadata: { link: `/inventory/sales/${id}` } }
+      )
+    }
+
     return NextResponse.json(updatedSale)
   }
 
@@ -192,6 +203,16 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       createdAt: new Date(),
     },
   })
+
+  if (sale.requestedById !== session.user.id) {
+    await notifyUser(
+      sale.requestedById,
+      'WARNING',
+      'Venta rechazada',
+      `Tu solicitud de venta de ${sale.equipment.code} fue rechazada: ${rejectionReason.trim()}`,
+      { metadata: { link: `/inventory/sales/${id}` } }
+    )
+  }
 
   return NextResponse.json(updatedSale)
 }
