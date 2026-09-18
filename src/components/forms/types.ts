@@ -105,9 +105,9 @@ export function formatFileSize(bytes: number | null | undefined): string {
 export function getFileEmoji(fileType: string | null | undefined): string {
   if (!fileType) return '📄'
   if (fileType.includes('pdf')) return '📕'
-  if (fileType.includes('word') || fileType.includes('document')) return '📘'
   if (fileType.includes('excel') || fileType.includes('spreadsheet')) return '📗'
   if (fileType.includes('powerpoint') || fileType.includes('presentation')) return '📙'
+  if (fileType.includes('word') || fileType.includes('wordprocessingml')) return '📘'
   if (fileType.includes('image')) return '🖼️'
   if (fileType.includes('zip') || fileType.includes('compressed')) return '🗜️'
   return '📄'

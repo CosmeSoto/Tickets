@@ -77,6 +77,17 @@ function getEmbedUrl(fileUrl: string): string | null {
   return null
 }
 
+/** Word/Excel — se convierten a HTML en el navegador dentro de FilePreviewModal */
+function isOfficeMime(fileType: string | null | undefined): boolean {
+  if (!fileType) return false
+  return (
+    fileType === 'application/msword' ||
+    fileType === 'application/vnd.ms-excel' ||
+    fileType.includes('wordprocessingml') ||
+    fileType.includes('spreadsheetml')
+  )
+}
+
 /** Determina si una URL puede mostrarse en iframe/img */
 function canPreviewUrl(
   fileUrl: string | null | undefined,
@@ -84,10 +95,10 @@ function canPreviewUrl(
 ): boolean {
   if (!fileUrl) return false
 
-  // Archivos locales: PDF e imágenes
+  // Archivos locales: PDF, imágenes y Word/Excel
   if (isLocalFile(fileUrl)) {
     if (!fileType) return false
-    return fileType.includes('pdf') || fileType.includes('image')
+    return fileType.includes('pdf') || fileType.includes('image') || isOfficeMime(fileType)
   }
 
   // Google Drive — siempre previsualizable
@@ -123,9 +134,9 @@ function getFileLabel(
 ): string {
   if (fileType) {
     if (fileType.includes('pdf')) return 'PDF'
-    if (fileType.includes('word') || fileType.includes('document')) return 'Word'
     if (fileType.includes('excel') || fileType.includes('spreadsheet')) return 'Excel'
     if (fileType.includes('powerpoint') || fileType.includes('presentation')) return 'PowerPoint'
+    if (fileType.includes('word') || fileType.includes('wordprocessingml')) return 'Word'
     if (fileType.includes('image')) return 'Imagen'
     if (fileType.includes('zip') || fileType.includes('compressed')) return 'Archivo comprimido'
     if (fileType.includes('text')) return 'Texto'
@@ -465,21 +476,25 @@ export function FormDetail({
         </DialogContent>
       </Dialog>
 
-      {/* Modal de vista previa para PDFs locales */}
-      {showPreview && isLocal && canPreview && previewSrc && form.fileType?.includes('pdf') && (
-        <FilePreviewModal
-          isOpen={showPreview}
-          onClose={() => setShowPreview(false)}
-          file={{
-            id: form.id,
-            originalName: form.title,
-            mimeType: form.fileType ?? 'application/pdf',
-            size: form.fileSize ?? 0,
-            url: previewSrc,
-            downloadUrl: `/api/forms/${form.id}/file?download=true`,
-          }}
-        />
-      )}
+      {/* Modal de vista previa para PDFs y Word/Excel locales */}
+      {showPreview &&
+        isLocal &&
+        canPreview &&
+        previewSrc &&
+        (form.fileType?.includes('pdf') || isOfficeMime(form.fileType)) && (
+          <FilePreviewModal
+            isOpen={showPreview}
+            onClose={() => setShowPreview(false)}
+            file={{
+              id: form.id,
+              originalName: form.title,
+              mimeType: form.fileType ?? 'application/pdf',
+              size: form.fileSize ?? 0,
+              url: previewSrc,
+              downloadUrl: `/api/forms/${form.id}/file?download=true`,
+            }}
+          />
+        )}
     </>
   )
 }

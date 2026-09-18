@@ -1,12 +1,15 @@
 /**
  * FilePreviewModal — Modal global de vista previa de archivos
- * Soporta: imágenes, PDFs (con verificación previa), texto
+ * Soporta: imágenes, PDFs (con verificación previa), texto, Word y Excel
+ * (estos últimos dos se convierten a HTML en el navegador con mammoth/xlsx,
+ * ya que el servidor los sirve como octet-stream, no inline)
  * Usado en: tickets, documentos, timeline, y cualquier módulo que necesite preview
  */
 
 'use client'
 
 import { useState, useEffect } from 'react'
+import DOMPurify from 'isomorphic-dompurify'
 import {
   Dialog,
   DialogContent,
@@ -15,6 +18,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import {
   Download,
   FileText,
@@ -24,7 +28,22 @@ import {
   AlertTriangle,
   ExternalLink,
   Smartphone,
+  FileSpreadsheet,
 } from 'lucide-react'
+
+const WORD_MIMES = new Set([
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+])
+const EXCEL_MIMES = new Set([
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+])
+
+interface ExcelSheet {
+  name: string
+  html: string
+}
 
 /**
  * Detecta si el navegador actual es móvil/tablet y no puede renderizar
@@ -75,13 +94,66 @@ export function FilePreviewModal({ isOpen, onClose, file }: FilePreviewModalProp
   const isImage = (file?.mimeType || '').startsWith('image/')
   const isPDF = file?.mimeType === 'application/pdf'
   const isText = (file?.mimeType || '').startsWith('text/')
+  const isWord = WORD_MIMES.has(file?.mimeType || '')
+  const isExcel = EXCEL_MIMES.has(file?.mimeType || '')
+
+  const [officeState, setOfficeState] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [officeError, setOfficeError] = useState('')
+  const [wordHtml, setWordHtml] = useState('')
+  const [sheets, setSheets] = useState<ExcelSheet[]>([])
+  const [activeSheet, setActiveSheet] = useState(0)
 
   // Reset de estado al cambiar de archivo
   useEffect(() => {
     setImageError(false)
     setPdfState('loading')
     setPdfError('')
+    setOfficeState('loading')
+    setOfficeError('')
+    setWordHtml('')
+    setSheets([])
+    setActiveSheet(0)
   }, [file?.id])
+
+  // Word/Excel: se convierten a HTML en el navegador (mammoth/xlsx) a partir
+  // de los bytes reales del archivo — el servidor los sirve como
+  // application/octet-stream (no están en INLINE_SAFE_MIMES), así que un
+  // <iframe src=...> no serviría para esto; hay que traer el arraybuffer.
+  useEffect(() => {
+    if (!file || !isOpen || (!isWord && !isExcel)) return
+
+    const controller = new AbortController()
+    setOfficeState('loading')
+
+    fetch(file.url, { signal: controller.signal, credentials: 'include' })
+      .then(async res => {
+        if (!res.ok) throw new Error(`Error ${res.status}`)
+        return res.arrayBuffer()
+      })
+      .then(async buffer => {
+        if (isWord) {
+          const mammoth = await import('mammoth')
+          const result = await mammoth.convertToHtml({ arrayBuffer: buffer })
+          setWordHtml(DOMPurify.sanitize(result.value))
+        } else {
+          const XLSX = await import('xlsx')
+          const workbook = XLSX.read(buffer, { type: 'array' })
+          const parsed = workbook.SheetNames.map(name => ({
+            name,
+            html: DOMPurify.sanitize(XLSX.utils.sheet_to_html(workbook.Sheets[name])),
+          }))
+          setSheets(parsed)
+        }
+        setOfficeState('ready')
+      })
+      .catch(err => {
+        if (err.name === 'AbortError') return
+        setOfficeError(err.message || 'No se pudo generar la vista previa')
+        setOfficeState('error')
+      })
+
+    return () => controller.abort()
+  }, [file?.id, file?.url, isWord, isExcel, isOpen]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Verificar disponibilidad del PDF antes de mostrar el iframe.
   // Solo para URLs externas — las rutas relativas del mismo origen se confían directamente.
@@ -150,7 +222,9 @@ export function FilePreviewModal({ isOpen, onClose, file }: FilePreviewModalProp
           <DialogTitle className='flex items-center gap-2'>
             {isImage && <ImageIcon className='h-5 w-5 shrink-0' />}
             {isPDF && <FileText className='h-5 w-5 shrink-0' />}
-            {!isImage && !isPDF && <File className='h-5 w-5 shrink-0' />}
+            {isExcel && <FileSpreadsheet className='h-5 w-5 shrink-0' />}
+            {isWord && <FileText className='h-5 w-5 shrink-0' />}
+            {!isImage && !isPDF && !isWord && !isExcel && <File className='h-5 w-5 shrink-0' />}
             <span className='truncate'>{file.originalName}</span>
           </DialogTitle>
           <DialogDescription className='flex items-center justify-between gap-2 flex-wrap'>
@@ -286,8 +360,82 @@ export function FilePreviewModal({ isOpen, onClose, file }: FilePreviewModalProp
             </div>
           )}
 
+          {/* ── Word / Excel (convertidos a HTML en el navegador) ── */}
+          {(isWord || isExcel) && (
+            <div className='w-full min-h-[400px]'>
+              {officeState === 'loading' && (
+                <div className='flex flex-col items-center justify-center min-h-[400px] gap-3'>
+                  <Loader2 className='h-8 w-8 animate-spin text-muted-foreground' />
+                  <p className='text-sm text-muted-foreground'>Generando vista previa...</p>
+                </div>
+              )}
+
+              {officeState === 'error' && (
+                <div className='flex flex-col items-center justify-center min-h-[400px] gap-4 p-8 text-center'>
+                  <AlertTriangle className='h-10 w-10 text-amber-500' />
+                  <div>
+                    <p className='font-medium text-sm'>No se pudo generar la vista previa</p>
+                    <p className='text-xs text-muted-foreground mt-1'>{officeError}</p>
+                  </div>
+                  <Button size='sm' variant='outline' onClick={handleDownload}>
+                    <Download className='h-3.5 w-3.5 mr-1.5' />
+                    Descargar
+                  </Button>
+                </div>
+              )}
+
+              {officeState === 'ready' && isWord && (
+                <div
+                  className={cn(
+                    'bg-background rounded border p-6 max-h-[600px] overflow-auto text-sm leading-relaxed',
+                    '[&_h1]:text-xl [&_h1]:font-bold [&_h1]:mt-4 [&_h1]:mb-2',
+                    '[&_h2]:text-lg [&_h2]:font-bold [&_h2]:mt-4 [&_h2]:mb-2',
+                    '[&_h3]:text-base [&_h3]:font-semibold [&_h3]:mt-3 [&_h3]:mb-1',
+                    '[&_p]:mb-3',
+                    '[&_ul]:list-disc [&_ul]:pl-5 [&_ul]:mb-3',
+                    '[&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:mb-3',
+                    '[&_table]:border-collapse [&_table]:my-3',
+                    '[&_td]:border [&_td]:border-border [&_td]:px-2 [&_td]:py-1',
+                    '[&_th]:border [&_th]:border-border [&_th]:px-2 [&_th]:py-1 [&_th]:bg-muted',
+                    '[&_a]:text-primary [&_a]:underline',
+                    '[&_strong]:font-semibold'
+                  )}
+                  dangerouslySetInnerHTML={{ __html: wordHtml }}
+                />
+              )}
+
+              {officeState === 'ready' && isExcel && (
+                <div className='space-y-2'>
+                  {sheets.length > 1 && (
+                    <div className='flex gap-1 flex-wrap border-b pb-2'>
+                      {sheets.map((sheet, i) => (
+                        <Button
+                          key={sheet.name}
+                          size='sm'
+                          variant={i === activeSheet ? 'secondary' : 'ghost'}
+                          onClick={() => setActiveSheet(i)}
+                        >
+                          {sheet.name}
+                        </Button>
+                      ))}
+                    </div>
+                  )}
+                  <div
+                    className={cn(
+                      'bg-background rounded border overflow-auto max-h-[550px]',
+                      '[&_table]:border-collapse [&_table]:text-xs',
+                      '[&_td]:border [&_td]:border-border [&_td]:px-2 [&_td]:py-1',
+                      '[&_th]:border [&_th]:border-border [&_th]:px-2 [&_th]:py-1 [&_th]:bg-muted'
+                    )}
+                    dangerouslySetInnerHTML={{ __html: sheets[activeSheet]?.html || '' }}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
           {/* ── Tipo no soportado ── */}
-          {!isImage && !isPDF && !isText && (
+          {!isImage && !isPDF && !isText && !isWord && !isExcel && (
             <div className='flex flex-col items-center justify-center min-h-[400px] text-center'>
               <File className='h-16 w-16 text-muted-foreground mb-4' />
               <p className='text-lg font-medium'>Vista previa no disponible</p>
