@@ -295,18 +295,18 @@ export function DocumentFormDialog({
             <div className='space-y-2'>
               <Label>Archivo</Label>
               <div className='space-y-3'>
-                {editingForm?.fileUrl && pendingFiles.length === 0 && (
+                {formData.fileUrl && pendingFiles.length === 0 && (
                   <div className='flex items-center gap-3 p-3 rounded-lg border bg-muted/30'>
                     <span className='text-xl'>📄</span>
                     <div className='flex-1 min-w-0'>
                       <p className='text-sm font-medium truncate'>
-                        {editingForm.fileType || 'Archivo adjunto'}
+                        {formData.fileType || 'Archivo adjunto'}
                       </p>
-                      {editingForm.fileSize && (
+                      {formData.fileSize && (
                         <p className='text-xs text-muted-foreground'>
-                          {editingForm.fileSize < 1024 * 1024
-                            ? `${(editingForm.fileSize / 1024).toFixed(1)} KB`
-                            : `${(editingForm.fileSize / (1024 * 1024)).toFixed(1)} MB`}
+                          {formData.fileSize < 1024 * 1024
+                            ? `${(formData.fileSize / 1024).toFixed(1)} KB`
+                            : `${(formData.fileSize / (1024 * 1024)).toFixed(1)} MB`}
                         </p>
                       )}
                     </div>
@@ -315,7 +315,7 @@ export function DocumentFormDialog({
                         type='button'
                         variant='outline'
                         size='sm'
-                        onClick={() => window.open(editingForm.fileUrl!, '_blank')}
+                        onClick={() => window.open(formData.fileUrl, '_blank')}
                       >
                         Ver
                       </Button>
@@ -350,14 +350,17 @@ export function DocumentFormDialog({
                     }
                   }}
                   maxFiles={1}
-                  acceptLabel='PDF, Word, Excel, imágenes'
-                  accept='.pdf,.doc,.docx,.xls,.xlsx,image/*'
+                  acceptLabel='PDF, Word, Excel, PowerPoint, TXT, imágenes'
+                  accept='.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,image/*'
                   allowedTypes={[
                     'application/pdf',
                     'application/msword',
                     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
                     'application/vnd.ms-excel',
                     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    'application/vnd.ms-powerpoint',
+                    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+                    'text/plain',
                     'image/jpeg',
                     'image/jpg',
                     'image/png',
@@ -365,12 +368,12 @@ export function DocumentFormDialog({
                     'image/webp',
                   ]}
                 />
-                {pendingFiles.length === 0 && !editingForm?.fileUrl && (
+                {pendingFiles.length === 0 && !formData.fileUrl && (
                   <MediaUrlInput
                     label=''
                     value={formData.fileUrl}
                     onChange={v => setFormData(p => ({ ...p, fileUrl: v }))}
-                    placeholder='O pega una URL externa (Google Drive, OneDrive, Dropbox, PDF...)'
+                    placeholder='Ya tienes el archivo en Drive/OneDrive/Dropbox: pega aquí ese link (no lo sube ni lo comparte por ti)'
                     optional={false}
                   />
                 )}

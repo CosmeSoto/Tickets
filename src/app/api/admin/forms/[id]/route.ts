@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { FileService } from '@/lib/services/file-service'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 import { assertCanManageForms, assertCanModifyForm } from '@/lib/forms/forms-access'
 import {
@@ -151,12 +152,26 @@ export async function PUT(request: NextRequest, { params }: Params) {
     })
     if (sanitized instanceof NextResponse) return sanitized
 
+    // Si el admin quitó el archivo (botón "Quitar"), limpiar también los
+    // `form_attachments` huérfanos — antes solo se vaciaba `forms.fileUrl`
+    // y el adjunto físico/registro quedaba abandonado en BD y disco.
+    const willClearFile = !data.fileUrl?.trim()
+    let orphanedAttachmentPaths: string[] = []
+
     // Actualizar en transacción: primero borrar relaciones antiguas, luego recrear
     const form = await prisma.$transaction(async tx => {
       await tx.form_roles.deleteMany({ where: { formId: id } })
       await tx.form_users.deleteMany({ where: { formId: id } })
       await tx.form_departments.deleteMany({ where: { formId: id } })
       await tx.form_families.deleteMany({ where: { formId: id } })
+
+      if (willClearFile) {
+        const staleAttachments = await tx.form_attachments.findMany({ where: { formId: id } })
+        if (staleAttachments.length > 0) {
+          orphanedAttachmentPaths = staleAttachments.map(a => a.path)
+          await tx.form_attachments.deleteMany({ where: { formId: id } })
+        }
+      }
 
       return tx.forms.update({
         where: { id },
@@ -189,6 +204,12 @@ export async function PUT(request: NextRequest, { params }: Params) {
         include: FORM_INCLUDE,
       })
     })
+
+    // Best-effort, fuera de la transacción — un archivo huérfano en disco
+    // no es un problema de integridad de datos.
+    if (orphanedAttachmentPaths.length > 0) {
+      await FileService.deletePhysicalFiles(orphanedAttachmentPaths)
+    }
 
     await AuditServiceComplete.log({
       action: AuditActionsComplete.FORM_UPDATED,

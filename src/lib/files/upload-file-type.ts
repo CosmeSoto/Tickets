@@ -23,8 +23,10 @@ export type SafeUploadMime =
   | 'text/plain'
   | 'application/msword'
   | 'application/vnd.ms-excel'
+  | 'application/vnd.ms-powerpoint'
   | 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
   | 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  | 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
 
 /** Extensión en disco derivada siempre del mime detectado — nunca del nombre del cliente. */
 export const EXT_BY_MIME: Record<SafeUploadMime, string> = {
@@ -36,8 +38,10 @@ export const EXT_BY_MIME: Record<SafeUploadMime, string> = {
   'text/plain': 'txt',
   'application/msword': 'doc',
   'application/vnd.ms-excel': 'xls',
+  'application/vnd.ms-powerpoint': 'ppt',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'pptx',
 }
 
 /**
@@ -100,8 +104,13 @@ function detectUploadSignature(buf: Buffer): SignatureFamily {
 const OOXML_MIMES: ReadonlySet<string> = new Set([
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
 ])
-const OLE_MIMES: ReadonlySet<string> = new Set(['application/msword', 'application/vnd.ms-excel'])
+const OLE_MIMES: ReadonlySet<string> = new Set([
+  'application/msword',
+  'application/vnd.ms-excel',
+  'application/vnd.ms-powerpoint',
+])
 
 /**
  * Cruza la firma real del contenido con el tipo que declaró el cliente y
