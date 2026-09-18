@@ -14,11 +14,10 @@
  *   `attachment.originalName` crudo en la cabecera.
  */
 import { NextResponse } from 'next/server'
-import { existsSync } from 'fs'
-import { readFile } from 'fs/promises'
 import prisma from '@/lib/prisma'
 import { assertCanViewNews } from '@/lib/news/news-access'
 import { INLINE_SAFE_MIMES, buildContentDisposition } from '@/lib/files/upload-file-type'
+import { FileService } from '@/lib/services/file-service'
 
 export async function serveNewsAttachment(
   newsId: string,
@@ -42,15 +41,16 @@ export async function serveNewsAttachment(
   if (!attachment) {
     return new NextResponse('Archivo no encontrado', { status: 404 })
   }
-  if (!existsSync(attachment.path)) {
+
+  const fileBuffer = await FileService.readAttachmentBytes(attachment)
+  if (!fileBuffer) {
     return new NextResponse('Archivo no disponible', { status: 404 })
   }
 
   const inline = INLINE_SAFE_MIMES.has(attachment.mimeType)
   const contentType = inline ? attachment.mimeType : 'application/octet-stream'
-  const fileBuffer = await readFile(attachment.path)
 
-  return new NextResponse(fileBuffer, {
+  return new NextResponse(fileBuffer as BodyInit, {
     headers: {
       'Content-Type': contentType,
       'Content-Disposition': buildContentDisposition(attachment.originalName, inline),

@@ -9,10 +9,9 @@ import {
   toInventoryAccessUser,
 } from '@/lib/inventory/inventory-resource-access'
 import prisma from '@/lib/prisma'
-import { unlink, readFile } from 'fs/promises'
-import { existsSync } from 'fs'
 import { randomUUID } from 'crypto'
 import { INLINE_SAFE_MIMES, buildContentDisposition } from '@/lib/files/upload-file-type'
+import { FileService } from '@/lib/services/file-service'
 
 /**
  * GET /api/inventory/equipment/[id]/attachments/[attachmentId]
@@ -41,11 +40,10 @@ export async function GET(
   })
   if (!attachment) return NextResponse.json({ error: 'Archivo no encontrado' }, { status: 404 })
 
-  if (!existsSync(attachment.path)) {
-    return NextResponse.json({ error: 'Archivo no disponible en el servidor' }, { status: 404 })
+  const buffer = await FileService.readAttachmentBytes(attachment)
+  if (!buffer) {
+    return NextResponse.json({ error: 'Archivo no disponible' }, { status: 404 })
   }
-
-  const buffer = await readFile(attachment.path)
   // El `mimeType` guardado en BD puede venir de un adjunto legado subido antes
   // de validar por contenido real — nunca se confía en él para decidir
   // `inline`: solo se sirve embebido si está en la allowlist, si no se fuerza
@@ -54,7 +52,7 @@ export async function GET(
   const inline = isPreview && INLINE_SAFE_MIMES.has(attachment.mimeType)
   const contentType = inline ? attachment.mimeType : 'application/octet-stream'
 
-  return new NextResponse(buffer, {
+  return new NextResponse(buffer as BodyInit, {
     headers: {
       'Content-Type': contentType,
       'Content-Disposition': buildContentDisposition(attachment.originalName, inline),
@@ -99,14 +97,7 @@ export async function DELETE(
   })
   if (!attachment) return NextResponse.json({ error: 'Archivo no encontrado' }, { status: 404 })
 
-  // Eliminar archivo físico
-  try {
-    await unlink(attachment.path)
-  } catch {
-    /* ignorar si ya no existe */
-  }
-
-  await prisma.equipment_attachments.delete({ where: { id: attachmentId } })
+  await FileService.deleteEquipmentFile(attachmentId)
 
   await prisma.audit_logs.create({
     data: {

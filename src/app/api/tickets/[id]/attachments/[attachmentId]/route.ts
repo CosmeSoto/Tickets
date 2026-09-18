@@ -65,7 +65,7 @@ export async function GET(
     const inline = isPreview && INLINE_SAFE_MIMES.has(attachment.mimeType)
     const contentType = inline ? attachment.mimeType : 'application/octet-stream'
 
-    return new NextResponse(fileData.buffer, {
+    return new NextResponse(fileData.buffer as BodyInit, {
       headers: {
         'Content-Type': contentType,
         'Content-Disposition': buildContentDisposition(attachment.originalName, inline),

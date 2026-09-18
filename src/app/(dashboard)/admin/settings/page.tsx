@@ -39,12 +39,14 @@ import {
   EyeOff,
   Inbox,
   Wrench,
+  Cloud,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { invalidateLandingCache } from '@/hooks/use-landing-data'
 import { validateEnabledEmailSettings } from '@/lib/email/smtp-settings-validation'
 import { OAuthSettingsTab } from '@/components/settings/oauth-settings-tab'
 import { SLAPoliciesTab } from '@/components/settings/sla-policies-tab'
+import { AttachmentsStorageTab } from '@/components/settings/attachments-storage-tab'
 
 interface SystemSettings {
   // Configuración general
@@ -679,6 +681,13 @@ function SettingsPage() {
                 {!isSuperAdmin && <Crown className='h-3 w-3 text-amber-500' />}
                 <Send className='h-4 w-4 hidden sm:inline' />
                 <span>Telegram</span>
+              </span>
+            </TabsTrigger>
+            <TabsTrigger value='storage' className='shrink-0 px-3' disabled={!isSuperAdmin}>
+              <span className='flex items-center gap-1'>
+                {!isSuperAdmin && <Crown className='h-3 w-3 text-amber-500' />}
+                <Cloud className='h-4 w-4 hidden sm:inline' />
+                <span>Almacenamiento</span>
               </span>
             </TabsTrigger>
           </TabsList>
@@ -2115,6 +2124,21 @@ function SettingsPage() {
             </div>
           ) : (
             <SLAPoliciesTab isSuperAdmin={isSuperAdmin} />
+          )}
+        </TabsContent>
+
+        {/* Almacenamiento de adjuntos (nube) */}
+        <TabsContent value='storage'>
+          {!isSuperAdmin ? (
+            <div className='flex flex-col items-center justify-center py-16 text-center'>
+              <Crown className='h-12 w-12 text-amber-500 mb-4' />
+              <h3 className='text-lg font-semibold text-foreground mb-2'>Acceso restringido</h3>
+              <p className='text-muted-foreground max-w-sm'>
+                Esta sección solo está disponible para Administradores Principales (Super Admin).
+              </p>
+            </div>
+          ) : (
+            <AttachmentsStorageTab />
           )}
         </TabsContent>
       </Tabs>

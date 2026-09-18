@@ -23,8 +23,10 @@ jest.mock('@/lib/auth', () => ({
 jest.mock('@/lib/prisma', () => ({
   __esModule: true,
   default: {
-    equipment_attachments: { findFirst: jest.fn(), delete: jest.fn() },
+    equipment_attachments: { findFirst: jest.fn(), findUnique: jest.fn(), delete: jest.fn() },
     audit_logs: { create: jest.fn().mockResolvedValue({}) },
+    // Sin fila -> CloudStorageService.getActiveProvider() resuelve a 'local'.
+    system_settings: { findUnique: jest.fn().mockResolvedValue(null) },
   },
 }))
 
@@ -216,6 +218,13 @@ describe('DELETE /api/inventory/equipment/[id]/attachments/[attachmentId]', () =
       path: '/uploads/equipment/eq-1/x.pdf',
       originalName: 'factura.pdf',
       equipment: { code: 'EQ-001' },
+    })
+    ;(prisma.equipment_attachments.findUnique as jest.Mock).mockResolvedValue({
+      id: ATTACHMENT_ID,
+      equipmentId: EQUIPMENT_ID,
+      path: '/uploads/equipment/eq-1/x.pdf',
+      storageProvider: 'local',
+      externalId: null,
     })
 
     const res = await DELETE({} as any, params())

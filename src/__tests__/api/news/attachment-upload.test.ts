@@ -20,6 +20,8 @@ jest.mock('@/lib/prisma', () => ({
   default: {
     news: { findUnique: jest.fn() },
     news_attachments: { create: jest.fn() },
+    // Sin fila -> CloudStorageService.getActiveProvider() resuelve a 'local'.
+    system_settings: { findUnique: jest.fn().mockResolvedValue(null) },
   },
 }))
 

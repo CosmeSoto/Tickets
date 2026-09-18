@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
-import { readFile } from 'fs/promises'
-import { existsSync } from 'fs'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { DigitalSignatureService } from '@/lib/services/digital-signature.service'
+import { FileService } from '@/lib/services/file-service'
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -37,16 +36,15 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
     }
 
-    if (!existsSync(attachment.path)) {
+    const fileBuffer = await FileService.readAttachmentBytes(attachment)
+    if (!fileBuffer) {
       return NextResponse.json({ error: 'Archivo no encontrado' }, { status: 404 })
     }
-
-    const fileBuffer = await readFile(attachment.path)
 
     const { searchParams } = new URL(request.url)
     const download = searchParams.get('download') === 'true'
 
-    return new NextResponse(fileBuffer, {
+    return new NextResponse(fileBuffer as BodyInit, {
       headers: {
         'Content-Type': attachment.mimeType,
         'Content-Disposition': download

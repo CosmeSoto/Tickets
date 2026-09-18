@@ -18,6 +18,9 @@ jest.mock('@/lib/prisma', () => ({
   default: {
     forms: { findUnique: jest.fn() },
     form_attachments: { create: jest.fn() },
+    // Sin fila -> CloudStorageService.getActiveProvider() resuelve a 'local'
+    // (comportamiento real: sin config de nube, el destino sigue siendo disco).
+    system_settings: { findUnique: jest.fn().mockResolvedValue(null) },
   },
 }))
 

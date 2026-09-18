@@ -17,6 +17,8 @@ jest.mock('@/lib/prisma', () => ({
     tickets: { findUnique: jest.fn() },
     attachments: { findMany: jest.fn().mockResolvedValue([]), create: jest.fn() },
     ticket_history: { create: jest.fn() },
+    // Sin fila -> CloudStorageService.getActiveProvider() resuelve a 'local'.
+    system_settings: { findUnique: jest.fn().mockResolvedValue(null) },
   },
 }))
 

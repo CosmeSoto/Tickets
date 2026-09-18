@@ -51,7 +51,7 @@ jest.mock('@/lib/prisma', () => ({
 jest.mock('@/lib/services/file-service', () => ({
   FileService: {
     prepareFormFileUpload: jest.fn(),
-    deletePhysicalFiles: jest.fn().mockResolvedValue(undefined),
+    deleteAttachmentFiles: jest.fn().mockResolvedValue(undefined),
     getFilesByForm: jest.fn(),
   },
 }))
@@ -103,7 +103,14 @@ describe('POST /api/admin/forms/[id]/attachments', () => {
   it('borra las filas viejas, crea la nueva y actualiza forms dentro de la MISMA transacción', async () => {
     ;(prisma.forms.findUnique as jest.Mock).mockResolvedValue({
       id: FORM_ID,
-      form_attachments: [{ id: 'old-1', path: '/uploads/forms/form-1/old.pdf' }],
+      form_attachments: [
+        {
+          id: 'old-1',
+          path: '/uploads/forms/form-1/old.pdf',
+          storageProvider: 'local',
+          externalId: null,
+        },
+      ],
     })
 
     const res: any = await POST(makeRequest(), params())
@@ -116,20 +123,29 @@ describe('POST /api/admin/forms/[id]/attachments', () => {
       expect.objectContaining({ data: expect.objectContaining({ fileType: 'application/pdf' }) })
     )
     // El borrado físico del archivo viejo ocurre DESPUÉS de que la transacción confirme
-    expect(FileService.deletePhysicalFiles).toHaveBeenCalledWith(['/uploads/forms/form-1/old.pdf'])
+    expect(FileService.deleteAttachmentFiles).toHaveBeenCalledWith([
+      { path: '/uploads/forms/form-1/old.pdf', storageProvider: 'local', externalId: null },
+    ])
   })
 
   it('si la transacción falla (p. ej. el update de forms), no queda ningún efecto parcial ni se limpia el archivo viejo', async () => {
     ;(prisma.forms.findUnique as jest.Mock).mockResolvedValue({
       id: FORM_ID,
-      form_attachments: [{ id: 'old-1', path: '/uploads/forms/form-1/old.pdf' }],
+      form_attachments: [
+        {
+          id: 'old-1',
+          path: '/uploads/forms/form-1/old.pdf',
+          storageProvider: 'local',
+          externalId: null,
+        },
+      ],
     })
     ;(prisma.$transaction as jest.Mock).mockRejectedValue(new Error('fallo de BD a mitad'))
 
     const res: any = await POST(makeRequest(), params())
 
     expect(res.status).toBe(500)
-    expect(FileService.deletePhysicalFiles).not.toHaveBeenCalled()
+    expect(FileService.deleteAttachmentFiles).not.toHaveBeenCalled()
   })
 
   it('sin adjuntos previos: no intenta borrar nada del disco', async () => {
@@ -141,6 +157,6 @@ describe('POST /api/admin/forms/[id]/attachments', () => {
     const res: any = await POST(makeRequest(), params())
 
     expect(res.status).toBe(201)
-    expect(FileService.deletePhysicalFiles).toHaveBeenCalledWith([])
+    expect(FileService.deleteAttachmentFiles).toHaveBeenCalledWith([])
   })
 })

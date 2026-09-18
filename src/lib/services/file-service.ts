@@ -36,6 +36,7 @@ import { writeFile, mkdir, unlink, readFile } from 'fs/promises'
 import { existsSync } from 'fs'
 import { randomUUID } from 'crypto'
 import { getUploadDir } from '@/lib/upload-path'
+import { CloudStorageService } from '@/lib/services/cloud-storage-service'
 import {
   EXT_BY_MIME,
   resolveSafeUploadMime,
@@ -190,6 +191,69 @@ export class FileService {
     return { ok: true }
   }
 
+  /**
+   * Escribe los bytes ya validados/comprimidos en el destino activo (disco
+   * local o nube) y arma el objeto listo para `prisma.<tabla>.create`. Único
+   * lugar donde se decide "local vs nube" — todos los módulos con adjuntos
+   * pasan por acá, así la lógica de branching no queda copiada por módulo.
+   * Nunca cae a disco en silencio si el admin configuró la nube y esta
+   * quedó inválida — `getActiveProvider` lanza en ese caso.
+   */
+  private static async storeAttachmentBytes(
+    buffer: Buffer,
+    mime: SafeUploadMime,
+    originalFileName: string,
+    module: string,
+    entityId: string
+  ) {
+    const originalName = sanitizeOriginalFilename(originalFileName)
+    const activeProvider = await CloudStorageService.getActiveProvider()
+
+    if (activeProvider === 'local') {
+      const uploadDir = getUploadDir(module, entityId)
+      if (!existsSync(uploadDir)) await mkdir(uploadDir, { recursive: true })
+
+      // La extensión en disco SIEMPRE sale del mime final, nunca del nombre del cliente.
+      const uniqueFilename = `${randomUUID()}.${EXT_BY_MIME[mime]}`
+      const filePath = getUploadDir(module, entityId, uniqueFilename)
+      await writeFile(filePath, buffer)
+
+      return {
+        filename: uniqueFilename,
+        originalName,
+        mimeType: mime as string,
+        size: buffer.length,
+        path: filePath,
+        storageProvider: 'local' as const,
+        externalId: null,
+        externalUrl: null,
+      }
+    }
+
+    // Nube: nunca toca disco. Nombre legible (con prefijo corto para evitar
+    // colisiones entre revisiones del mismo archivo en la misma carpeta).
+    const cloudFilename = `${randomUUID().slice(0, 8)}-${originalName}`
+    const uploaded = await CloudStorageService.uploadAttachment(
+      buffer,
+      cloudFilename,
+      mime,
+      module,
+      entityId,
+      activeProvider
+    )
+
+    return {
+      filename: cloudFilename,
+      originalName,
+      mimeType: mime as string,
+      size: buffer.length,
+      path: null,
+      storageProvider: activeProvider,
+      externalId: uploaded.externalId,
+      externalUrl: uploaded.externalUrl ?? null,
+    }
+  }
+
   // ── Upload principal ─────────────────────────────────────────────────────────
 
   static async uploadFile(data: UploadFileData) {
@@ -235,26 +299,20 @@ export class FileService {
       compressed = result.compressed
     }
 
-    // 6. Organizar en subdirectorio por ticket
-    const uploadDir = getUploadDir('tickets', ticketId)
-    if (!existsSync(uploadDir)) await mkdir(uploadDir, { recursive: true })
+    // 6. Guardar el archivo — disco local o nube, según el destino activo.
+    const stored = await this.storeAttachmentBytes(
+      finalBuffer,
+      finalMime,
+      file.name,
+      'tickets',
+      ticketId
+    )
 
-    // La extensión en disco SIEMPRE sale del mime final, nunca del nombre del cliente.
-    const uniqueFilename = `${randomUUID()}.${EXT_BY_MIME[finalMime]}`
-    const filePath = getUploadDir('tickets', ticketId, uniqueFilename)
-
-    // 7. Guardar en disco
-    await writeFile(filePath, finalBuffer)
-
-    // 8. Registrar en BD con tamaño final (post-compresión)
+    // 7. Registrar en BD con tamaño final (post-compresión)
     const attachment = await prisma.attachments.create({
       data: {
         id: randomUUID(),
-        filename: uniqueFilename,
-        originalName: sanitizeOriginalFilename(file.name),
-        mimeType: finalMime,
-        size: finalBuffer.length,
-        path: filePath,
+        ...stored,
         ticketId,
         uploadedBy,
         createdAt: new Date(),
@@ -334,21 +392,18 @@ export class FileService {
       finalMime = result.ext === 'webp' ? 'image/webp' : 'image/jpeg'
     }
 
-    const uploadDir = getUploadDir('tickets', params.ticketId)
-    if (!existsSync(uploadDir)) await mkdir(uploadDir, { recursive: true })
-
-    const uniqueFilename = `${randomUUID()}.${EXT_BY_MIME[finalMime]}`
-    const filePath = getUploadDir('tickets', params.ticketId, uniqueFilename)
-    await writeFile(filePath, finalBuffer)
+    const stored = await this.storeAttachmentBytes(
+      finalBuffer,
+      finalMime,
+      params.originalName,
+      'tickets',
+      params.ticketId
+    )
 
     const attachment = await prisma.attachments.create({
       data: {
         id: randomUUID(),
-        filename: uniqueFilename,
-        originalName: sanitizeOriginalFilename(params.originalName),
-        mimeType: finalMime,
-        size: finalBuffer.length,
-        path: filePath,
+        ...stored,
         ticketId: params.ticketId,
         uploadedBy: params.uploadedBy,
         createdAt: new Date(),
@@ -474,12 +529,7 @@ export class FileService {
 
     if (!attachment) throw new Error('Archivo no encontrado')
 
-    // Eliminar archivo físico
-    try {
-      if (existsSync(attachment.path)) await unlink(attachment.path)
-    } catch {
-      console.warn('[FileService] No se pudo eliminar el archivo físico:', attachment.path)
-    }
+    await this.deleteAttachmentFiles([attachment])
 
     // Eliminar registro BD
     await prisma.attachments.delete({ where: { id: fileId } })
@@ -501,11 +551,48 @@ export class FileService {
 
   // ── Descarga / lectura ───────────────────────────────────────────────────────
 
+  /**
+   * Lee los bytes de un adjunto sin importar dónde vive — disco local o nube
+   * (Google Drive/OneDrive). `null` significa "no disponible ahora mismo"
+   * (borrado del disco, o borrado/movido directamente en la nube por fuera
+   * de la app) — el caller debe responder 404, nunca lanzar un 500 crudo.
+   * Única fuente de verdad para esto — reusada también por
+   * `src/lib/forms/serve-form-attachment.ts`.
+   */
+  static async readAttachmentBytes(attachment: {
+    path: string | null
+    storageProvider?: string | null
+    externalId?: string | null
+  }): Promise<Buffer | null> {
+    if (!attachment.storageProvider || attachment.storageProvider === 'local') {
+      if (!attachment.path || !existsSync(attachment.path)) return null
+      return readFile(attachment.path)
+    }
+
+    if (
+      (attachment.storageProvider === 'google-drive' ||
+        attachment.storageProvider === 'onedrive') &&
+      attachment.externalId
+    ) {
+      const result = await CloudStorageService.downloadAttachment(
+        attachment.storageProvider,
+        attachment.externalId
+      )
+      return result?.buffer ?? null
+    }
+
+    return null
+  }
+
   static async downloadFile(fileId: string) {
     const attachment = await prisma.attachments.findUnique({ where: { id: fileId } })
     if (!attachment) throw new Error('Archivo no encontrado')
+
+    const buffer = await this.readAttachmentBytes(attachment)
+    if (!buffer) throw new Error('Archivo no disponible')
+
     return {
-      path: attachment.path,
+      buffer,
       filename: attachment.originalName,
       mimeType: attachment.mimeType,
     }
@@ -515,7 +602,9 @@ export class FileService {
     const attachment = await prisma.attachments.findUnique({ where: { id: fileId } })
     if (!attachment) throw new Error('Archivo no encontrado')
 
-    const buffer = await readFile(attachment.path)
+    const buffer = await this.readAttachmentBytes(attachment)
+    if (!buffer) throw new Error('Archivo no disponible')
+
     return {
       buffer,
       filename: attachment.originalName,
@@ -583,26 +672,20 @@ export class FileService {
       finalMime = result.ext === 'webp' ? 'image/webp' : 'image/jpeg'
     }
 
-    // 5. Organizar en subdirectorio por noticia
-    const uploadDir = getUploadDir('news', newsId)
-    if (!existsSync(uploadDir)) await mkdir(uploadDir, { recursive: true })
+    // 5. Guardar el archivo — disco local o nube, según el destino activo.
+    const stored = await this.storeAttachmentBytes(
+      finalBuffer,
+      finalMime,
+      file.name,
+      'news',
+      newsId
+    )
 
-    // La extensión en disco SIEMPRE sale del mime final, nunca del nombre del cliente.
-    const uniqueFilename = `${randomUUID()}.${EXT_BY_MIME[finalMime]}`
-    const filePath = getUploadDir('news', newsId, uniqueFilename)
-
-    // 6. Guardar en disco
-    await writeFile(filePath, finalBuffer)
-
-    // 7. Registrar en BD
+    // 6. Registrar en BD
     const attachment = await prisma.news_attachments.create({
       data: {
         id: randomUUID(),
-        filename: uniqueFilename,
-        originalName: sanitizeOriginalFilename(file.name),
-        mimeType: finalMime,
-        size: finalBuffer.length,
-        path: filePath,
+        ...stored,
         newsId,
         uploadedById: uploadedBy,
         createdAt: new Date(),
@@ -630,12 +713,7 @@ export class FileService {
 
     if (!attachment) throw new Error('Archivo no encontrado')
 
-    // Eliminar archivo físico
-    try {
-      if (existsSync(attachment.path)) await unlink(attachment.path)
-    } catch {
-      console.warn('[FileService] No se pudo eliminar el archivo físico:', attachment.path)
-    }
+    await this.deleteAttachmentFiles([attachment])
 
     // Eliminar registro BD
     await prisma.news_attachments.delete({ where: { id: fileId } })
@@ -683,21 +761,28 @@ export class FileService {
       finalMime = result.ext === 'webp' ? 'image/webp' : 'image/jpeg'
     }
 
-    const uploadDir = getUploadDir('forms', formId)
-    if (!existsSync(uploadDir)) await mkdir(uploadDir, { recursive: true })
+    return this.storeAttachmentBytes(finalBuffer, finalMime, file.name, 'forms', formId)
+  }
 
-    // La extensión en disco SIEMPRE sale del mime final, nunca del nombre del cliente.
-    const uniqueFilename = `${randomUUID()}.${EXT_BY_MIME[finalMime]}`
-    const filePath = getUploadDir('forms', formId, uniqueFilename)
-
-    await writeFile(filePath, finalBuffer)
-
+  /**
+   * Registra un link que el usuario pegó a mano (Drive/OneDrive/SharePoint,
+   * vía `MediaUrlInput`) como un adjunto real — antes ese link vivía suelto
+   * como string en `forms.fileUrl`, sin fila en `form_attachments`: sin
+   * historial de quién lo pegó ni protección si algo más adelante
+   * sobreescribía `fileUrl` sin querer. La app no sube ni administra este
+   * archivo, solo guarda la referencia.
+   */
+  static prepareExternalLinkAttachment(url: string) {
+    const trimmed = url.trim()
     return {
-      filename: uniqueFilename,
-      originalName: sanitizeOriginalFilename(file.name),
-      mimeType: finalMime as string,
-      size: finalBuffer.length,
-      path: filePath,
+      filename: trimmed,
+      originalName: trimmed,
+      mimeType: 'text/uri-list',
+      size: 0,
+      path: null,
+      storageProvider: 'external-link' as const,
+      externalId: null,
+      externalUrl: trimmed,
     }
   }
 
@@ -731,6 +816,31 @@ export class FileService {
     }
   }
 
+  /**
+   * Igual que `deletePhysicalFiles` pero consciente de `storageProvider` —
+   * un adjunto en la nube no tiene nada que borrar en disco, y uno
+   * "external-link" (el usuario solo pegó un link) no le pertenece a la app
+   * borrar en absoluto. Best-effort en los tres casos.
+   */
+  static async deleteAttachmentFiles(
+    attachments: { path: string | null; storageProvider: string; externalId: string | null }[]
+  ) {
+    for (const attachment of attachments) {
+      if (attachment.storageProvider === 'local') {
+        if (attachment.path) await this.deletePhysicalFiles([attachment.path])
+      } else if (
+        (attachment.storageProvider === 'google-drive' ||
+          attachment.storageProvider === 'onedrive') &&
+        attachment.externalId
+      ) {
+        await CloudStorageService.deleteAttachment(
+          attachment.storageProvider,
+          attachment.externalId
+        )
+      }
+    }
+  }
+
   static async getFilesByForm(formId: string) {
     return prisma.form_attachments.findMany({
       where: { formId },
@@ -741,9 +851,7 @@ export class FileService {
   static async deleteFormFile(fileId: string) {
     const attachment = await prisma.form_attachments.findUnique({ where: { id: fileId } })
     if (!attachment) throw new Error('Archivo no encontrado')
-    try {
-      if (existsSync(attachment.path)) await unlink(attachment.path)
-    } catch {}
+    await this.deleteAttachmentFiles([attachment])
     await prisma.form_attachments.delete({ where: { id: fileId } })
     return { success: true }
   }
@@ -758,32 +866,39 @@ export class FileService {
     const process = await prisma.processes.findUnique({ where: { id: processId } })
     if (!process) throw new Error('Proceso no encontrado')
 
+    // Cruza el contenido real (magic bytes) con el tipo declarado — este
+    // método confiaba en `file.type` tal cual (falsificable) y en la
+    // extensión del nombre del cliente; mismo fix ya aplicado a
+    // tickets/noticias/documentos.
     const originalBuffer = Buffer.from(await file.arrayBuffer()) as Buffer
-    let finalBuffer = originalBuffer
-    let finalExt = file.name.split('.').pop()?.toLowerCase() || 'bin'
-    let compressed = false
-
-    if (IMAGE_TYPES.has(file.type)) {
-      const result = await compressImage(originalBuffer, file.type, file.name)
-      finalBuffer = result.buffer
-      finalExt = result.ext
-      compressed = result.compressed
+    const safeMime = resolveSafeUploadMime(originalBuffer, file.type)
+    if (!safeMime) {
+      throw new Error(
+        'El contenido del archivo no coincide con su tipo. Verifica que no esté corrupto o renombrado.'
+      )
     }
 
-    const uploadDir = getUploadDir('processes', processId)
-    if (!existsSync(uploadDir)) await mkdir(uploadDir, { recursive: true })
-    const uniqueFilename = `${randomUUID()}.${finalExt}`
-    const filePath = getUploadDir('processes', processId, uniqueFilename)
-    await writeFile(filePath, finalBuffer)
+    let finalBuffer = originalBuffer
+    let finalMime: SafeUploadMime = safeMime
+
+    if (IMAGE_TYPES.has(safeMime)) {
+      const result = await compressImage(originalBuffer, safeMime, file.name)
+      finalBuffer = result.buffer
+      finalMime = result.ext === 'webp' ? 'image/webp' : 'image/jpeg'
+    }
+
+    const stored = await this.storeAttachmentBytes(
+      finalBuffer,
+      finalMime,
+      file.name,
+      'processes',
+      processId
+    )
 
     return prisma.process_attachments.create({
       data: {
         id: randomUUID(),
-        filename: uniqueFilename,
-        originalName: file.name,
-        mimeType: compressed ? (finalExt === 'webp' ? 'image/webp' : 'image/jpeg') : file.type,
-        size: finalBuffer.length,
-        path: filePath,
+        ...stored,
         processId,
         uploadedById,
         createdAt: new Date(),
@@ -803,12 +918,122 @@ export class FileService {
       where: { id: fileId },
     })
     if (!attachment) throw new Error('Archivo no encontrado')
-    try {
-      if (existsSync(attachment.path)) await unlink(attachment.path)
-    } catch {
-      // El registro sigue eliminándose para no dejar una referencia inválida.
-    }
+    await this.deleteAttachmentFiles([attachment])
     await prisma.process_attachments.delete({ where: { id: fileId } })
+    return { success: true }
+  }
+
+  // ── Métodos para Inventario (Equipos, Licencias, Contratos) ────────────────
+
+  /**
+   * Antes cada ruta (`equipment/[id]/attachments`, `licenses/[id]/attachments`,
+   * `contracts/[id]/attachments`) escribía a disco inline, copiada entre las
+   * tres y desincronizada entre sí (contratos ni siquiera usaba
+   * `getUploadDir` — tenía su propia constante `UPLOAD_DIR`). Consolidarlas
+   * acá es lo que permite ramificar disco/nube en un solo lugar en vez de
+   * tres, igual que ya se hizo con tickets/noticias/documentos/procesos.
+   */
+  static async uploadEquipmentFile(data: { file: File; equipmentId: string; uploadedBy: string }) {
+    const { file, equipmentId, uploadedBy } = data
+
+    const validation = await this.validateFile(file)
+    if (!validation.isValid) throw new Error(validation.error)
+
+    const originalBuffer = Buffer.from(await file.arrayBuffer()) as Buffer
+    const safeMime = resolveSafeUploadMime(originalBuffer, file.type)
+    if (!safeMime) {
+      throw new Error('El contenido del archivo no corresponde a un tipo permitido')
+    }
+
+    const stored = await this.storeAttachmentBytes(
+      originalBuffer,
+      safeMime,
+      file.name,
+      'equipment',
+      equipmentId
+    )
+
+    return prisma.equipment_attachments.create({
+      data: { id: randomUUID(), ...stored, equipmentId, uploadedBy, createdAt: new Date() },
+      include: { uploader: { select: { id: true, name: true } } },
+    })
+  }
+
+  static async deleteEquipmentFile(fileId: string) {
+    const attachment = await prisma.equipment_attachments.findUnique({ where: { id: fileId } })
+    if (!attachment) throw new Error('Archivo no encontrado')
+    await this.deleteAttachmentFiles([attachment])
+    await prisma.equipment_attachments.delete({ where: { id: fileId } })
+    return { success: true }
+  }
+
+  static async uploadLicenseFile(data: { file: File; licenseId: string; uploadedBy: string }) {
+    const { file, licenseId, uploadedBy } = data
+
+    const validation = await this.validateFile(file)
+    if (!validation.isValid) throw new Error(validation.error)
+
+    // Cruza el contenido real (magic bytes) con el tipo declarado — este
+    // método confiaba en `file.type`/la extensión del nombre del cliente tal
+    // cual (falsificable); mismo fix ya aplicado al resto de los módulos.
+    const originalBuffer = Buffer.from(await file.arrayBuffer()) as Buffer
+    const safeMime = resolveSafeUploadMime(originalBuffer, file.type)
+    if (!safeMime) {
+      throw new Error('El contenido del archivo no corresponde a un tipo permitido')
+    }
+
+    const stored = await this.storeAttachmentBytes(
+      originalBuffer,
+      safeMime,
+      file.name,
+      'licenses',
+      licenseId
+    )
+
+    return prisma.license_attachments.create({
+      data: { id: randomUUID(), ...stored, licenseId, uploadedBy, createdAt: new Date() },
+      include: { uploader: { select: { id: true, name: true } } },
+    })
+  }
+
+  static async deleteLicenseFile(fileId: string) {
+    const attachment = await prisma.license_attachments.findUnique({ where: { id: fileId } })
+    if (!attachment) throw new Error('Archivo no encontrado')
+    await this.deleteAttachmentFiles([attachment])
+    await prisma.license_attachments.delete({ where: { id: fileId } })
+    return { success: true }
+  }
+
+  static async uploadContractFile(data: { file: File; contractId: string; uploadedBy: string }) {
+    const { file, contractId, uploadedBy } = data
+
+    const validation = await this.validateFile(file)
+    if (!validation.isValid) throw new Error(validation.error)
+
+    const originalBuffer = Buffer.from(await file.arrayBuffer()) as Buffer
+    const safeMime = resolveSafeUploadMime(originalBuffer, file.type)
+    if (!safeMime) {
+      throw new Error('El contenido del archivo no corresponde a un tipo permitido')
+    }
+
+    const stored = await this.storeAttachmentBytes(
+      originalBuffer,
+      safeMime,
+      file.name,
+      'contracts',
+      contractId
+    )
+
+    return prisma.contract_attachments.create({
+      data: { id: randomUUID(), ...stored, contractId, uploadedBy, createdAt: new Date() },
+    })
+  }
+
+  static async deleteContractFile(fileId: string) {
+    const attachment = await prisma.contract_attachments.findUnique({ where: { id: fileId } })
+    if (!attachment) throw new Error('Archivo no encontrado')
+    await this.deleteAttachmentFiles([attachment])
+    await prisma.contract_attachments.delete({ where: { id: fileId } })
     return { success: true }
   }
 

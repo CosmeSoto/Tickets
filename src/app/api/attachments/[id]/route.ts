@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { FileService } from '@/lib/services/file-service'
-import { readFile } from 'fs/promises'
 import prisma from '@/lib/prisma'
 import {
   assertTicketAccessById,
@@ -36,16 +35,15 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     const fileInfo = await FileService.downloadFile(attachmentId)
-    const fileBuffer = await readFile(fileInfo.path)
 
     // Verificar si es una solicitud de descarga o vista previa
     const { searchParams } = new URL(request.url)
     const download = searchParams.get('download') === 'true'
 
-    return new NextResponse(fileBuffer, {
+    return new NextResponse(fileInfo.buffer as BodyInit, {
       headers: {
         'Content-Type': fileInfo.mimeType,
-        'Content-Disposition': download 
+        'Content-Disposition': download
           ? `attachment; filename="${fileInfo.filename}"`
           : `inline; filename="${fileInfo.filename}"`,
       },
@@ -83,7 +81,11 @@ export async function DELETE(
     const accessUser = toTicketAccessUser(session.user)
     try {
       const isUploader = attachment.uploadedBy === session.user.id
-      await assertTicketAccessById(accessUser, attachment.ticketId, isUploader ? 'comment' : 'write')
+      await assertTicketAccessById(
+        accessUser,
+        attachment.ticketId,
+        isUploader ? 'comment' : 'write'
+      )
     } catch (err) {
       if (err instanceof TicketAccessError) {
         return NextResponse.json({ error: err.message }, { status: err.statusCode })

@@ -264,6 +264,25 @@ export default function PublicFormsPage() {
           const uploadErr = await uploadRes.json().catch(() => ({}))
           throw new Error(uploadErr.error || 'Error al subir el archivo')
         }
+      } else if (
+        // Link pegado a mano (Drive/OneDrive/SharePoint) nuevo o distinto al
+        // que ya tenía: crea también su fila en form_attachments — antes
+        // quedaba solo como string suelto en forms.fileUrl, sin historial ni
+        // auditoría de quién lo pegó.
+        formData.fileUrl &&
+        formData.fileUrl !== editingForm?.fileUrl &&
+        savedId
+      ) {
+        const linkData = new FormData()
+        linkData.append('externalUrl', formData.fileUrl)
+        const linkRes = await fetch(`/api/admin/forms/${savedId}/attachments`, {
+          method: 'POST',
+          body: linkData,
+        })
+        if (!linkRes.ok) {
+          const linkErr = await linkRes.json().catch(() => ({}))
+          throw new Error(linkErr.error || 'Error al registrar el enlace')
+        }
       }
       toast({ title: editingForm ? 'Documento actualizado' : 'Documento creado' })
       setShowCreateDialog(false)

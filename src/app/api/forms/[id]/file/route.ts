@@ -12,9 +12,10 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { assertCanViewForm } from '@/lib/forms/form-visibility'
-import { buildFormAttachmentResponse } from '@/lib/forms/serve-form-attachment'
-import { readFile } from 'fs/promises'
-import { existsSync } from 'fs'
+import {
+  buildFormAttachmentResponse,
+  readFormAttachmentBuffer,
+} from '@/lib/forms/serve-form-attachment'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -52,16 +53,23 @@ export async function GET(request: NextRequest, { params }: Params) {
     const { searchParams } = new URL(request.url)
     const download = searchParams.get('download') === 'true'
 
-    // ── Caso 1: tiene adjunto local ──────────────────────────────────────────
+    // ── Caso 1: tiene adjunto (disco local o nube) ───────────────────────────
     if (form.form_attachments.length > 0) {
       const attachment = form.form_attachments[0]
 
-      if (!existsSync(attachment.path)) {
-        console.error(`[forms/file] Archivo no encontrado en disco: ${attachment.path}`)
-        return new NextResponse('File not found on disk', { status: 404 })
+      // "external-link": el usuario pegó un link a mano, la app no lo aloja.
+      if (attachment.storageProvider === 'external-link' && attachment.externalUrl) {
+        return NextResponse.redirect(attachment.externalUrl)
       }
 
-      const buffer = await readFile(attachment.path)
+      const buffer = await readFormAttachmentBuffer(attachment)
+      if (!buffer) {
+        console.error(
+          `[forms/file] Archivo no disponible (${attachment.storageProvider}): ${attachment.id}`
+        )
+        return new NextResponse('File not found', { status: 404 })
+      }
+
       return buildFormAttachmentResponse(attachment, buffer, download)
     }
 
@@ -75,9 +83,9 @@ export async function GET(request: NextRequest, { params }: Params) {
           const attachment = await prisma.form_attachments.findUnique({
             where: { id: attachmentId },
           })
-          if (attachment && existsSync(attachment.path)) {
-            const buffer = await readFile(attachment.path)
-            return buildFormAttachmentResponse(attachment, buffer, download)
+          if (attachment) {
+            const buffer = await readFormAttachmentBuffer(attachment)
+            if (buffer) return buildFormAttachmentResponse(attachment, buffer, download)
           }
         }
       }

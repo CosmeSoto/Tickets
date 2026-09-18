@@ -78,7 +78,7 @@ export async function GET(
 
     const disposition = isPreview ? 'inline' : 'attachment'
 
-    return new NextResponse(fileData.buffer, {
+    return new NextResponse(fileData.buffer as BodyInit, {
       headers: {
         'Content-Type': attachment.mimeType || 'application/octet-stream',
         'Content-Disposition': `${disposition}; filename="${encodeURIComponent(attachment.originalName)}"`,

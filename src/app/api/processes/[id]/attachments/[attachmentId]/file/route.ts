@@ -2,14 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
-import { readFile } from 'fs/promises'
-import { existsSync } from 'fs'
 import {
   assertCanViewProcesses,
   getProcessAccess,
   isFamilyWithinProcessScope,
 } from '@/lib/processes/access'
 import { AuditActionsComplete, AuditServiceComplete } from '@/lib/services/audit-service-complete'
+import { FileService } from '@/lib/services/file-service'
 
 type Params = { params: Promise<{ id: string; attachmentId: string }> }
 
@@ -40,11 +39,11 @@ export async function GET(request: NextRequest, { params }: Params) {
     if (!attachment || attachment.processId !== id) {
       return new NextResponse('Not found', { status: 404 })
     }
-    if (!existsSync(attachment.path)) {
-      return new NextResponse('File not found on disk', { status: 404 })
-    }
 
-    const buffer = await readFile(attachment.path)
+    const buffer = await FileService.readAttachmentBytes(attachment)
+    if (!buffer) {
+      return new NextResponse('File not found', { status: 404 })
+    }
     const download = new URL(request.url).searchParams.get('download') === 'true'
     await AuditServiceComplete.log({
       action: AuditActionsComplete.FILE_DOWNLOADED,
@@ -59,7 +58,7 @@ export async function GET(request: NextRequest, { params }: Params) {
       request,
     })
 
-    return new NextResponse(buffer, {
+    return new NextResponse(buffer as BodyInit, {
       headers: {
         'Content-Type': attachment.mimeType,
         'Content-Length': String(buffer.length),

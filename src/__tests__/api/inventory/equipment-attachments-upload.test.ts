@@ -26,6 +26,8 @@ jest.mock('@/lib/prisma', () => ({
     equipment: { findUnique: jest.fn() },
     equipment_attachments: { create: jest.fn() },
     audit_logs: { create: jest.fn().mockResolvedValue({}) },
+    // Sin fila -> CloudStorageService.getActiveProvider() resuelve a 'local'.
+    system_settings: { findUnique: jest.fn().mockResolvedValue(null) },
   },
 }))
 
@@ -43,7 +45,10 @@ jest.mock('@/lib/upload-path', () => ({
 }))
 
 jest.mock('@/lib/services/security-config-service', () => ({
-  SecurityConfigService: { validateFileSize: jest.fn().mockResolvedValue({ valid: true }) },
+  SecurityConfigService: {
+    validateFileSize: jest.fn().mockResolvedValue({ valid: true }),
+    validateFileType: jest.fn().mockResolvedValue({ valid: true }),
+  },
 }))
 
 jest.mock('@/lib/inventory/inventory-resource-access', () => ({

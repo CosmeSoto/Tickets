@@ -111,7 +111,7 @@ export async function POST(request: NextRequest, { params }: Params) {
 
   const contentType = request.headers.get('content-type') || ''
   let payload: z.infer<typeof reviewJsonSchema>
-  let uploadedEvidence: { path: string; attachment?: any } | null = null
+  let uploadedEvidence: { path: string | null; attachment?: any } | null = null
 
   if (contentType.includes('multipart/form-data')) {
     const form = await request.formData()
@@ -133,7 +133,11 @@ export async function POST(request: NextRequest, { params }: Params) {
         processId: id,
         uploadedById: session.user.id,
       })
-      uploadedEvidence = { path: attachment.path, attachment }
+      // `path` es nulo cuando el adjunto quedó en la nube (Google
+      // Drive/OneDrive) — `externalUrl` es la referencia equivalente en ese
+      // caso. Sin este fallback, un adjunto en la nube se guardaba como "sin
+      // evidencia" pese a existir realmente.
+      uploadedEvidence = { path: attachment.path ?? attachment.externalUrl, attachment }
     }
   } else {
     const parsed = reviewJsonSchema.safeParse(await request.json())
@@ -155,12 +159,12 @@ export async function POST(request: NextRequest, { params }: Params) {
   if (!evidencePath && payload.evidenceAttachmentId) {
     const attachment = await prisma.process_attachments.findFirst({
       where: { id: payload.evidenceAttachmentId, processId: id },
-      select: { path: true },
+      select: { path: true, externalUrl: true },
     })
     if (!attachment) {
       return NextResponse.json({ error: 'El adjunto de evidencia no existe.' }, { status: 400 })
     }
-    evidencePath = attachment.path
+    evidencePath = attachment.path ?? attachment.externalUrl
   }
   if (!evidencePath && payload.evidenceReference) {
     evidencePath = payload.evidenceReference

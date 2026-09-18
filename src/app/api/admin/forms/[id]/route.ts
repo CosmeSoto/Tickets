@@ -156,7 +156,11 @@ export async function PUT(request: NextRequest, { params }: Params) {
     // `form_attachments` huérfanos — antes solo se vaciaba `forms.fileUrl`
     // y el adjunto físico/registro quedaba abandonado en BD y disco.
     const willClearFile = !data.fileUrl?.trim()
-    let orphanedAttachmentPaths: string[] = []
+    let orphanedAttachments: {
+      path: string | null
+      storageProvider: string
+      externalId: string | null
+    }[] = []
 
     // Actualizar en transacción: primero borrar relaciones antiguas, luego recrear
     const form = await prisma.$transaction(async tx => {
@@ -168,7 +172,11 @@ export async function PUT(request: NextRequest, { params }: Params) {
       if (willClearFile) {
         const staleAttachments = await tx.form_attachments.findMany({ where: { formId: id } })
         if (staleAttachments.length > 0) {
-          orphanedAttachmentPaths = staleAttachments.map(a => a.path)
+          orphanedAttachments = staleAttachments.map(a => ({
+            path: a.path,
+            storageProvider: a.storageProvider,
+            externalId: a.externalId,
+          }))
           await tx.form_attachments.deleteMany({ where: { formId: id } })
         }
       }
@@ -205,10 +213,10 @@ export async function PUT(request: NextRequest, { params }: Params) {
       })
     })
 
-    // Best-effort, fuera de la transacción — un archivo huérfano en disco
-    // no es un problema de integridad de datos.
-    if (orphanedAttachmentPaths.length > 0) {
-      await FileService.deletePhysicalFiles(orphanedAttachmentPaths)
+    // Best-effort, fuera de la transacción — un archivo huérfano (disco o
+    // nube) no es un problema de integridad de datos.
+    if (orphanedAttachments.length > 0) {
+      await FileService.deleteAttachmentFiles(orphanedAttachments)
     }
 
     await AuditServiceComplete.log({

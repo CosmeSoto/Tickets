@@ -53,7 +53,6 @@ import {
   type ContractFormData,
 } from '@/types/contracts'
 import type { ContractPickerPrefill } from '@/lib/contracts/contract-picker-prefill'
-import { toPublicUploadUrl } from '@/lib/uploads/public-upload-url'
 import {
   applyContractFormPrefill,
   lineTypeForCategory,
@@ -1554,7 +1553,7 @@ export function ContractForm({
                             originalName: att.originalName,
                             mimeType: att.mimeType,
                             size: att.size,
-                            url: toPublicUploadUrl(att.path) ?? att.path,
+                            url: `/api/inventory/contracts/${contract!.id}/attachments/${att.id}?preview=true`,
                           })
                         }
                         className='shrink-0 rounded p-0.5 hover:bg-muted'
@@ -1563,7 +1562,7 @@ export function ContractForm({
                         <Eye className='h-3.5 w-3.5 text-muted-foreground' />
                       </button>
                       <a
-                        href={toPublicUploadUrl(att.path) ?? att.path}
+                        href={`/api/inventory/contracts/${contract!.id}/attachments/${att.id}`}
                         target='_blank'
                         rel='noopener noreferrer'
                         className='shrink-0 rounded p-0.5 hover:bg-muted'

@@ -53,17 +53,25 @@ export async function POST(request: NextRequest, { params }: Params) {
 
     const formData = await request.formData()
     const file = formData.get('file') as File | null
+    const externalUrlRaw = formData.get('externalUrl')
+    const externalUrl = typeof externalUrlRaw === 'string' ? externalUrlRaw.trim() : ''
 
-    if (!file) {
-      return NextResponse.json({ error: 'No se recibió ningún archivo' }, { status: 400 })
+    if (!file && !externalUrl) {
+      return NextResponse.json({ error: 'No se recibió ningún archivo ni enlace' }, { status: 400 })
     }
 
-    // Procesar y escribir el archivo a disco ANTES de la transacción — no
-    // hace falta mantener una conexión de BD abierta durante la lectura y
-    // compresión del archivo.
-    const prepared = await FileService.prepareFormFileUpload(file, id)
+    // Procesar y escribir el archivo (disco o nube) ANTES de la transacción
+    // — no hace falta mantener una conexión de BD abierta durante la lectura
+    // y compresión. Un link pegado a mano no tiene nada que procesar.
+    const prepared = file
+      ? await FileService.prepareFormFileUpload(file, id)
+      : FileService.prepareExternalLinkAttachment(externalUrl)
     const fileUrl = `/api/forms/${id}/file`
-    const oldPaths = form.form_attachments.map(a => a.path)
+    const oldAttachments = form.form_attachments.map(a => ({
+      path: a.path,
+      storageProvider: a.storageProvider,
+      externalId: a.externalId,
+    }))
 
     // Borrar adjuntos viejos + crear el nuevo + actualizar `forms` en una
     // única transacción: antes se borraba cada adjunto viejo y se subía el
@@ -96,10 +104,10 @@ export async function POST(request: NextRequest, { params }: Params) {
       return created
     })
 
-    // Limpieza del/los archivo(s) físico(s) viejo(s), best-effort — fuera de
-    // la transacción: un archivo huérfano en disco no es un problema de
-    // integridad de datos, a diferencia de las filas de `form_attachments`.
-    await FileService.deletePhysicalFiles(oldPaths)
+    // Limpieza del/los archivo(s) viejo(s) (disco o nube), best-effort — fuera
+    // de la transacción: un archivo huérfano no es un problema de integridad
+    // de datos, a diferencia de las filas de `form_attachments`.
+    await FileService.deleteAttachmentFiles(oldAttachments)
 
     return NextResponse.json({ attachment, fileUrl }, { status: 201 })
   } catch (error) {

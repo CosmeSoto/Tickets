@@ -3,19 +3,14 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { canManageInventory } from '@/lib/inventory-access'
 import prisma from '@/lib/prisma'
-import { writeFile, mkdir } from 'fs/promises'
-import { existsSync } from 'fs'
 import { randomUUID } from 'crypto'
-import { getUploadDir } from '@/lib/upload-path'
+import { FileService } from '@/lib/services/file-service'
 
 /**
  * GET /api/inventory/licenses/[id]/attachments
  * Lista adjuntos de una licencia
  */
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
@@ -34,15 +29,15 @@ export async function GET(
  * POST /api/inventory/licenses/[id]/attachments
  * Sube un adjunto a una licencia
  */
-export async function POST(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
-  if (!await canManageInventory(session.user.id, session.user.role)) {
-    return NextResponse.json({ error: 'No tienes permiso para gestionar el inventario' }, { status: 403 })
+  if (!(await canManageInventory(session.user.id, session.user.role))) {
+    return NextResponse.json(
+      { error: 'No tienes permiso para gestionar el inventario' },
+      { status: 403 }
+    )
   }
 
   const { id: licenseId } = await params
@@ -54,36 +49,19 @@ export async function POST(
   const file = formData.get('file') as File | null
   if (!file) return NextResponse.json({ error: 'No se proporcionó archivo' }, { status: 400 })
 
-  const { SecurityConfigService } = await import('@/lib/services/security-config-service')
-  const sizeCheck = await SecurityConfigService.validateFileSize(file.size)
-  if (!sizeCheck.valid) {
-    return NextResponse.json({ error: sizeCheck.message }, { status: 400 })
-  }
-
-  const uploadDir = getUploadDir('licenses', licenseId)
-  if (!existsSync(uploadDir)) await mkdir(uploadDir, { recursive: true })
-
-  const ext = file.name.split('.').pop()?.toLowerCase() || 'bin'
-  const filename = `${randomUUID()}.${ext}`
-  const filepath = getUploadDir('licenses', licenseId, filename)
-
-  const buffer = Buffer.from(await file.arrayBuffer())
-  await writeFile(filepath, buffer)
-
-  const attachment = await prisma.license_attachments.create({
-    data: {
-      id: randomUUID(),
+  let attachment
+  try {
+    attachment = await FileService.uploadLicenseFile({
+      file,
       licenseId,
-      filename,
-      originalName: file.name,
-      mimeType: file.type,
-      size: file.size,
-      path: filepath,
       uploadedBy: session.user.id,
-      createdAt: new Date(),
-    },
-    include: { uploader: { select: { id: true, name: true } } },
-  })
+    })
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : 'Error al subir el archivo' },
+      { status: 400 }
+    )
+  }
 
   await prisma.audit_logs.create({
     data: {

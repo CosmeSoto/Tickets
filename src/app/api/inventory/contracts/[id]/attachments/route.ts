@@ -2,23 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { randomUUID } from 'crypto'
-import { writeFile, mkdir } from 'fs/promises'
-import { join } from 'path'
 import { createAuditLog } from '@/lib/audit'
 import { canManageInventory, inventoryForbidden } from '@/lib/inventory-access'
-
-const UPLOAD_DIR = process.env.UPLOAD_DIR ?? join(process.cwd(), 'public', 'uploads')
-const DEFAULT_MAX_MB = 10
-
-async function getMaxFileSizeMB(): Promise<number> {
-  try {
-    const setting = await prisma.system_settings.findUnique({ where: { key: 'maxFileSize' } })
-    return setting ? parseInt(setting.value) || DEFAULT_MAX_MB : DEFAULT_MAX_MB
-  } catch {
-    return DEFAULT_MAX_MB
-  }
-}
+import { FileService } from '@/lib/services/file-service'
 
 export async function POST(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions)
@@ -36,36 +22,23 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
   })
   if (!contract) return NextResponse.json({ error: 'Contrato no encontrado' }, { status: 404 })
 
-  const maxMB = await getMaxFileSizeMB()
   const formData = await req.formData()
   const file = formData.get('file') as File | null
   if (!file) return NextResponse.json({ error: 'No se recibió archivo' }, { status: 400 })
 
-  if (file.size > maxMB * 1024 * 1024) {
+  let attachment
+  try {
+    attachment = await FileService.uploadContractFile({
+      file,
+      contractId: params.id,
+      uploadedBy: session.user.id,
+    })
+  } catch (err) {
     return NextResponse.json(
-      { error: `El archivo supera el límite de ${maxMB}MB configurado en el sistema` },
+      { error: err instanceof Error ? err.message : 'Error al subir el archivo' },
       { status: 400 }
     )
   }
-
-  const ext = file.name.split('.').pop() ?? 'bin'
-  const filename = `contract_${params.id}_${Date.now()}.${ext}`
-  const dir = join(UPLOAD_DIR, 'contracts', params.id)
-  await mkdir(dir, { recursive: true })
-  await writeFile(join(dir, filename), Buffer.from(await file.arrayBuffer()))
-
-  const attachment = await prisma.contract_attachments.create({
-    data: {
-      id: randomUUID(),
-      contractId: params.id,
-      filename,
-      originalName: file.name,
-      mimeType: file.type,
-      size: file.size,
-      path: `/uploads/contracts/${params.id}/${filename}`,
-      uploadedBy: session.user.id,
-    },
-  })
 
   await createAuditLog({
     entityType: 'contract',
@@ -96,7 +69,9 @@ export async function DELETE(req: NextRequest, context: { params: Promise<{ id: 
   })
   if (!attachment) return NextResponse.json({ error: 'Adjunto no encontrado' }, { status: 404 })
 
-  await prisma.contract_attachments.delete({ where: { id: attachmentId } })
+  // Antes solo se borraba la fila — el archivo físico quedaba huérfano en
+  // disco para siempre. `deleteContractFile` también limpia disco/nube.
+  await FileService.deleteContractFile(attachmentId)
 
   await createAuditLog({
     entityType: 'contract',
