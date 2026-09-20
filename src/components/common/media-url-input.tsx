@@ -392,7 +392,10 @@ export function MediaUrlInput({
               title='Vista previa'
               className='w-full h-72 border-0'
               allow='autoplay; fullscreen'
-              sandbox='allow-scripts allow-same-origin allow-popups allow-forms allow-presentation'
+              // Sin allow-same-origin: combinado con allow-scripts le permitiría al
+              // contenido embebido (una URL que pegó el usuario, no necesariamente
+              // confiable) quitarse su propio sandbox.
+              sandbox='allow-scripts allow-popups allow-forms allow-presentation'
             />
           ) : (
             /* Fallback: no embebible o imagen falló */

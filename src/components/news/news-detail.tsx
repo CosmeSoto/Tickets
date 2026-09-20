@@ -595,7 +595,10 @@ export function NewsDetail({
                 title={news.title}
                 className='w-full h-[300px] sm:h-[400px] border-0'
                 allow='autoplay; fullscreen'
-                sandbox='allow-scripts allow-same-origin allow-popups allow-presentation'
+                // Sin allow-same-origin: combinado con allow-scripts le permitiría al
+                // contenido embebido (URL pegada al crear la noticia) quitarse su
+                // propio sandbox.
+                sandbox='allow-scripts allow-popups allow-presentation'
               />
             )
           ) : (
@@ -619,7 +622,7 @@ export function NewsDetail({
                     title={news.title}
                     className='w-full h-[300px] sm:h-[400px] border-0'
                     allow='autoplay; fullscreen'
-                    sandbox='allow-scripts allow-same-origin allow-popups allow-presentation'
+                    sandbox='allow-scripts allow-popups allow-presentation'
                   />
                 )}
               </div>

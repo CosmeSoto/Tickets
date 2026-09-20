@@ -14,6 +14,8 @@ import { getOAuthCredentials } from '@/lib/oauth-config'
 import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
 import { requireAttachmentsSuperAdmin } from '../_auth'
+import { resetActiveProviderIfMatches } from '../_storage-settings'
+import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 
 const REDIRECT_URI_BASE = process.env.NEXTAUTH_URL ?? 'http://localhost:3000'
 const REDIRECT_URI = `${REDIRECT_URI_BASE}/api/admin/attachments/cloud-auth/callback`
@@ -103,7 +105,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const { errorResponse } = await requireAttachmentsSuperAdmin()
+  const { session, errorResponse } = await requireAttachmentsSuperAdmin()
   if (errorResponse) return errorResponse
 
   const provider = request.nextUrl.searchParams.get('provider') as
@@ -130,6 +132,16 @@ export async function DELETE(request: NextRequest) {
       updatedAt: new Date(),
     },
   })
+
+  await resetActiveProviderIfMatches(provider, session!.user!.id)
+
+  await AuditServiceComplete.log({
+    action: AuditActionsComplete.ATTACHMENTS_STORAGE_OAUTH_REVOKED,
+    entityType: 'attachments_storage_oauth',
+    entityId: session!.user!.id,
+    userId: session!.user!.id,
+    details: { provider },
+  }).catch(() => {})
 
   return NextResponse.json({ success: true, message: `Autorización de ${provider} revocada` })
 }

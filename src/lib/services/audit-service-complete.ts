@@ -44,6 +44,8 @@ export interface AuditLogData {
     | 'access_organization'
     | 'planner_task'
     | 'planner_oauth'
+    | 'attachments_storage_oauth'
+    | 'attachments_storage_settings'
   entityId?: string
   /** null para acciones sin actor humano (p. ej. el pull automático de Fase 2 de Planner) */
   userId: string | null
@@ -1029,6 +1031,11 @@ export const AuditActionsComplete = {
   PLANNER_SYNC_ERROR: 'planner_sync_error',
   PLANNER_OAUTH_CONNECTED: 'planner_oauth_connected',
   PLANNER_OAUTH_REVOKED: 'planner_oauth_revoked',
+
+  // Almacenamiento de adjuntos en la nube (Google Drive / OneDrive)
+  ATTACHMENTS_STORAGE_OAUTH_CONNECTED: 'attachments_storage_oauth_connected',
+  ATTACHMENTS_STORAGE_OAUTH_REVOKED: 'attachments_storage_oauth_revoked',
+  ATTACHMENTS_STORAGE_PROVIDER_CHANGED: 'attachments_storage_provider_changed',
 
   // Accesos (nunca registrar tokens QR ni PII completa)
   ACCESS_PASS_CREATED: 'access_pass_created',

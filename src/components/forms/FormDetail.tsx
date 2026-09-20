@@ -437,7 +437,11 @@ export function FormDetail({
                     </div>
                   )}
 
-                {/* Vista previa inline para URLs externas embebibles (Google Drive, OneDrive, etc.) */}
+                {/* Vista previa inline para URLs externas embebibles (Google Drive, OneDrive, etc.) —
+                    `previewSrc` es una URL que pegó quien creó el documento (no necesariamente un
+                    admin: técnicos/clientes con canManageForms también pueden). Por eso ambos
+                    iframes van con `sandbox` sin `allow-same-origin`: combinarlo con
+                    `allow-scripts` le permitiría al contenido embebido quitarse su propio sandbox. */}
                 {showPreview && canPreview && previewSrc && !isLocal && (
                   <div className='rounded-lg overflow-hidden border bg-muted/30'>
                     {/* Para PDFs directos, usar object con fallback a Google Docs Viewer */}
@@ -451,6 +455,7 @@ export function FormDetail({
                           src={`https://docs.google.com/viewer?url=${encodeURIComponent(previewSrc)}&embedded=true`}
                           className='w-full h-[500px] border-0'
                           title={form.title}
+                          sandbox='allow-scripts allow-popups allow-popups-to-escape-sandbox'
                         />
                       </object>
                     ) : (
@@ -459,6 +464,7 @@ export function FormDetail({
                         title={form.title}
                         className='w-full h-[500px] border-0'
                         allow='autoplay'
+                        sandbox='allow-scripts allow-popups allow-popups-to-escape-sandbox'
                       />
                     )}
                   </div>

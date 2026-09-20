@@ -16,6 +16,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
 import { requireAttachmentsSuperAdmin } from '../_auth'
+import { resetActiveProviderIfMatches } from '../_storage-settings'
+import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 
 type ActiveProvider = 'local' | 'google-drive' | 'onedrive' | 'sharepoint'
 
@@ -60,7 +62,7 @@ export async function GET() {
 }
 
 export async function PUT(request: NextRequest) {
-  const { errorResponse } = await requireAttachmentsSuperAdmin()
+  const { session, errorResponse } = await requireAttachmentsSuperAdmin()
   if (errorResponse) return errorResponse
 
   const body = await request.json().catch(() => null)
@@ -73,6 +75,8 @@ export async function PUT(request: NextRequest) {
     googleDriveEnabled?: boolean
     oneDriveEnabled?: boolean
   }
+
+  const previousActiveProvider = (await loadSettings()).activeProvider
 
   const upsert = (key: string, value: string, description: string) =>
     prisma.system_settings.upsert({
@@ -94,6 +98,10 @@ export async function PUT(request: NextRequest) {
       String(googleDriveEnabled),
       'Google Drive habilitado como destino de adjuntos'
     )
+    // Si Google Drive era el destino activo, no lo dejamos huérfano: sin
+    // esto, toda subida nueva empezaría a fallar hasta que un admin lo
+    // notara y lo corrigiera a mano.
+    if (!googleDriveEnabled) await resetActiveProviderIfMatches('google-drive', session!.user!.id)
   }
 
   if (typeof oneDriveEnabled === 'boolean') {
@@ -102,6 +110,7 @@ export async function PUT(request: NextRequest) {
       String(oneDriveEnabled),
       'OneDrive habilitado como destino de adjuntos'
     )
+    if (!oneDriveEnabled) await resetActiveProviderIfMatches('onedrive', session!.user!.id)
   }
 
   if (activeProvider) {
@@ -146,6 +155,16 @@ export async function PUT(request: NextRequest) {
       activeProvider,
       'Destino activo para adjuntos nuevos'
     )
+
+    if (activeProvider !== previousActiveProvider) {
+      await AuditServiceComplete.log({
+        action: AuditActionsComplete.ATTACHMENTS_STORAGE_PROVIDER_CHANGED,
+        entityType: 'attachments_storage_settings',
+        entityId: 'attachmentsStorageProvider',
+        userId: session!.user!.id,
+        details: { from: previousActiveProvider, to: activeProvider },
+      }).catch(() => {})
+    }
   }
 
   const settings = await loadSettings()
