@@ -19,21 +19,23 @@ import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
-import { Cloud, HardDrive, CheckCircle2, RefreshCw, Lock } from 'lucide-react'
+import { Cloud, HardDrive, CheckCircle2, RefreshCw } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { SharePointStorageCard } from '@/components/settings/sharepoint-storage-card'
 
-type ProviderId = 'local' | 'google-drive' | 'onedrive'
+type ProviderId = 'local' | 'google-drive' | 'onedrive' | 'sharepoint'
 
 interface StorageSettings {
-  activeProvider: ProviderId | 'sharepoint'
+  activeProvider: ProviderId
   googleDrive: { enabled: boolean; authorized: boolean }
   oneDrive: { enabled: boolean; authorized: boolean }
-  sharePoint: { enabled: boolean; available: boolean }
+  sharePoint: { enabled: boolean; configured: boolean; siteUrl: string | null }
 }
 
-const PROVIDER_LABEL: Record<'google-drive' | 'onedrive', string> = {
+const PROVIDER_LABEL: Record<'google-drive' | 'onedrive' | 'sharepoint', string> = {
   'google-drive': 'Google Drive',
   onedrive: 'OneDrive',
+  sharepoint: 'SharePoint',
 }
 
 export function AttachmentsStorageTab() {
@@ -145,6 +147,8 @@ export function AttachmentsStorageTab() {
   if (settings.googleDrive.enabled && settings.googleDrive.authorized)
     eligibleForActive.push('google-drive')
   if (settings.oneDrive.enabled && settings.oneDrive.authorized) eligibleForActive.push('onedrive')
+  if (settings.sharePoint.enabled && settings.sharePoint.configured)
+    eligibleForActive.push('sharepoint')
 
   return (
     <div className='space-y-6'>
@@ -158,7 +162,7 @@ export function AttachmentsStorageTab() {
         </CardHeader>
         <CardContent>
           <RadioGroup
-            value={settings.activeProvider === 'sharepoint' ? 'local' : settings.activeProvider}
+            value={settings.activeProvider}
             onValueChange={value => patch({ activeProvider: value })}
             disabled={saving}
           >
@@ -173,7 +177,8 @@ export function AttachmentsStorageTab() {
           </RadioGroup>
           {eligibleForActive.length === 1 && (
             <p className='text-sm text-muted-foreground mt-2'>
-              Habilita y autoriza Google Drive u OneDrive abajo para poder elegirlos como destino.
+              Habilita y conecta Google Drive, OneDrive o SharePoint abajo para poder elegirlos como
+              destino.
             </p>
           )}
         </CardContent>
@@ -201,17 +206,14 @@ export function AttachmentsStorageTab() {
         onRevoke={() => revoke('onedrive')}
       />
 
-      <Card className='opacity-60'>
-        <CardHeader>
-          <CardTitle className='flex items-center gap-2'>
-            <Lock className='h-4 w-4' /> SharePoint
-          </CardTitle>
-          <CardDescription>
-            Próximamente — requiere permisos de aplicación (Sites.Selected) configurados en Azure
-            por sitio.
-          </CardDescription>
-        </CardHeader>
-      </Card>
+      <SharePointStorageCard
+        enabled={settings.sharePoint.enabled}
+        configured={settings.sharePoint.configured}
+        siteUrl={settings.sharePoint.siteUrl}
+        saving={saving}
+        onToggleEnabled={enabled => patch({ sharePointEnabled: enabled })}
+        onSiteConfigChanged={load}
+      />
     </div>
   )
 }

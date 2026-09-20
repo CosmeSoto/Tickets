@@ -79,11 +79,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (!['google', 'azure-ad', 'azure-ad-planner'].includes(provider)) {
+    if (!['google', 'azure-ad', 'azure-ad-planner', 'azure-ad-sharepoint'].includes(provider)) {
       return NextResponse.json(
         {
           success: false,
-          error: 'Provider inválido. Debe ser "google", "azure-ad" o "azure-ad-planner"',
+          error:
+            'Provider inválido. Debe ser "google", "azure-ad", "azure-ad-planner" o "azure-ad-sharepoint"',
         },
         { status: 400 }
       )
@@ -107,6 +108,24 @@ export async function POST(request: NextRequest) {
         {
           success: false,
           error: 'No puedes activar OAuth sin Client ID y Client Secret configurados',
+        },
+        { status: 400 }
+      )
+    }
+
+    // 'azure-ad-sharepoint' usa client_credentials, que no acepta el
+    // endpoint multi-tenant "common" (a diferencia de los otros tres
+    // providers, delegados) — sin Tenant ID, cada subida fallaría con un
+    // error de Microsoft mucho más críptico que decirlo aquí al guardar.
+    if (
+      provider === 'azure-ad-sharepoint' &&
+      isEnabled &&
+      !(tenantId || existingConfig?.tenantId)
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'SharePoint requiere el Tenant ID del directorio — no se puede usar "common"',
         },
         { status: 400 }
       )

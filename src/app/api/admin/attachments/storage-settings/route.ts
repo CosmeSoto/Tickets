@@ -10,6 +10,13 @@
  * `allowedFileTypes` corregido en esta misma conversación) — mezclar estas
  * claves ahí repetiría el mismo riesgo de que un guardado no relacionado
  * pise un valor que no debía tocar.
+ *
+ * SharePoint no tiene un flujo de "autorizar" (popup) como Google/OneDrive
+ * — usa credenciales de aplicación configuradas en Ajustes → OAuth
+ * ('azure-ad-sharepoint') más un sitio configurado vía
+ * `/api/admin/attachments/sharepoint-site`. Por eso su equivalente de
+ * "autorizado" acá es `configured` (¿hay un driveId resuelto?), no un
+ * refresh token.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -20,6 +27,7 @@ import { resetActiveProviderIfMatches } from '../_storage-settings'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 
 type ActiveProvider = 'local' | 'google-drive' | 'onedrive' | 'sharepoint'
+type CloudProvider = Exclude<ActiveProvider, 'local'>
 
 const SETTINGS_KEYS = [
   'attachmentsStorageProvider',
@@ -28,6 +36,8 @@ const SETTINGS_KEYS = [
   'attachmentsSharePointEnabled',
   'attachmentsGoogleRefreshToken',
   'attachmentsMicrosoftRefreshToken',
+  'attachmentsSharePointDriveId',
+  'attachmentsSharePointSiteUrl',
 ] as const
 
 async function loadSettings() {
@@ -43,15 +53,15 @@ async function loadSettings() {
       enabled: map.get('attachmentsOneDriveEnabled') === 'true',
       authorized: !!map.get('attachmentsMicrosoftRefreshToken'),
     },
-    // SharePoint todavía no tiene flujo de autorización (fase futura, ver
-    // plan) — se expone en el estado para que la UI muestre la tarjeta
-    // deshabilitada, no para que se pueda activar como destino real.
     sharePoint: {
-      enabled: false,
-      available: false,
+      enabled: map.get('attachmentsSharePointEnabled') === 'true',
+      configured: !!map.get('attachmentsSharePointDriveId'),
+      siteUrl: map.get('attachmentsSharePointSiteUrl') || null,
     },
   }
 }
+
+export type StorageSettingsSnapshot = Awaited<ReturnType<typeof loadSettings>>
 
 export async function GET() {
   const { errorResponse } = await requireAttachmentsSuperAdmin()
@@ -70,10 +80,11 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: 'Cuerpo inválido' }, { status: 400 })
   }
 
-  const { activeProvider, googleDriveEnabled, oneDriveEnabled } = body as {
+  const { activeProvider, googleDriveEnabled, oneDriveEnabled, sharePointEnabled } = body as {
     activeProvider?: ActiveProvider
     googleDriveEnabled?: boolean
     oneDriveEnabled?: boolean
+    sharePointEnabled?: boolean
   }
 
   const previousActiveProvider = (await loadSettings()).activeProvider
@@ -113,37 +124,46 @@ export async function PUT(request: NextRequest) {
     if (!oneDriveEnabled) await resetActiveProviderIfMatches('onedrive', session!.user!.id)
   }
 
+  if (typeof sharePointEnabled === 'boolean') {
+    await upsert(
+      'attachmentsSharePointEnabled',
+      String(sharePointEnabled),
+      'SharePoint habilitado como destino de adjuntos'
+    )
+    if (!sharePointEnabled) await resetActiveProviderIfMatches('sharepoint', session!.user!.id)
+  }
+
   if (activeProvider) {
-    if (!['local', 'google-drive', 'onedrive'].includes(activeProvider)) {
-      return NextResponse.json(
-        { error: 'Destino inválido o todavía no disponible (SharePoint llega en una fase futura)' },
-        { status: 400 }
-      )
+    if (!['local', 'google-drive', 'onedrive', 'sharepoint'].includes(activeProvider)) {
+      return NextResponse.json({ error: 'Destino inválido' }, { status: 400 })
     }
 
     // No se permite fijar como destino activo un proveedor que no esté
-    // habilitado + autorizado — evita dejar la config en un estado que
-    // rompería la próxima subida sin que el admin lo haya notado acá mismo.
+    // habilitado + autorizado/configurado — evita dejar la config en un
+    // estado que rompería la próxima subida sin que el admin lo haya
+    // notado acá mismo.
     if (activeProvider !== 'local') {
-      const settingsAfterToggle = await loadSettings()
-      const enabled =
-        activeProvider === 'google-drive'
-          ? typeof googleDriveEnabled === 'boolean'
-            ? googleDriveEnabled
-            : settingsAfterToggle.googleDrive.enabled
-          : typeof oneDriveEnabled === 'boolean'
-            ? oneDriveEnabled
-            : settingsAfterToggle.oneDrive.enabled
-      const authorized =
-        activeProvider === 'google-drive'
-          ? settingsAfterToggle.googleDrive.authorized
-          : settingsAfterToggle.oneDrive.authorized
+      const s = await loadSettings()
+      const pendingEnabled: Record<CloudProvider, boolean> = {
+        'google-drive':
+          typeof googleDriveEnabled === 'boolean' ? googleDriveEnabled : s.googleDrive.enabled,
+        onedrive: typeof oneDriveEnabled === 'boolean' ? oneDriveEnabled : s.oneDrive.enabled,
+        sharepoint:
+          typeof sharePointEnabled === 'boolean' ? sharePointEnabled : s.sharePoint.enabled,
+      }
+      const ready: Record<CloudProvider, boolean> = {
+        'google-drive': s.googleDrive.authorized,
+        onedrive: s.oneDrive.authorized,
+        sharepoint: s.sharePoint.configured,
+      }
 
-      if (!enabled || !authorized) {
+      if (!pendingEnabled[activeProvider] || !ready[activeProvider]) {
         return NextResponse.json(
           {
             error:
-              'Ese proveedor debe estar habilitado y autorizado antes de fijarlo como destino activo',
+              activeProvider === 'sharepoint'
+                ? 'SharePoint debe estar habilitado y con un sitio configurado antes de fijarlo como destino activo'
+                : 'Ese proveedor debe estar habilitado y autorizado antes de fijarlo como destino activo',
           },
           { status: 400 }
         )

@@ -14,7 +14,7 @@ export const ACTIVE_PROVIDER_KEY = 'attachmentsStorageProvider'
  * a los toggles de módulo por usuario.
  */
 export async function resetActiveProviderIfMatches(
-  provider: 'google-drive' | 'onedrive',
+  provider: 'google-drive' | 'onedrive' | 'sharepoint',
   actorUserId: string
 ): Promise<void> {
   const current = await prisma.system_settings.findUnique({ where: { key: ACTIVE_PROVIDER_KEY } })

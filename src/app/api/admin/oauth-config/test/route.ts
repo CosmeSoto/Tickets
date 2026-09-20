@@ -9,6 +9,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   google: 'Google',
   'azure-ad': 'Microsoft',
   'azure-ad-planner': 'Microsoft (Planner)',
+  'azure-ad-sharepoint': 'Microsoft (SharePoint)',
 }
 
 // Verifica que el tenant de Azure AD existe y es accesible
@@ -147,7 +148,10 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { provider } = body
 
-    if (!provider || !['google', 'azure-ad', 'azure-ad-planner'].includes(provider)) {
+    if (
+      !provider ||
+      !['google', 'azure-ad', 'azure-ad-planner', 'azure-ad-sharepoint'].includes(provider)
+    ) {
       return NextResponse.json({ success: false, error: 'Proveedor inválido.' }, { status: 400 })
     }
 
@@ -196,7 +200,11 @@ export async function POST(request: NextRequest) {
 
     const diagnostics: string[] = []
 
-    if (provider === 'azure-ad' || provider === 'azure-ad-planner') {
+    if (
+      provider === 'azure-ad' ||
+      provider === 'azure-ad-planner' ||
+      provider === 'azure-ad-sharepoint'
+    ) {
       const tenant = config.tenantId || 'common'
 
       // Paso 1: verificar que el tenant existe
@@ -244,6 +252,21 @@ export async function POST(request: NextRequest) {
         )
       }
       diagnostics.push('Client ID y Client Secret de Google verificados correctamente')
+    }
+
+    // SharePoint es app-only (client_credentials) — no hay Redirect URI ni
+    // popup de usuario que registrar en el portal, así que ese mensaje no
+    // aplica. En su lugar se recuerda el paso aparte que sí es obligatorio:
+    // otorgar Sites.Selected al sitio específico (no se hace desde aquí).
+    if (provider === 'azure-ad-sharepoint') {
+      return NextResponse.json({
+        success: true,
+        label,
+        provider,
+        diagnostics,
+        redirectUri: null,
+        message: `Credenciales de ${label} verificadas correctamente. Falta otorgarle a esta app el permiso Sites.Selected sobre el sitio específico de SharePoint (paso aparte, ver Ajustes → Almacenamiento).`,
+      })
     }
 
     // Todo OK — devolver también la redirect URI para que el usuario confirme que está en el portal

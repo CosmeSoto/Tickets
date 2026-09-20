@@ -571,7 +571,8 @@ export class FileService {
 
     if (
       (attachment.storageProvider === 'google-drive' ||
-        attachment.storageProvider === 'onedrive') &&
+        attachment.storageProvider === 'onedrive' ||
+        attachment.storageProvider === 'sharepoint') &&
       attachment.externalId
     ) {
       const result = await CloudStorageService.downloadAttachment(
@@ -830,7 +831,8 @@ export class FileService {
         if (attachment.path) await this.deletePhysicalFiles([attachment.path])
       } else if (
         (attachment.storageProvider === 'google-drive' ||
-          attachment.storageProvider === 'onedrive') &&
+          attachment.storageProvider === 'onedrive' ||
+          attachment.storageProvider === 'sharepoint') &&
         attachment.externalId
       ) {
         await CloudStorageService.deleteAttachment(
