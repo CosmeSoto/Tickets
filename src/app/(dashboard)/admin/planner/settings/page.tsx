@@ -1,25 +1,13 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import {
-  ArrowLeft,
-  Save,
-  CheckCircle,
-  RefreshCw,
-  Eye,
-  EyeOff,
-  Key,
-  FlaskConical,
-  Loader2,
-} from 'lucide-react'
+import { ArrowLeft, Save, CheckCircle, RefreshCw } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
@@ -28,24 +16,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
-
-type OAuthFormState = {
-  clientId: string
-  clientSecret: string
-  tenantId: string
-  isEnabled: boolean
-  hasExistingSecret: boolean
-  showSecret: boolean
-}
-
-const initialOAuthConfig: OAuthFormState = {
-  clientId: '',
-  clientSecret: '',
-  tenantId: '',
-  isEnabled: false,
-  hasExistingSecret: false,
-  showSecret: false,
-}
+import { OAuthCredentialsStatusLink } from '@/components/settings/oauth-credentials-fields'
 
 type PlannerSettings = {
   enabled: boolean
@@ -90,87 +61,6 @@ export default function PlannerSettingsPage() {
 
   const [links, setLinks] = useState<SyncLink[]>([])
 
-  const [oauthConfig, setOauthConfig] = useState<OAuthFormState>(initialOAuthConfig)
-  const [savingOAuth, setSavingOAuth] = useState(false)
-  const [testingOAuth, setTestingOAuth] = useState(false)
-
-  const loadOAuthConfig = useCallback(async () => {
-    try {
-      const res = await fetch('/api/admin/oauth-config')
-      const data = await res.json()
-      const existing = data.data?.find((c: any) => c.provider === 'azure-ad-planner')
-      if (existing) {
-        setOauthConfig(current => ({
-          ...current,
-          clientId: existing.clientId ?? '',
-          tenantId: existing.tenantId ?? '',
-          isEnabled: existing.isEnabled ?? false,
-          hasExistingSecret: Boolean(existing.hasClientSecret),
-        }))
-      }
-    } catch {
-      // silencioso — no crítico
-    }
-  }, [])
-
-  const saveOAuthConfig = async () => {
-    if (!oauthConfig.clientId || (!oauthConfig.clientSecret && !oauthConfig.hasExistingSecret)) {
-      toast({
-        title: 'Faltan datos',
-        description: 'Client ID y Client Secret son obligatorios.',
-        variant: 'destructive',
-      })
-      return
-    }
-    setSavingOAuth(true)
-    try {
-      const res = await fetch('/api/admin/oauth-config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          provider: 'azure-ad-planner',
-          clientId: oauthConfig.clientId,
-          clientSecret: oauthConfig.clientSecret || undefined,
-          tenantId: oauthConfig.tenantId || null,
-          isEnabled: oauthConfig.isEnabled,
-        }),
-      })
-      const data = await res.json()
-      if (!data.success) throw new Error(data.error || 'No fue posible guardar.')
-      toast({ title: 'Credenciales guardadas' })
-      setOauthConfig(current => ({ ...current, clientSecret: '', hasExistingSecret: true }))
-    } catch (err) {
-      toast({
-        title: 'Error',
-        description: err instanceof Error ? err.message : 'No fue posible guardar.',
-        variant: 'destructive',
-      })
-    } finally {
-      setSavingOAuth(false)
-    }
-  }
-
-  const testOAuthConfig = async () => {
-    setTestingOAuth(true)
-    try {
-      const res = await fetch('/api/admin/oauth-config/test', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ provider: 'azure-ad-planner' }),
-      })
-      const data = await res.json()
-      toast({
-        title: data.success ? 'Conexión verificada' : 'Error de verificación',
-        description: data.message || data.error,
-        variant: data.success ? undefined : 'destructive',
-      })
-    } catch {
-      toast({ title: 'Error de conexión', variant: 'destructive' })
-    } finally {
-      setTestingOAuth(false)
-    }
-  }
-
   const load = useCallback(async () => {
     try {
       setLoading(true)
@@ -201,8 +91,7 @@ export default function PlannerSettingsPage() {
   useEffect(() => {
     void load()
     void loadSyncStatus()
-    void loadOAuthConfig()
-  }, [load, loadSyncStatus, loadOAuthConfig])
+  }, [load, loadSyncStatus])
 
   // El callback de OAuth redirige de vuelta acá con ?cloud=authorized|error
   useEffect(() => {
@@ -351,121 +240,12 @@ export default function PlannerSettingsPage() {
           <CardHeader>
             <CardTitle>Credenciales de la aplicación (Azure AD)</CardTitle>
             <CardDescription>
-              Registro de aplicación en Entra ID con permisos delegados de Planner (Tasks.ReadWrite,
-              Group.Read.All). Puede ser el mismo registro que ya usa el login de Microsoft, solo
-              con estos permisos agregados.
+              Se configuran una sola vez para todo el sistema en Ajustes → OAuth, junto con las
+              demás credenciales de Microsoft (login, SharePoint).
             </CardDescription>
           </CardHeader>
-          <CardContent className='space-y-4'>
-            <div className='space-y-2'>
-              <Label htmlFor='planner-client-id'>Client ID *</Label>
-              <Input
-                id='planner-client-id'
-                value={oauthConfig.clientId}
-                disabled={!canWrite}
-                onChange={e =>
-                  setOauthConfig(current => ({ ...current, clientId: e.target.value }))
-                }
-                placeholder='00000000-0000-0000-0000-000000000000'
-                className='font-mono text-sm'
-              />
-            </div>
-            <div className='space-y-2'>
-              <Label htmlFor='planner-client-secret'>
-                Client Secret{' '}
-                {oauthConfig.hasExistingSecret ? '(dejar vacío para mantener el actual)' : '*'}
-              </Label>
-              {oauthConfig.hasExistingSecret && !oauthConfig.clientSecret && (
-                <div className='flex items-center gap-2 rounded-md border border-border bg-muted/50 px-3 py-2 text-xs text-muted-foreground'>
-                  <Key className='h-3.5 w-3.5 shrink-0' />
-                  Secret guardado — deja vacío para mantenerlo o escribe uno nuevo para reemplazarlo
-                </div>
-              )}
-              <div className='relative'>
-                <Input
-                  id='planner-client-secret'
-                  type={oauthConfig.showSecret ? 'text' : 'password'}
-                  value={oauthConfig.clientSecret}
-                  disabled={!canWrite}
-                  onChange={e =>
-                    setOauthConfig(current => ({ ...current, clientSecret: e.target.value }))
-                  }
-                  placeholder={oauthConfig.hasExistingSecret ? '••••••••  (sin cambios)' : ''}
-                  className='pr-10 font-mono text-sm'
-                />
-                <Button
-                  type='button'
-                  variant='ghost'
-                  size='sm'
-                  className='absolute right-0 top-0 h-full px-3'
-                  onClick={() =>
-                    setOauthConfig(current => ({ ...current, showSecret: !current.showSecret }))
-                  }
-                >
-                  {oauthConfig.showSecret ? (
-                    <EyeOff className='h-4 w-4' />
-                  ) : (
-                    <Eye className='h-4 w-4' />
-                  )}
-                </Button>
-              </div>
-            </div>
-            <div className='space-y-2'>
-              <Label htmlFor='planner-tenant-id'>Tenant ID (opcional)</Label>
-              <Input
-                id='planner-tenant-id'
-                value={oauthConfig.tenantId}
-                disabled={!canWrite}
-                onChange={e =>
-                  setOauthConfig(current => ({ ...current, tenantId: e.target.value }))
-                }
-                placeholder='common'
-                className='font-mono text-sm'
-              />
-            </div>
-            <div className='flex items-center justify-between rounded-lg border p-4'>
-              <div>
-                <p className='font-medium'>Habilitar credenciales</p>
-                <p className='text-sm text-muted-foreground'>
-                  Debe estar activo para poder conectar la cuenta más abajo.
-                </p>
-              </div>
-              <Switch
-                checked={oauthConfig.isEnabled}
-                disabled={!canWrite}
-                onCheckedChange={checked =>
-                  setOauthConfig(current => ({ ...current, isEnabled: checked }))
-                }
-              />
-            </div>
-            {canWrite && (
-              <div className='flex flex-col gap-2 sm:flex-row'>
-                <Button
-                  onClick={() => void saveOAuthConfig()}
-                  disabled={savingOAuth}
-                  className='flex-1'
-                >
-                  {savingOAuth ? (
-                    <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-                  ) : (
-                    <Save className='mr-2 h-4 w-4' />
-                  )}
-                  Guardar credenciales
-                </Button>
-                <Button
-                  variant='outline'
-                  onClick={() => void testOAuthConfig()}
-                  disabled={testingOAuth || !oauthConfig.isEnabled || !oauthConfig.clientId}
-                >
-                  {testingOAuth ? (
-                    <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-                  ) : (
-                    <FlaskConical className='mr-2 h-4 w-4' />
-                  )}
-                  Probar conexión
-                </Button>
-              </div>
-            )}
+          <CardContent>
+            <OAuthCredentialsStatusLink provider='azure-ad-planner' />
           </CardContent>
         </Card>
 
