@@ -28,6 +28,8 @@ declare module 'next-auth' {
       canManageProcesses?: boolean
       accessEnabled?: boolean
       canManageAccess?: boolean
+      plannerEnabled?: boolean
+      canManagePlanner?: boolean
     }
   }
 
@@ -66,5 +68,7 @@ declare module 'next-auth/jwt' {
     canManageProcesses?: boolean
     accessEnabled?: boolean
     canManageAccess?: boolean
+    plannerEnabled?: boolean
+    canManagePlanner?: boolean
   }
 }

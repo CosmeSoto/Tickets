@@ -42,6 +42,8 @@ export interface AuditLogData {
     | 'access_pass'
     | 'access_scan'
     | 'access_organization'
+    | 'planner_task'
+    | 'planner_oauth'
   entityId?: string
   userId: string
   details?: Record<string, any>
@@ -1019,6 +1021,12 @@ export const AuditActionsComplete = {
   PROCESS_VERSION_CREATED: 'process_version_created',
   PROCESS_DIAGRAM_UPDATED: 'process_diagram_updated',
   PROCESS_EXTERNAL_REVIEW_RECORDED: 'process_external_review_recorded',
+
+  // Planner / sincronización de tareas
+  PLANNER_TASK_PUSHED: 'planner_task_pushed',
+  PLANNER_SYNC_ERROR: 'planner_sync_error',
+  PLANNER_OAUTH_CONNECTED: 'planner_oauth_connected',
+  PLANNER_OAUTH_REVOKED: 'planner_oauth_revoked',
 
   // Accesos (nunca registrar tokens QR ni PII completa)
   ACCESS_PASS_CREATED: 'access_pass_created',

@@ -12,6 +12,7 @@ import {
 } from '@/lib/time-utils'
 import { NotificationService } from '@/lib/services/notification-service'
 import { ResolutionNotificationService } from '@/lib/services/resolution-notification-service'
+import { PlannerSyncService } from '@/lib/services/planner-sync-service'
 import {
   assertTicketAccess,
   TicketAccessError,
@@ -192,6 +193,19 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 
     notifyTicketChanged(ticketId, 'plan_task_created')
+
+    // Sincronización con Microsoft Planner (Fase 1: solo app → Planner, fire-and-forget).
+    // pushTask nunca lanza — un problema con Microsoft no debe afectar esta respuesta.
+    void PlannerSyncService.pushTask(
+      {
+        id: task.id,
+        title: task.title,
+        status: task.status,
+        dueDate: task.dueDate,
+        assignedTo: task.assignedTo,
+      },
+      session.user.id
+    )
 
     // ── Notificar al técnico asignado a la tarea ─────────────────────────
     // El servicio ResolutionNotificationService.notifyTaskAssigned existe pero

@@ -5,6 +5,7 @@ import prisma from '@/lib/prisma'
 import { auditTaskChange } from '@/lib/audit'
 import { calculateDuration, validateTimeRange, combineDateAndTime } from '@/lib/time-utils'
 import { ResolutionNotificationService } from '@/lib/services/resolution-notification-service'
+import { PlannerSyncService } from '@/lib/services/planner-sync-service'
 import {
   assertTicketAccess,
   TicketAccessError,
@@ -279,6 +280,18 @@ export async function PATCH(
 
     notifyTicketChanged(ticketId, 'plan_task_updated')
 
+    // Sincronización con Microsoft Planner — nunca lanza, ver planner-sync-service.ts
+    void PlannerSyncService.pushTask(
+      {
+        id: updatedTask.id,
+        title: updatedTask.title,
+        status: updatedTask.status,
+        dueDate: updatedTask.dueDate,
+        assignedTo: updatedTask.assignedTo,
+      },
+      session.user.id
+    )
+
     // ── Notificar al técnico si cambia la asignación ─────────────────────
     const newAssignedTo = body.assignedTo !== undefined ? body.assignedTo : null
     const assigneeChanged = body.assignedTo !== undefined && body.assignedTo !== task.assignedTo
@@ -413,6 +426,10 @@ export async function DELETE(
     })
 
     notifyTicketChanged(ticketId, 'plan_task_deleted')
+
+    // Elimina también la tarea vinculada en Microsoft Planner, si existe — evita
+    // dejar una tarea fantasma en Planner cuando se borra del lado de la app.
+    void PlannerSyncService.removeTask(taskId, session.user.id)
 
     return NextResponse.json({
       success: true,

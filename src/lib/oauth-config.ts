@@ -9,12 +9,21 @@ export interface OAuthCredentials {
 }
 
 /**
+ * 'azure-ad-planner' es una fila independiente de 'azure-ad' (login) — mismo
+ * App Registration en Entra ID puede reusarse, pero el permiso/alcance de
+ * Planner se administra (habilitar/revocar) sin tocar el login de Microsoft.
+ */
+export type OAuthProviderKey = 'google' | 'azure-ad' | 'azure-ad-planner'
+
+/**
  * Obtiene las credenciales OAuth de un proveedor desde la base de datos
  */
-export async function getOAuthCredentials(provider: 'google' | 'azure-ad'): Promise<OAuthCredentials | null> {
+export async function getOAuthCredentials(
+  provider: OAuthProviderKey
+): Promise<OAuthCredentials | null> {
   try {
     const config = await prisma.oauth_configs.findUnique({
-      where: { provider }
+      where: { provider },
     })
 
     if (!config || !config.isEnabled) {
@@ -39,11 +48,11 @@ export async function getOAuthCredentials(provider: 'google' | 'azure-ad'): Prom
 /**
  * Verifica si un proveedor OAuth está configurado y habilitado
  */
-export async function isOAuthProviderEnabled(provider: 'google' | 'azure-ad'): Promise<boolean> {
+export async function isOAuthProviderEnabled(provider: OAuthProviderKey): Promise<boolean> {
   try {
     const config = await prisma.oauth_configs.findUnique({
       where: { provider },
-      select: { isEnabled: true }
+      select: { isEnabled: true },
     })
 
     return config?.isEnabled ?? false
@@ -60,7 +69,7 @@ export async function getEnabledOAuthProviders(): Promise<string[]> {
   try {
     const configs = await prisma.oauth_configs.findMany({
       where: { isEnabled: true },
-      select: { provider: true }
+      select: { provider: true },
     })
 
     return configs.map(c => c.provider)

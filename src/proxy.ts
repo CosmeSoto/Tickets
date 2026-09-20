@@ -436,6 +436,18 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(new URL('/admin/processes', request.url))
     }
 
+    // Configuración de Tareas/Planner: la conexión OAuth es global al sistema
+    // (una sola cuenta de Microsoft 365), igual que Procesos — solo Super Admin.
+    if (path.startsWith('/admin/planner/settings') && (token as any).isSuperAdmin !== true) {
+      ApplicationLogger.securityEvent(
+        'insufficient_privileges',
+        'medium',
+        { userId, userRole, requiredCapability: 'isSuperAdmin', path, ip },
+        { requestId }
+      )
+      return NextResponse.redirect(new URL('/planner', request.url))
+    }
+
     // ADMIN de familia: respetar toggles de módulos (Super Admin exento).
     if (userRole === 'ADMIN' && (token as any).isSuperAdmin !== true) {
       if (
@@ -473,6 +485,15 @@ export async function proxy(request: NextRequest) {
           'insufficient_privileges',
           'medium',
           { userId, userRole, requiredCapability: 'processesEnabled', path, ip },
+          { requestId }
+        )
+        return NextResponse.redirect(new URL('/admin', request.url))
+      }
+      if (path.startsWith('/admin/planner') && (token as any).plannerEnabled !== true) {
+        ApplicationLogger.securityEvent(
+          'insufficient_privileges',
+          'medium',
+          { userId, userRole, requiredCapability: 'plannerEnabled', path, ip },
           { requestId }
         )
         return NextResponse.redirect(new URL('/admin', request.url))
@@ -592,6 +613,22 @@ export async function proxy(request: NextRequest) {
         'insufficient_privileges',
         'medium',
         { userId, userRole, requiredCapability: 'processesEnabled', path, ip },
+        { requestId }
+      )
+      return NextResponse.redirect(new URL(dashboardForRole(userRole), request.url))
+    }
+
+    // Tareas / Planner: requiere habilitación del módulo (Super Admin exento).
+    if (
+      path.startsWith('/planner') &&
+      (token as any).isSuperAdmin !== true &&
+      (token as any).plannerEnabled !== true &&
+      (token as any).canManagePlanner !== true
+    ) {
+      ApplicationLogger.securityEvent(
+        'insufficient_privileges',
+        'medium',
+        { userId, userRole, requiredCapability: 'plannerEnabled', path, ip },
         { requestId }
       )
       return NextResponse.redirect(new URL(dashboardForRole(userRole), request.url))

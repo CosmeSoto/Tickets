@@ -12,6 +12,7 @@ interface UserModules {
   credentials: boolean
   processes: boolean
   access: boolean
+  planner: boolean
   canRequestAssets: boolean
   canAccessKnowledge: boolean
   canManageInventory: boolean
@@ -20,6 +21,7 @@ interface UserModules {
   canManageCredentials: boolean
   canManageProcesses: boolean
   canManageAccess: boolean
+  canManagePlanner: boolean
   families: Array<{
     id: string
     name: string
@@ -34,6 +36,7 @@ interface UserModules {
       credentials: boolean
       processes: boolean
       access: boolean
+      planner: boolean
     }
   }>
 }
@@ -47,6 +50,7 @@ const DEFAULT: UserModules = {
   credentials: false,
   processes: false,
   access: false,
+  planner: false,
   canRequestAssets: false,
   canAccessKnowledge: true,
   canManageInventory: false,
@@ -55,6 +59,7 @@ const DEFAULT: UserModules = {
   canManageCredentials: false,
   canManageProcesses: false,
   canManageAccess: false,
+  canManagePlanner: false,
   families: [],
 }
 

@@ -79,9 +79,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (!['google', 'azure-ad'].includes(provider)) {
+    if (!['google', 'azure-ad', 'azure-ad-planner'].includes(provider)) {
       return NextResponse.json(
-        { success: false, error: 'Provider inválido. Debe ser "google" o "azure-ad"' },
+        {
+          success: false,
+          error: 'Provider inválido. Debe ser "google", "azure-ad" o "azure-ad-planner"',
+        },
         { status: 400 }
       )
     }
@@ -119,28 +122,34 @@ export async function POST(request: NextRequest) {
       updatedAt: new Date(),
     }
 
-    // Solo actualizar clientSecret si se proporcionó uno nuevo
+    // Solo encriptar si se proporcionó un secret nuevo — encrypt(undefined) lanza.
     if (clientSecret) {
       updateData.clientSecret = encrypt(clientSecret)
     }
 
-    // Crear o actualizar configuración
-    const config = await prisma.oauth_configs.upsert({
-      where: { provider },
-      create: {
-        id: randomUUID(),
-        provider,
-        clientId,
-        clientSecret: encrypt(clientSecret!), // Sabemos que existe porque lo validamos arriba
-        tenantId: tenantId || null,
-        isEnabled: isEnabled ?? false,
-        redirectUri: redirectUri || null,
-        scopes: scopes || null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-      update: updateData,
-    })
+    // Create/update explícitos en vez de upsert: Prisma valida los tipos de
+    // AMBOS objetos (create/update) de un upsert antes de decidir cuál usar,
+    // así que un `create.clientSecret` opcional (undefined cuando no se
+    // reenvía) fallaba con PrismaClientValidationError incluso en una
+    // actualización que nunca iba a tocar esa rama. Antes esto rompía con 500
+    // cualquier actualización que no reenviara el secret (p. ej. solo
+    // activar/desactivar).
+    const config = existingConfig
+      ? await prisma.oauth_configs.update({ where: { provider }, data: updateData })
+      : await prisma.oauth_configs.create({
+          data: {
+            id: randomUUID(),
+            provider,
+            clientId,
+            clientSecret: encrypt(clientSecret!), // Sabemos que existe porque lo validamos arriba
+            tenantId: tenantId || null,
+            isEnabled: isEnabled ?? false,
+            redirectUri: redirectUri || null,
+            scopes: scopes || null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        })
 
     // Auditoría
     try {

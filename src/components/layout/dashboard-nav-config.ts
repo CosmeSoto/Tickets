@@ -31,6 +31,7 @@ import {
   ScrollText,
   Workflow,
   Wallet,
+  ListTodo,
 } from 'lucide-react'
 import type { DashboardNavItem } from '@/components/layout/dashboard-nav-types'
 
@@ -104,6 +105,15 @@ export const navigationByRole: Record<string, DashboardNavItem[]> = {
         { name: 'Configuración', href: '/admin/processes/settings', icon: Settings },
       ],
     },
+    {
+      name: 'Tareas',
+      href: '/planner',
+      icon: ListTodo,
+      children: [
+        { name: 'Tablero', href: '/planner', icon: ListTodo },
+        { name: 'Configuración', href: '/admin/planner/settings', icon: Settings },
+      ],
+    },
     { name: 'Familias', href: '/admin/families', icon: Layers },
     { name: 'Usuarios', href: '/admin/users', icon: Users },
     { name: 'Auditoría', href: '/admin/audit', icon: ScrollText },
@@ -167,6 +177,11 @@ export const navigationByRole: Record<string, DashboardNavItem[]> = {
       href: '/processes',
       icon: Workflow,
     },
+    {
+      name: 'Tareas',
+      href: '/planner',
+      icon: ListTodo,
+    },
     { name: 'Centro de Ayuda', href: '/help/center', icon: HelpCircle },
   ],
 
@@ -228,6 +243,11 @@ export const navigationByRole: Record<string, DashboardNavItem[]> = {
       name: 'Procesos',
       href: '/processes',
       icon: Workflow,
+    },
+    {
+      name: 'Tareas',
+      href: '/planner',
+      icon: ListTodo,
     },
     { name: 'Centro de Ayuda', href: '/help/center', icon: HelpCircle },
   ],

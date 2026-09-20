@@ -2,24 +2,12 @@
 import { DEFAULT_TIMEZONE } from '@/lib/constants'
 
 import { useMemo } from 'react'
-import {
-  addDays,
-  addMonths,
-  eachDayOfInterval,
-  endOfMonth,
-  endOfWeek,
-  format,
-  isSameDay,
-  isSameMonth,
-  isToday,
-  startOfMonth,
-  startOfWeek,
-  subMonths,
-} from 'date-fns'
+import { addDays, format, isSameDay, isSameMonth, isToday } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { getMonthGridDays, shiftMonthKeepingDay } from '@/lib/calendar/month-grid'
 
 export type AgendaEvent = {
   id: string
@@ -75,18 +63,10 @@ export function PatrolAgendaCalendar({
   byDay,
   loading,
 }: PatrolAgendaCalendarProps) {
-  const days = useMemo(() => {
-    const start = startOfWeek(startOfMonth(month), { weekStartsOn: 1 })
-    const end = endOfWeek(endOfMonth(month), { weekStartsOn: 1 })
-    return eachDayOfInterval({ start, end })
-  }, [month])
+  const days = useMemo(() => getMonthGridDays(month, 1), [month])
 
   const shiftMonth = (delta: number) => {
-    const nextMonth = delta < 0 ? subMonths(month, 1) : addMonths(month, 1)
-    // Conservar el día del mes (p. ej. 3 → 3), o el último día si no existe
-    const targetDay = Math.min(selectedDay.getDate(), endOfMonth(nextMonth).getDate())
-    const next = new Date(nextMonth.getFullYear(), nextMonth.getMonth(), targetDay)
-    goToDay(next, onSelectDay, onMonthChange)
+    goToDay(shiftMonthKeepingDay(month, selectedDay, delta), onSelectDay, onMonthChange)
   }
 
   return (

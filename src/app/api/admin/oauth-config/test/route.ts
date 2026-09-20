@@ -8,6 +8,7 @@ import { decrypt } from '@/lib/crypto'
 const PROVIDER_LABELS: Record<string, string> = {
   google: 'Google',
   'azure-ad': 'Microsoft',
+  'azure-ad-planner': 'Microsoft (Planner)',
 }
 
 // Verifica que el tenant de Azure AD existe y es accesible
@@ -146,7 +147,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { provider } = body
 
-    if (!provider || !['google', 'azure-ad'].includes(provider)) {
+    if (!provider || !['google', 'azure-ad', 'azure-ad-planner'].includes(provider)) {
       return NextResponse.json({ success: false, error: 'Proveedor inválido.' }, { status: 400 })
     }
 
@@ -195,7 +196,7 @@ export async function POST(request: NextRequest) {
 
     const diagnostics: string[] = []
 
-    if (provider === 'azure-ad') {
+    if (provider === 'azure-ad' || provider === 'azure-ad-planner') {
       const tenant = config.tenantId || 'common'
 
       // Paso 1: verificar que el tenant existe
@@ -248,7 +249,11 @@ export async function POST(request: NextRequest) {
     // Todo OK — devolver también la redirect URI para que el usuario confirme que está en el portal
     const baseUrl =
       request.headers.get('origin') || request.headers.get('referer')?.split('/admin')[0] || ''
-    const redirectUri = config.redirectUri || `${baseUrl}/api/auth/callback/${provider}`
+    const defaultRedirectUri =
+      provider === 'azure-ad-planner'
+        ? `${baseUrl}/api/admin/planner/cloud-auth/callback`
+        : `${baseUrl}/api/auth/callback/${provider}`
+    const redirectUri = config.redirectUri || defaultRedirectUri
 
     return NextResponse.json({
       success: true,

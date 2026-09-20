@@ -26,22 +26,22 @@ model accounts {
 }
 
 model attachments {
-  id           String   @id
-  filename     String
-  originalName String
-  mimeType     String
-  size         Int
+  id              String   @id
+  filename        String
+  originalName    String
+  mimeType        String
+  size            Int
   // Nulo cuando storageProvider != "local". Ver form_attachments y
   // src/lib/services/cloud-storage-service.ts para el significado de cada valor.
   path            String?
-  storageProvider String  @default("local")
+  storageProvider String   @default("local")
   externalId      String?
   externalUrl     String?
-  ticketId     String
-  uploadedBy   String
-  createdAt    DateTime @default(now())
-  tickets      tickets  @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  users        users    @relation(fields: [uploadedBy], references: [id])
+  ticketId        String
+  uploadedBy      String
+  createdAt       DateTime @default(now())
+  tickets         tickets  @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  users           users    @relation(fields: [uploadedBy], references: [id])
 
   @@index([ticketId, createdAt(sort: Desc)])
   @@index([uploadedBy, createdAt(sort: Desc)])
@@ -553,6 +553,8 @@ model users {
   canManageProcesses                                Boolean                          @default(false) @map("can_manage_processes")
   accessEnabled                                     Boolean                          @default(false) @map("access_enabled")
   canManageAccess                                   Boolean                          @default(false) @map("can_manage_access")
+  plannerEnabled                                    Boolean                          @default(false) @map("planner_enabled")
+  canManagePlanner                                  Boolean                          @default(false) @map("can_manage_planner")
   lastLogin                                         DateTime?
   passwordChangedAt                                 DateTime?                        @map("password_changed_at")
   oauthProvider                                     String?
@@ -808,6 +810,29 @@ model resolution_tasks {
   @@index([assignedTo])
   @@index([startTime, endTime])
   @@map("resolution_tasks")
+}
+
+/// Vincula una tarea interna con su contraparte en Microsoft Planner.
+/// sourceType/sourceId en vez de una FK directa a resolution_tasks — deja
+/// abierta la puerta a sincronizar otros tipos de tarea sin otra migración.
+model planner_task_links {
+  id              String    @id @default(uuid())
+  sourceType      String    @map("source_type")
+  sourceId        String    @map("source_id")
+  plannerTaskId   String    @map("planner_task_id")
+  plannerPlanId   String    @map("planner_plan_id")
+  plannerBucketId String?   @map("planner_bucket_id")
+  etag            String?
+  syncStatus      String    @default("synced") @map("sync_status")
+  syncError       String?   @map("sync_error")
+  lastSyncedAt    DateTime? @map("last_synced_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@unique([sourceType, sourceId])
+  @@unique([plannerTaskId])
+  @@index([syncStatus])
+  @@map("planner_task_links")
 }
 
 model ticket_knowledge_articles {
@@ -1260,20 +1285,20 @@ model equipment {
 }
 
 model equipment_attachments {
-  id           String    @id @default(uuid())
-  equipmentId  String    @map("equipment_id")
-  filename     String
-  originalName String    @map("original_name")
-  mimeType     String    @map("mime_type")
-  size         Int
+  id              String    @id @default(uuid())
+  equipmentId     String    @map("equipment_id")
+  filename        String
+  originalName    String    @map("original_name")
+  mimeType        String    @map("mime_type")
+  size            Int
   path            String? // nulo cuando storageProvider != "local"
-  storageProvider String  @default("local") @map("storage_provider")
-  externalId      String? @map("external_id")
-  externalUrl     String? @map("external_url")
-  uploadedBy   String    @map("uploaded_by")
-  createdAt    DateTime  @default(now()) @map("created_at")
-  equipment    equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
-  uploader     users     @relation(fields: [uploadedBy], references: [id])
+  storageProvider String    @default("local") @map("storage_provider")
+  externalId      String?   @map("external_id")
+  externalUrl     String?   @map("external_url")
+  uploadedBy      String    @map("uploaded_by")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  equipment       equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+  uploader        users     @relation(fields: [uploadedBy], references: [id])
 
   @@index([equipmentId])
   @@map("equipment_attachments")
@@ -2083,20 +2108,20 @@ model warehouses {
 }
 
 model license_attachments {
-  id           String            @id @default(uuid())
-  licenseId    String            @map("license_id")
-  filename     String
-  originalName String            @map("original_name")
-  mimeType     String            @map("mime_type")
-  size         Int
+  id              String            @id @default(uuid())
+  licenseId       String            @map("license_id")
+  filename        String
+  originalName    String            @map("original_name")
+  mimeType        String            @map("mime_type")
+  size            Int
   path            String? // nulo cuando storageProvider != "local"
-  storageProvider String  @default("local") @map("storage_provider")
-  externalId      String? @map("external_id")
-  externalUrl     String? @map("external_url")
-  uploadedBy   String            @map("uploaded_by")
-  createdAt    DateTime          @default(now()) @map("created_at")
-  license      software_licenses @relation(fields: [licenseId], references: [id], onDelete: Cascade)
-  uploader     users             @relation(fields: [uploadedBy], references: [id])
+  storageProvider String            @default("local") @map("storage_provider")
+  externalId      String?           @map("external_id")
+  externalUrl     String?           @map("external_url")
+  uploadedBy      String            @map("uploaded_by")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  license         software_licenses @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+  uploader        users             @relation(fields: [uploadedBy], references: [id])
 
   @@index([licenseId])
   @@map("license_attachments")
@@ -2355,20 +2380,20 @@ model process_diagrams {
 }
 
 model process_attachments {
-  id           String    @id @default(uuid())
-  processId    String    @map("process_id")
-  filename     String    @db.VarChar(255)
-  originalName String    @map("original_name") @db.VarChar(255)
-  mimeType     String    @map("mime_type") @db.VarChar(100)
-  size         Int
-  path            String? @db.VarChar(500) // nulo cuando storageProvider != "local"
-  storageProvider String  @default("local") @map("storage_provider")
-  externalId      String? @map("external_id")
-  externalUrl     String? @map("external_url")
-  uploadedById String    @map("uploaded_by_id")
-  createdAt    DateTime  @default(now()) @map("created_at")
-  process      processes @relation(fields: [processId], references: [id], onDelete: Cascade)
-  uploader     users     @relation("ProcessAttachmentUploader", fields: [uploadedById], references: [id])
+  id              String    @id @default(uuid())
+  processId       String    @map("process_id")
+  filename        String    @db.VarChar(255)
+  originalName    String    @map("original_name") @db.VarChar(255)
+  mimeType        String    @map("mime_type") @db.VarChar(100)
+  size            Int
+  path            String?   @db.VarChar(500) // nulo cuando storageProvider != "local"
+  storageProvider String    @default("local") @map("storage_provider")
+  externalId      String?   @map("external_id")
+  externalUrl     String?   @map("external_url")
+  uploadedById    String    @map("uploaded_by_id")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  process         processes @relation(fields: [processId], references: [id], onDelete: Cascade)
+  uploader        users     @relation("ProcessAttachmentUploader", fields: [uploadedById], references: [id])
 
   @@index([processId])
   @@map("process_attachments")
@@ -3020,18 +3045,18 @@ model contract_amendments {
 }
 
 model contract_attachments {
-  id           String   @id @default(uuid())
-  contractId   String   @map("contract_id")
-  filename     String   @db.VarChar(255)
-  originalName String   @map("original_name") @db.VarChar(255)
-  mimeType     String   @map("mime_type") @db.VarChar(100)
-  size         Int
-  path            String? @db.VarChar(500) // nulo cuando storageProvider != "local"
-  storageProvider String  @default("local") @map("storage_provider")
-  externalId      String? @map("external_id")
-  externalUrl     String? @map("external_url")
-  uploadedBy   String   @map("uploaded_by")
-  createdAt    DateTime @default(now()) @map("created_at")
+  id              String   @id @default(uuid())
+  contractId      String   @map("contract_id")
+  filename        String   @db.VarChar(255)
+  originalName    String   @map("original_name") @db.VarChar(255)
+  mimeType        String   @map("mime_type") @db.VarChar(100)
+  size            Int
+  path            String?  @db.VarChar(500) // nulo cuando storageProvider != "local"
+  storageProvider String   @default("local") @map("storage_provider")
+  externalId      String?  @map("external_id")
+  externalUrl     String?  @map("external_url")
+  uploadedBy      String   @map("uploaded_by")
+  createdAt       DateTime @default(now()) @map("created_at")
 
   contract contracts @relation(fields: [contractId], references: [id], onDelete: Cascade)
   uploader users     @relation("ContractAttachmentUploader", fields: [uploadedBy], references: [id])
@@ -3999,18 +4024,18 @@ model news_comments {
 }
 
 model news_attachments {
-  id           String   @id @default(uuid())
-  newsId       String   @map("news_id")
-  filename     String
-  originalName String   @map("original_name")
-  mimeType     String   @map("mime_type")
-  size         Int
+  id              String   @id @default(uuid())
+  newsId          String   @map("news_id")
+  filename        String
+  originalName    String   @map("original_name")
+  mimeType        String   @map("mime_type")
+  size            Int
   path            String? // nulo cuando storageProvider != "local"
-  storageProvider String  @default("local") @map("storage_provider")
-  externalId      String? @map("external_id")
-  externalUrl     String? @map("external_url")
-  uploadedById String   @map("uploaded_by_id")
-  createdAt    DateTime @default(now()) @map("created_at")
+  storageProvider String   @default("local") @map("storage_provider")
+  externalId      String?  @map("external_id")
+  externalUrl     String?  @map("external_url")
+  uploadedById    String   @map("uploaded_by_id")
+  createdAt       DateTime @default(now()) @map("created_at")
 
   news       news  @relation(fields: [newsId], references: [id], onDelete: Cascade)
   uploadedBy users @relation("NewsAttachmentUploader", fields: [uploadedById], references: [id])
@@ -4153,23 +4178,23 @@ model form_downloads {
 }
 
 model form_attachments {
-  id           String   @id @default(uuid())
-  formId       String   @map("form_id")
-  filename     String
-  originalName String
-  mimeType     String   @map("mime_type") @db.VarChar(100)
-  size         Int
+  id              String   @id @default(uuid())
+  formId          String   @map("form_id")
+  filename        String
+  originalName    String
+  mimeType        String   @map("mime_type") @db.VarChar(100)
+  size            Int
   // Nulo cuando storageProvider != "local" — el archivo no vive en disco.
-  path         String?
+  path            String?
   // "local" | "google-drive" | "onedrive" | "sharepoint" | "external-link".
   // Ver src/lib/services/cloud-storage-service.ts para el significado de cada valor.
-  storageProvider String @default("local") @map("storage_provider")
+  storageProvider String   @default("local") @map("storage_provider")
   // Id del archivo en Drive/Graph — nulo para "local" y "external-link".
-  externalId      String? @map("external_id")
+  externalId      String?  @map("external_id")
   // webViewLink/webUrl del proveedor, o el link pegado a mano en "external-link".
-  externalUrl     String? @map("external_url")
-  uploadedById String   @map("uploaded_by_id")
-  createdAt    DateTime @default(now()) @map("created_at")
+  externalUrl     String?  @map("external_url")
+  uploadedById    String   @map("uploaded_by_id")
+  createdAt       DateTime @default(now()) @map("created_at")
 
   form       forms @relation(fields: [formId], references: [id], onDelete: Cascade)
   uploadedBy users @relation("FormAttachmentUploader", fields: [uploadedById], references: [id])

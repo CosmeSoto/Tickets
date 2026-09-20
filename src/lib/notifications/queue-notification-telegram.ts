@@ -45,6 +45,7 @@ function resolveTgModule(
     credentials: 'system',
     processes: 'system',
     access: 'system',
+    planner: 'system',
   } as const
   return map[module]
 }

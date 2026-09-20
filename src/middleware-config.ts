@@ -63,6 +63,7 @@ export const protectedRoutes = [
   '/forms',
   '/processes',
   '/access',
+  '/planner',
   '/knowledge',
   '/help/center',
   '/help/documentation',

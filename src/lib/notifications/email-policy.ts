@@ -17,6 +17,7 @@ export type EmailModule =
   | 'credentials'
   | 'processes'
   | 'access'
+  | 'planner'
 
 /** critical = seguridad/SMTP; important = operativo; optional = ruido / prefs finas */
 export type EmailPriority = 'critical' | 'important' | 'optional'
@@ -41,6 +42,7 @@ export type NotificationEmailEvent =
   | 'accessPassIssued'
   | 'accessPassExpiring'
   | 'newsPublished'
+  | 'plannerSyncError'
 
 export const EMAIL_EVENT_PRIORITY: Record<NotificationEmailEvent, EmailPriority> = {
   security: 'critical',
@@ -62,6 +64,7 @@ export const EMAIL_EVENT_PRIORITY: Record<NotificationEmailEvent, EmailPriority>
   accessPassIssued: 'important',
   accessPassExpiring: 'important',
   newsPublished: 'optional',
+  plannerSyncError: 'important',
 }
 
 export function resolveEmailPriority(

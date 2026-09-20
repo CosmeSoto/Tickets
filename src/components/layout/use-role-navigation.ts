@@ -23,6 +23,7 @@ export type RoleNavigationInput = {
   hasCredentials: boolean
   hasProcesses: boolean
   hasAccess: boolean
+  hasPlanner: boolean
   canRequestAssets: boolean
   /** Tickets + canAccessKnowledge (Super Admin = true) */
   hasKnowledge: boolean
@@ -86,6 +87,7 @@ export function buildRoleNavigation({
   hasCredentials,
   hasProcesses,
   hasAccess,
+  hasPlanner,
   canRequestAssets,
   hasKnowledge,
 }: RoleNavigationInput): DashboardNavItem[] {
@@ -107,17 +109,28 @@ export function buildRoleNavigation({
         item.name === 'Procesos'
       )
         return hasProcesses
+      if (item.href === '/planner' || item.name === 'Tareas') return hasPlanner
       return true
     })
     const navigation = filterKnowledgeChildren(
       adminNav.map(item => {
-        if (item.name !== 'Procesos' || !item.children?.length) return item
-        return {
-          ...item,
-          children: item.children.filter(
-            child => child.href !== '/admin/processes/settings' || isSuperAdmin
-          ),
+        if (item.name === 'Procesos' && item.children?.length) {
+          return {
+            ...item,
+            children: item.children.filter(
+              child => child.href !== '/admin/processes/settings' || isSuperAdmin
+            ),
+          }
         }
+        if (item.name === 'Tareas' && item.children?.length) {
+          return {
+            ...item,
+            children: item.children.filter(
+              child => child.href !== '/admin/planner/settings' || isSuperAdmin
+            ),
+          }
+        }
+        return item
       }),
       isSuperAdmin || hasKnowledge
     )
@@ -157,6 +170,9 @@ export function buildRoleNavigation({
       item.name === 'Procesos'
     ) {
       return hasProcesses
+    }
+    if (item.href === '/planner' || item.name === 'Tareas') {
+      return hasPlanner
     }
     return true
   })

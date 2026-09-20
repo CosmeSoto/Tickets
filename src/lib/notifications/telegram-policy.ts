@@ -60,6 +60,8 @@ export const TELEGRAM_EVENT_PRIORITY: Record<TelegramEvent, TelegramPriority> = 
   accessPassExpiring: 'important',
   // Noticias — solo in-app + email, no Telegram (evitar ruido)
   newsPublished: 'optional',
+  // Planner — solo in-app + email, no Telegram (evitar ruido)
+  plannerSyncError: 'optional',
   // Rondas — todas important (canal operativo del staff de seguridad)
   patrolAssigned: 'important',
   patrolReminder: 'important',

@@ -330,6 +330,8 @@ const sharedAuthOptions: Omit<NextAuthOptions, 'providers'> = {
                 token.canManageProcesses = dbUser.canManageProcesses ?? false
                 token.accessEnabled = (dbUser as any).accessEnabled ?? false
                 token.canManageAccess = (dbUser as any).canManageAccess ?? false
+                token.plannerEnabled = (dbUser as any).plannerEnabled ?? false
+                token.canManagePlanner = (dbUser as any).canManagePlanner ?? false
                 token.canApproveDecommission = (dbUser as any).canApproveDecommission ?? false
                 token.isOAuth = true
                 token.needsProfileCompletion = clientNeedsProfileCompletion({
@@ -354,6 +356,8 @@ const sharedAuthOptions: Omit<NextAuthOptions, 'providers'> = {
                 token.canManageProcesses = false
                 token.accessEnabled = false
                 token.canManageAccess = false
+                token.plannerEnabled = false
+                token.canManagePlanner = false
                 token.canApproveDecommission = false
               }
             } catch (error) {
@@ -395,6 +399,8 @@ const sharedAuthOptions: Omit<NextAuthOptions, 'providers'> = {
                   canManageProcesses: true,
                   accessEnabled: true,
                   canManageAccess: true,
+                  plannerEnabled: true,
+                  canManagePlanner: true,
                   canApproveDecommission: true,
                   passwordChangedAt: true,
                 },
@@ -420,6 +426,8 @@ const sharedAuthOptions: Omit<NextAuthOptions, 'providers'> = {
               token.canManageProcesses = dbUser?.canManageProcesses ?? false
               token.accessEnabled = (dbUser as any)?.accessEnabled ?? false
               token.canManageAccess = (dbUser as any)?.canManageAccess ?? false
+              token.plannerEnabled = (dbUser as any)?.plannerEnabled ?? false
+              token.canManagePlanner = (dbUser as any)?.canManagePlanner ?? false
               token.canApproveDecommission = (dbUser as any)?.canApproveDecommission ?? false
 
               // ── Política de cambio de contraseña ───────────────────────
@@ -499,6 +507,8 @@ const sharedAuthOptions: Omit<NextAuthOptions, 'providers'> = {
                   canManageProcesses: true,
                   accessEnabled: true,
                   canManageAccess: true,
+                  plannerEnabled: true,
+                  canManagePlanner: true,
                   canApproveDecommission: true,
                   departmentId: true,
                   phone: true,
@@ -535,6 +545,8 @@ const sharedAuthOptions: Omit<NextAuthOptions, 'providers'> = {
               token.canManageProcesses = dbUser.canManageProcesses ?? false
               token.accessEnabled = (dbUser as any).accessEnabled ?? false
               token.canManageAccess = (dbUser as any).canManageAccess ?? false
+              token.plannerEnabled = (dbUser as any).plannerEnabled ?? false
+              token.canManagePlanner = (dbUser as any).canManagePlanner ?? false
               token.canApproveDecommission = (dbUser as any).canApproveDecommission ?? false
               token.departmentId = dbUser.departmentId || undefined
               token.department = dbUser.departments?.name || undefined
@@ -684,6 +696,8 @@ const sharedAuthOptions: Omit<NextAuthOptions, 'providers'> = {
           ;(session.user as any).canManageProcesses = (token.canManageProcesses as boolean) ?? false
           ;(session.user as any).accessEnabled = (token.accessEnabled as boolean) ?? false
           ;(session.user as any).canManageAccess = (token.canManageAccess as boolean) ?? false
+          ;(session.user as any).plannerEnabled = (token.plannerEnabled as boolean) ?? false
+          ;(session.user as any).canManagePlanner = (token.canManagePlanner as boolean) ?? false
           ;(session.user as any).canApproveDecommission =
             (token.canApproveDecommission as boolean) ?? false
 
