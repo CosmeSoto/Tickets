@@ -62,6 +62,8 @@ interface EditUserData {
   canManageProcesses: boolean
   accessEnabled: boolean
   canManageAccess: boolean
+  plannerEnabled: boolean
+  canManagePlanner: boolean
   isSuperAdmin: boolean
   avatar?: File
 }
@@ -106,6 +108,8 @@ export function EditUserModal({
     canManageProcesses: false,
     accessEnabled: false,
     canManageAccess: false,
+    plannerEnabled: false,
+    canManagePlanner: false,
     isSuperAdmin: false,
   })
 
@@ -120,6 +124,7 @@ export function EditUserModal({
     credentialsFamilies,
     processesFamilies,
     accessFamilies,
+    plannerFamilies,
     technicianFamilyIds,
     clientFamilyIds,
     inventoryFamilyIds,
@@ -127,6 +132,7 @@ export function EditUserModal({
     credentialsFamilyIds,
     processesFamilyIds,
     accessFamilyIds,
+    plannerFamilyIds,
     adminFamilyIds,
     contentFamilyIds,
     adminScopeIds,
@@ -142,6 +148,7 @@ export function EditUserModal({
     credentialsReadOnlyIds,
     processesReadOnlyIds,
     accessReadOnlyIds,
+    plannerReadOnlyIds,
     adminScopeReadOnlyIds,
 
     // Handlers
@@ -160,6 +167,8 @@ export function EditUserModal({
     handleUnassignProcessesFamily,
     handleAssignAccessFamily,
     handleUnassignAccessFamily,
+    handleAssignPlannerFamily,
+    handleUnassignPlannerFamily,
     handleAssignAdminFamily,
     handleUnassignAdminFamily,
     handleAssignContentFamily,
@@ -203,6 +212,8 @@ export function EditUserModal({
         canManageProcesses: (user as any).canManageProcesses ?? false,
         accessEnabled: (user as any).accessEnabled ?? false,
         canManageAccess: (user as any).canManageAccess ?? false,
+        plannerEnabled: (user as any).plannerEnabled ?? false,
+        canManagePlanner: (user as any).canManagePlanner ?? false,
         isSuperAdmin: user.isSuperAdmin ?? false,
         avatar: undefined,
       })
@@ -311,6 +322,8 @@ export function EditUserModal({
           canManageProcesses: formData.canManageProcesses,
           accessEnabled: formData.accessEnabled,
           canManageAccess: formData.canManageAccess,
+          plannerEnabled: formData.plannerEnabled,
+          canManagePlanner: formData.canManagePlanner,
           isSuperAdmin: formData.role === 'ADMIN' ? formData.isSuperAdmin : false,
         }),
       })
@@ -404,6 +417,8 @@ export function EditUserModal({
       | 'canManageProcesses'
       | 'accessEnabled'
       | 'canManageAccess'
+      | 'plannerEnabled'
+      | 'canManagePlanner'
       | 'canManageInventory'
       | 'canRequestAssets'
       | 'canApproveDecommission'
@@ -456,6 +471,12 @@ export function EditUserModal({
         ...p,
         accessEnabled: value,
         canManageAccess: value ? (p.role === 'ADMIN' ? true : p.canManageAccess) : false,
+      }))
+    } else if (field === 'plannerEnabled') {
+      setFormData(p => ({
+        ...p,
+        plannerEnabled: value,
+        canManagePlanner: value ? (p.role === 'ADMIN' ? true : p.canManagePlanner) : false,
       }))
     } else {
       setFormData(p => ({ ...p, [field]: value }))
@@ -547,6 +568,7 @@ export function EditUserModal({
                 credentialsFamilies={credentialsFamilies}
                 processesFamilies={processesFamilies}
                 accessFamilies={accessFamilies}
+                plannerFamilies={plannerFamilies}
                 technicianFamilyIds={technicianFamilyIds}
                 clientFamilyIds={clientFamilyIds}
                 inventoryFamilyIds={inventoryFamilyIds}
@@ -554,6 +576,7 @@ export function EditUserModal({
                 credentialsFamilyIds={credentialsFamilyIds}
                 processesFamilyIds={processesFamilyIds}
                 accessFamilyIds={accessFamilyIds}
+                plannerFamilyIds={plannerFamilyIds}
                 adminFamilyIds={adminFamilyIds}
                 contentFamilyIds={contentFamilyIds}
                 ticketReadOnlyIds={ticketReadOnlyIds}
@@ -562,6 +585,7 @@ export function EditUserModal({
                 credentialsReadOnlyIds={credentialsReadOnlyIds}
                 processesReadOnlyIds={processesReadOnlyIds}
                 accessReadOnlyIds={accessReadOnlyIds}
+                plannerReadOnlyIds={plannerReadOnlyIds}
                 adminScopeReadOnlyIds={adminScopeReadOnlyIds}
                 onToggle={handleToggle}
                 handlers={{
@@ -579,6 +603,8 @@ export function EditUserModal({
                   handleUnassignProcessesFamily,
                   handleAssignAccessFamily,
                   handleUnassignAccessFamily,
+                  handleAssignPlannerFamily,
+                  handleUnassignPlannerFamily,
                   handleAssignAdminFamily,
                   handleUnassignAdminFamily,
                   handleAssignContentFamily,

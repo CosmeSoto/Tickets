@@ -116,6 +116,19 @@ const FALLBACK_MODULES = [
     requiresManager: true,
     familyScoped: true,
   },
+  {
+    key: 'planner',
+    name: 'Tareas (Planner)',
+    description: 'Tablero Kanban y calendario de tareas, sincronizado con Microsoft Planner',
+    icon: 'ListTodo',
+    isActive: true,
+    order: 9,
+    defaultForAdmin: true,
+    defaultForTech: false,
+    defaultForClient: false,
+    requiresManager: true,
+    familyScoped: true,
+  },
 ]
 
 export async function GET() {

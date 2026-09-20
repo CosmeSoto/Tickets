@@ -27,6 +27,8 @@ const createUserSchemaBase = z.object({
   canManageProcesses: z.boolean().optional(),
   accessEnabled: z.boolean().optional(),
   canManageAccess: z.boolean().optional(),
+  plannerEnabled: z.boolean().optional(),
+  canManagePlanner: z.boolean().optional(),
 })
 
 export async function GET(request: NextRequest) {
@@ -400,6 +402,8 @@ export async function GET(request: NextRequest) {
         canManageProcesses: true,
         accessEnabled: true,
         canManageAccess: true,
+        plannerEnabled: true,
+        canManagePlanner: true,
         isSuperAdmin: true,
         createdAt: true,
         lastLogin: true,

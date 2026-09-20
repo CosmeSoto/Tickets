@@ -737,6 +737,19 @@ async function seedSystemModules() {
       requiresManager: true,
       familyScoped: true,
     },
+    {
+      key: 'planner',
+      name: 'Tareas (Planner)',
+      description: 'Tablero Kanban y calendario de tareas, sincronizado con Microsoft Planner',
+      icon: 'ListTodo',
+      isActive: true,
+      order: 9,
+      defaultForAdmin: true,
+      defaultForTech: false,
+      defaultForClient: false,
+      requiresManager: true,
+      familyScoped: true,
+    },
   ]
 
   for (const mod of modules) {
@@ -747,7 +760,7 @@ async function seedSystemModules() {
     })
   }
   console.log(
-    '✅ Módulos del sistema (tickets, inventory, patrols, news, credentials, processes, access)'
+    '✅ Módulos del sistema (tickets, inventory, patrols, news, credentials, processes, access, planner)'
   )
 }
 

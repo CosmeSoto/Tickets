@@ -67,9 +67,38 @@ async function main() {
     },
   })
 
+  await prisma.system_modules.upsert({
+    where: { key: 'planner' },
+    create: {
+      key: 'planner',
+      name: 'Tareas (Planner)',
+      description: 'Tablero Kanban y calendario de tareas, sincronizado con Microsoft Planner',
+      icon: 'ListTodo',
+      isActive: true,
+      order: 9,
+      defaultForAdmin: true,
+      defaultForTech: false,
+      defaultForClient: false,
+      requiresManager: true,
+      familyScoped: true,
+    },
+    update: {
+      name: 'Tareas (Planner)',
+      description: 'Tablero Kanban y calendario de tareas, sincronizado con Microsoft Planner',
+      icon: 'ListTodo',
+      isActive: true,
+      order: 9,
+      defaultForAdmin: true,
+      defaultForTech: false,
+      defaultForClient: false,
+      requiresManager: true,
+      familyScoped: true,
+    },
+  })
+
   // El catálogo nace operativo para los administradores existentes; los demás
   // perfiles se habilitan explícitamente desde la gestión de usuarios.
-  const [processesResult, accessResult] = await Promise.all([
+  const [processesResult, accessResult, plannerResult] = await Promise.all([
     prisma.users.updateMany({
       where: { role: 'ADMIN' },
       data: { processesEnabled: true, canManageProcesses: true },
@@ -78,9 +107,13 @@ async function main() {
       where: { role: 'ADMIN' },
       data: { accessEnabled: true, canManageAccess: true },
     }),
+    prisma.users.updateMany({
+      where: { role: 'ADMIN' },
+      data: { plannerEnabled: true, canManagePlanner: true },
+    }),
   ])
   console.log(
-    `✅ Módulos asegurados; Procesos: ${processesResult.count} y Accesos: ${accessResult.count} administradores habilitados.`
+    `✅ Módulos asegurados; Procesos: ${processesResult.count}, Accesos: ${accessResult.count} y Tareas: ${plannerResult.count} administradores habilitados.`
   )
 }
 

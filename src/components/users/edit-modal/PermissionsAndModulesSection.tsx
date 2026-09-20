@@ -46,6 +46,8 @@ interface PermissionsAndModulesSectionProps {
     canManageProcesses: boolean
     accessEnabled: boolean
     canManageAccess: boolean
+    plannerEnabled: boolean
+    canManagePlanner: boolean
     canManageInventory: boolean
     canRequestAssets: boolean
     canApproveDecommission: boolean
@@ -63,6 +65,7 @@ interface PermissionsAndModulesSectionProps {
   credentialsFamilies: FamilyOption[]
   processesFamilies: FamilyOption[]
   accessFamilies: FamilyOption[]
+  plannerFamilies: FamilyOption[]
   technicianFamilyIds: string[]
   clientFamilyIds: string[]
   inventoryFamilyIds: string[]
@@ -70,6 +73,7 @@ interface PermissionsAndModulesSectionProps {
   credentialsFamilyIds: string[]
   processesFamilyIds: string[]
   accessFamilyIds: string[]
+  plannerFamilyIds: string[]
   adminFamilyIds: string[]
   /** Áreas adicionales del módulo unificado `content` (docs + noticias) */
   contentFamilyIds: string[]
@@ -79,6 +83,7 @@ interface PermissionsAndModulesSectionProps {
   credentialsReadOnlyIds: string[]
   processesReadOnlyIds: string[]
   accessReadOnlyIds: string[]
+  plannerReadOnlyIds: string[]
   adminScopeReadOnlyIds: string[]
   onToggle: (
     field:
@@ -97,6 +102,8 @@ interface PermissionsAndModulesSectionProps {
       | 'canManageProcesses'
       | 'accessEnabled'
       | 'canManageAccess'
+      | 'plannerEnabled'
+      | 'canManagePlanner'
       | 'canManageInventory'
       | 'canRequestAssets'
       | 'canApproveDecommission'
@@ -118,6 +125,8 @@ interface PermissionsAndModulesSectionProps {
     handleUnassignProcessesFamily: (id: string) => Promise<any>
     handleAssignAccessFamily: (id: string) => Promise<any>
     handleUnassignAccessFamily: (id: string) => Promise<any>
+    handleAssignPlannerFamily: (id: string) => Promise<any>
+    handleUnassignPlannerFamily: (id: string) => Promise<any>
     handleAssignAdminFamily: (id: string) => Promise<any>
     handleUnassignAdminFamily: (id: string) => Promise<any>
     handleAssignContentFamily: (id: string) => Promise<any>
@@ -139,6 +148,7 @@ export function PermissionsAndModulesSection({
   credentialsFamilies,
   processesFamilies,
   accessFamilies,
+  plannerFamilies,
   technicianFamilyIds,
   clientFamilyIds,
   inventoryFamilyIds,
@@ -146,6 +156,7 @@ export function PermissionsAndModulesSection({
   credentialsFamilyIds,
   processesFamilyIds,
   accessFamilyIds,
+  plannerFamilyIds,
   adminFamilyIds,
   contentFamilyIds,
   ticketReadOnlyIds,
@@ -154,6 +165,7 @@ export function PermissionsAndModulesSection({
   credentialsReadOnlyIds,
   processesReadOnlyIds,
   accessReadOnlyIds,
+  plannerReadOnlyIds,
   adminScopeReadOnlyIds,
   onToggle,
   handlers,
@@ -170,6 +182,7 @@ export function PermissionsAndModulesSection({
       ...credentialsFamilies,
       ...processesFamilies,
       ...accessFamilies,
+      ...plannerFamilies,
     ]) {
       if (f?.id) map.set(f.id, f)
     }
@@ -182,6 +195,7 @@ export function PermissionsAndModulesSection({
     credentialsFamilies,
     processesFamilies,
     accessFamilies,
+    plannerFamilies,
   ])
 
   // Familia nativa: depto del formulario (si cambia) o el del usuario cargado.
@@ -523,6 +537,32 @@ export function PermissionsAndModulesSection({
               loading={loadingFamilies}
               disabled={loading}
             />
+
+            {/* ── Tareas (Planner) ── */}
+            <ModuleAccessCard
+              moduleKey='planner'
+              moduleName='Tareas (Planner)'
+              role={formData.role}
+              enabled={formData.plannerEnabled || formData.canManagePlanner}
+              onToggle={v => onToggle('plannerEnabled', v)}
+              families={plannerFamilies}
+              assignedFamilyIds={plannerFamilyIds}
+              nativeFamilyId={nativeFamilyId}
+              nativeFamily={nativeFamilyForCards}
+              readOnlyFamilyIds={plannerReadOnlyIds}
+              onAssignFamily={handlers.handleAssignPlannerFamily}
+              onUnassignFamily={handlers.handleUnassignPlannerFamily}
+              options={
+                formData.role === 'TECHNICIAN' || formData.role === 'CLIENT'
+                  ? {
+                      canManagePlanner: formData.canManagePlanner,
+                      onToggleManagePlanner: v => onToggle('canManagePlanner', v),
+                    }
+                  : undefined
+              }
+              loading={loadingFamilies}
+              disabled={loading}
+            />
           </div>
         </div>
       )}
@@ -547,6 +587,8 @@ export function PermissionsAndModulesSection({
           canManageProcesses={formData.canManageProcesses}
           accessEnabled={formData.accessEnabled}
           canManageAccess={formData.canManageAccess}
+          plannerEnabled={formData.plannerEnabled}
+          canManagePlanner={formData.canManagePlanner}
           defaultCollapsed
         />
       )}
@@ -570,6 +612,8 @@ export function PermissionsAndModulesSection({
           canManageProcesses={true}
           accessEnabled={true}
           canManageAccess={true}
+          plannerEnabled={true}
+          canManagePlanner={true}
           defaultCollapsed
         />
       )}

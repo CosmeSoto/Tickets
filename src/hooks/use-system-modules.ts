@@ -127,6 +127,19 @@ const FALLBACK: SystemModule[] = [
     requiresManager: true,
     familyScoped: true,
   },
+  {
+    key: 'planner',
+    name: 'Tareas (Planner)',
+    description: 'Tablero Kanban y calendario de tareas, sincronizado con Microsoft Planner',
+    icon: 'ListTodo',
+    isActive: true,
+    order: 9,
+    defaultForAdmin: true,
+    defaultForTech: false,
+    defaultForClient: false,
+    requiresManager: true,
+    familyScoped: true,
+  },
 ]
 
 export function useSystemModules() {
@@ -193,6 +206,11 @@ export function getModuleRoleDescription(moduleKey: string, role: string): strin
       TECHNICIAN: 'Verificar pases · con gestión puede emitir y revocar en áreas asignadas',
       CLIENT: 'Verificar pases · con gestión puede emitir y revocar en su área',
     },
+    planner: {
+      ADMIN: 'Tablero y calendario de tareas de sus áreas, sincronizadas con Microsoft Planner',
+      TECHNICIAN: 'Ver tareas asignadas · con gestión puede crear y mover tarjetas del área',
+      CLIENT: 'Ver tareas asignadas · con gestión puede crear y mover tarjetas del área',
+    },
   }
   return descriptions[moduleKey]?.[role] ?? 'Acceso al módulo'
 }
@@ -238,6 +256,11 @@ export function getAdditionalFamilyHint(moduleKey: string, role: string): string
       TECHNICIAN: 'Áreas adicionales donde puede verificar o gestionar pases QR.',
       CLIENT: 'Áreas adicionales donde puede verificar o gestionar pases QR.',
     },
+    planner: {
+      ADMIN: 'Áreas adicionales cuyo tablero y calendario de tareas puede ver o gestionar.',
+      TECHNICIAN: 'Áreas adicionales donde puede ver o gestionar tareas.',
+      CLIENT: 'Áreas adicionales donde puede ver o gestionar tareas.',
+    },
   }
   return hints[moduleKey]?.[role] ?? null
 }
@@ -255,6 +278,7 @@ export function getModuleEmoji(moduleKey: string): string {
     credentials: '🔐',
     processes: '🔀',
     access: '🪪',
+    planner: '📋',
     contracts: '📄',
     reports: '📊',
     knowledge: '📚',

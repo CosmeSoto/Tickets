@@ -23,12 +23,14 @@ export function useFamilyAssignments({ user, isOpen }: UseFamilyAssignmentsProps
   const [credentialsFamilies, setCredentialsFamilies] = useState<FamilyOption[]>([])
   const [processesFamilies, setProcessesFamilies] = useState<FamilyOption[]>([])
   const [accessFamilies, setAccessFamilies] = useState<FamilyOption[]>([])
+  const [plannerFamilies, setPlannerFamilies] = useState<FamilyOption[]>([])
   const [adminTicketScopeIds, setAdminTicketScopeIds] = useState<string[]>([])
   const [adminInventoryScopeIds, setAdminInventoryScopeIds] = useState<string[]>([])
   const [adminPatrolScopeIds, setAdminPatrolScopeIds] = useState<string[]>([])
   const [adminCredentialsScopeIds, setAdminCredentialsScopeIds] = useState<string[]>([])
   const [adminProcessesScopeIds, setAdminProcessesScopeIds] = useState<string[]>([])
   const [adminAccessScopeIds, setAdminAccessScopeIds] = useState<string[]>([])
+  const [adminPlannerScopeIds, setAdminPlannerScopeIds] = useState<string[]>([])
   const [loadingFamilies, setLoadingFamilies] = useState(false)
   const [familyError, setFamilyError] = useState<string | null>(null)
   const [technicianFamilyIds, setTechnicianFamilyIds] = useState<string[]>([])
@@ -38,6 +40,7 @@ export function useFamilyAssignments({ user, isOpen }: UseFamilyAssignmentsProps
   const [credentialsFamilyIds, setCredentialsFamilyIds] = useState<string[]>([])
   const [processesFamilyIds, setProcessesFamilyIds] = useState<string[]>([])
   const [accessFamilyIds, setAccessFamilyIds] = useState<string[]>([])
+  const [plannerFamilyIds, setPlannerFamilyIds] = useState<string[]>([])
   const [adminFamilyIds, setAdminFamilyIds] = useState<string[]>([])
   const [contentFamilyIds, setContentFamilyIds] = useState<string[]>([])
   const [adminScopeIds, setAdminScopeIds] = useState<string[]>([])
@@ -89,6 +92,11 @@ export function useFamilyAssignments({ user, isOpen }: UseFamilyAssignmentsProps
     return allFamilies.map(f => f.id).filter(id => !adminAccessScopeIds.includes(id))
   })()
 
+  const plannerReadOnlyIds = (() => {
+    if (!viewerIsAdminNormal || adminPlannerScopeIds.length === 0) return []
+    return allFamilies.map(f => f.id).filter(id => !adminPlannerScopeIds.includes(id))
+  })()
+
   const adminScopeReadOnlyIds = [
     ...new Set([
       ...ticketReadOnlyIds,
@@ -97,6 +105,7 @@ export function useFamilyAssignments({ user, isOpen }: UseFamilyAssignmentsProps
       ...credentialsReadOnlyIds,
       ...processesReadOnlyIds,
       ...accessReadOnlyIds,
+      ...plannerReadOnlyIds,
     ]),
   ]
 
@@ -407,6 +416,43 @@ export function useFamilyAssignments({ user, isOpen }: UseFamilyAssignmentsProps
     }
   }
 
+  const handleAssignPlannerFamily = async (familyId: string) => {
+    if (!user) return
+    try {
+      const res = await fetch(`/api/admin/users/${user.id}/family-access`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ module: 'planner', familyId }),
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error ?? 'Error al asignar familia')
+      }
+      setPlannerFamilyIds(prev => (prev.includes(familyId) ? prev : [...prev, familyId]))
+      invalidateModulesCache()
+    } catch (err) {
+      showNetworkError(err)
+    }
+  }
+
+  const handleUnassignPlannerFamily = async (familyId: string) => {
+    if (!user) return
+    try {
+      const res = await fetch(
+        `/api/admin/users/${user.id}/family-access?module=planner&familyId=${familyId}`,
+        { method: 'DELETE' }
+      )
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error ?? 'Error al desasignar familia')
+      }
+      setPlannerFamilyIds(prev => prev.filter(id => id !== familyId))
+      invalidateModulesCache()
+    } catch (err) {
+      showNetworkError(err)
+    }
+  }
+
   const handleAssignAdminFamily = async (familyId: string) => {
     if (!user) return
     try {
@@ -502,6 +548,7 @@ export function useFamilyAssignments({ user, isOpen }: UseFamilyAssignmentsProps
           credentialsModuleRes,
           processesModuleRes,
           accessModuleRes,
+          plannerModuleRes,
           allRes,
         ] = await Promise.all([
           fetch('/api/families?includeInactive=false&module=tickets'),
@@ -510,6 +557,7 @@ export function useFamilyAssignments({ user, isOpen }: UseFamilyAssignmentsProps
           fetch('/api/families?includeInactive=false&module=credentials&scope=all'),
           fetch('/api/families?includeInactive=false&module=processes&scope=all'),
           fetch('/api/families?includeInactive=false&module=access&scope=all'),
+          fetch('/api/families?includeInactive=false&module=planner&scope=all'),
           fetch('/api/families?includeInactive=false&scope=all'),
         ])
 
@@ -525,6 +573,7 @@ export function useFamilyAssignments({ user, isOpen }: UseFamilyAssignmentsProps
         const cModuleFamilies = await parseFamilies(credentialsModuleRes)
         const prModuleFamilies = await parseFamilies(processesModuleRes)
         const accessModuleFamilies = await parseFamilies(accessModuleRes)
+        const plannerModuleFamilies = await parseFamilies(plannerModuleRes)
         const allActiveFamilies = await parseFamilies(allRes)
 
         setAllFamilies(allActiveFamilies)
@@ -541,6 +590,7 @@ export function useFamilyAssignments({ user, isOpen }: UseFamilyAssignmentsProps
             ...cModuleFamilies,
             ...prModuleFamilies,
             ...accessModuleFamilies,
+            ...plannerModuleFamilies,
           ],
         })
         const userNativeFamilyId = resolvedNative?.id ?? null
@@ -572,6 +622,7 @@ export function useFamilyAssignments({ user, isOpen }: UseFamilyAssignmentsProps
           setCredentialsFamilies(ensureNativeFamily(cModuleFamilies))
           setProcessesFamilies(ensureNativeFamily(prModuleFamilies))
           setAccessFamilies(ensureNativeFamily(accessModuleFamilies))
+          setPlannerFamilies(ensureNativeFamily(plannerModuleFamilies))
         } else {
           // Para Admin Normal: las listas de inventario y patrullas ya vienen sin filtro
           // de scope (scope=all), por lo que las usamos directamente asegurando que la
@@ -588,6 +639,7 @@ export function useFamilyAssignments({ user, isOpen }: UseFamilyAssignmentsProps
           setCredentialsFamilies(ensureNativeFamily(cModuleFamilies))
           setProcessesFamilies(ensureNativeFamily(prModuleFamilies))
           setAccessFamilies(ensureNativeFamily(accessModuleFamilies))
+          setPlannerFamilies(ensureNativeFamily(plannerModuleFamilies))
 
           // Para los readOnly locks necesitamos el scope real del viewer (sin scope=all).
           // Hacemos fetches adicionales sin scope=all para obtener solo lo que el viewer puede asignar.
@@ -597,18 +649,21 @@ export function useFamilyAssignments({ user, isOpen }: UseFamilyAssignmentsProps
             viewerCredentialsRes,
             viewerProcessesRes,
             viewerAccessRes,
+            viewerPlannerRes,
           ] = await Promise.all([
             fetch('/api/families?includeInactive=false&module=inventory'),
             fetch('/api/families?includeInactive=false&module=patrols'),
             fetch('/api/families?includeInactive=false&module=credentials'),
             fetch('/api/families?includeInactive=false&module=processes'),
             fetch('/api/families?includeInactive=false&module=access'),
+            fetch('/api/families?includeInactive=false&module=planner'),
           ])
           const viewerInvFamilies = await parseFamilies(viewerInvRes)
           const viewerPatrolFamilies = await parseFamilies(viewerPatrolRes)
           const viewerCredentialsFamilies = await parseFamilies(viewerCredentialsRes)
           const viewerProcessesFamilies = await parseFamilies(viewerProcessesRes)
           const viewerAccessFamilies = await parseFamilies(viewerAccessRes)
+          const viewerPlannerFamilies = await parseFamilies(viewerPlannerRes)
 
           setAdminTicketScopeIds(tModuleFamilies.map(f => f.id))
           setAdminInventoryScopeIds(viewerInvFamilies.map(f => f.id))
@@ -616,6 +671,7 @@ export function useFamilyAssignments({ user, isOpen }: UseFamilyAssignmentsProps
           setAdminCredentialsScopeIds(viewerCredentialsFamilies.map(f => f.id))
           setAdminProcessesScopeIds(viewerProcessesFamilies.map(f => f.id))
           setAdminAccessScopeIds(viewerAccessFamilies.map(f => f.id))
+          setAdminPlannerScopeIds(viewerPlannerFamilies.map(f => f.id))
           setAdminScopeIds(tModuleFamilies.map(f => f.id))
         }
 
@@ -646,6 +702,7 @@ export function useFamilyAssignments({ user, isOpen }: UseFamilyAssignmentsProps
           setCredentialsFamilyIds(byModule('credentials'))
           setProcessesFamilyIds(byModule('processes'))
           setAccessFamilyIds(byModule('access'))
+          setPlannerFamilyIds(byModule('planner'))
           setContentFamilyIds(byModule('content'))
         } else {
           // Fallback legacy si la API unificada aún no está disponible
@@ -690,6 +747,7 @@ export function useFamilyAssignments({ user, isOpen }: UseFamilyAssignmentsProps
           setContentFamilyIds([])
           setProcessesFamilyIds([])
           setAccessFamilyIds([])
+          setPlannerFamilyIds([])
         }
       } catch (err) {
         setFamilyError('Error al cargar familias')
@@ -710,6 +768,7 @@ export function useFamilyAssignments({ user, isOpen }: UseFamilyAssignmentsProps
     credentialsFamilies,
     processesFamilies,
     accessFamilies,
+    plannerFamilies,
     technicianFamilyIds,
     clientFamilyIds,
     inventoryFamilyIds,
@@ -717,6 +776,7 @@ export function useFamilyAssignments({ user, isOpen }: UseFamilyAssignmentsProps
     credentialsFamilyIds,
     processesFamilyIds,
     accessFamilyIds,
+    plannerFamilyIds,
     adminFamilyIds,
     contentFamilyIds,
     adminScopeIds,
@@ -732,6 +792,7 @@ export function useFamilyAssignments({ user, isOpen }: UseFamilyAssignmentsProps
     credentialsReadOnlyIds,
     processesReadOnlyIds,
     accessReadOnlyIds,
+    plannerReadOnlyIds,
     adminScopeReadOnlyIds,
 
     // Handlers
@@ -750,6 +811,8 @@ export function useFamilyAssignments({ user, isOpen }: UseFamilyAssignmentsProps
     handleUnassignProcessesFamily,
     handleAssignAccessFamily,
     handleUnassignAccessFamily,
+    handleAssignPlannerFamily,
+    handleUnassignPlannerFamily,
     handleAssignAdminFamily,
     handleUnassignAdminFamily,
     handleAssignContentFamily,

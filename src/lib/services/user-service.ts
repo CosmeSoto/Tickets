@@ -61,6 +61,8 @@ export interface CreateUserData {
   canManageProcesses?: boolean
   accessEnabled?: boolean
   canManageAccess?: boolean
+  plannerEnabled?: boolean
+  canManagePlanner?: boolean
   assignedCategories?: {
     categoryId: string
     priority: number
@@ -95,6 +97,8 @@ export interface UpdateUserData {
   canManageProcesses?: boolean
   accessEnabled?: boolean
   canManageAccess?: boolean
+  plannerEnabled?: boolean
+  canManagePlanner?: boolean
   isSuperAdmin?: boolean
   assignedCategories?: {
     categoryId: string
@@ -272,6 +276,8 @@ export class UserService {
         canManageProcesses: true,
         accessEnabled: true,
         canManageAccess: true,
+        plannerEnabled: true,
+        canManagePlanner: true,
         lastLogin: true,
         createdAt: true,
         updatedAt: true,
@@ -312,6 +318,7 @@ export class UserService {
     const credentialsEnabled = data.credentialsEnabled ?? (isAdminRole ? true : false)
     const processesEnabled = data.processesEnabled ?? (isAdminRole ? true : false)
     const accessEnabled = data.accessEnabled ?? (isAdminRole ? true : false)
+    const plannerEnabled = data.plannerEnabled ?? (isAdminRole ? true : false)
     const canManageInventory = roleCanBeInventoryManager(data.role)
       ? (data.canManageInventory ?? (isAdminRole ? true : false))
       : false
@@ -327,6 +334,9 @@ export class UserService {
       : false
     const canManageAccess = accessEnabled
       ? (data.canManageAccess ?? (isAdminRole ? true : false))
+      : false
+    const canManagePlanner = plannerEnabled
+      ? (data.canManagePlanner ?? (isAdminRole ? true : false))
       : false
 
     // Crear el usuario en una transacción para manejar las asignaciones de categorías
@@ -360,6 +370,8 @@ export class UserService {
             canManageProcesses,
             accessEnabled,
             canManageAccess,
+            plannerEnabled,
+            canManagePlanner,
             isEmailVerified: false,
             createdAt: new Date(),
             updatedAt: new Date(),
@@ -507,6 +519,8 @@ export class UserService {
       updateData.canManageProcesses = data.canManageProcesses
     if (data.accessEnabled !== undefined) updateData.accessEnabled = data.accessEnabled
     if (data.canManageAccess !== undefined) updateData.canManageAccess = data.canManageAccess
+    if (data.plannerEnabled !== undefined) updateData.plannerEnabled = data.plannerEnabled
+    if (data.canManagePlanner !== undefined) updateData.canManagePlanner = data.canManagePlanner
     // Crear requiere módulo activo: no dejar canManage* huérfano
     const effectiveRole = data.role ?? user.role
     const effectiveNewsEnabled =
@@ -525,6 +539,10 @@ export class UserService {
       updateData.accessEnabled !== undefined
         ? updateData.accessEnabled
         : (user as any).accessEnabled
+    const effectivePlannerEnabled =
+      updateData.plannerEnabled !== undefined
+        ? updateData.plannerEnabled
+        : (user as any).plannerEnabled
     if (!effectiveNewsEnabled) updateData.canManageNews = false
     else if (effectiveRole === 'ADMIN') updateData.canManageNews = true
     if (!effectiveFormsEnabled) updateData.canManageForms = false
@@ -534,6 +552,8 @@ export class UserService {
     else if (effectiveRole === 'ADMIN') updateData.canManageProcesses = true
     if (!effectiveAccessEnabled) updateData.canManageAccess = false
     else if (effectiveRole === 'ADMIN') updateData.canManageAccess = true
+    if (!effectivePlannerEnabled) updateData.canManagePlanner = false
+    else if (effectiveRole === 'ADMIN') updateData.canManagePlanner = true
     const effectiveInventoryEnabled =
       updateData.inventoryEnabled !== undefined
         ? updateData.inventoryEnabled

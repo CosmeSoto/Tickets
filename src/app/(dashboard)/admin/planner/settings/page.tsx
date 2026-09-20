@@ -306,6 +306,7 @@ export default function PlannerSettingsPage() {
           enabled: settings.enabled,
           groupId: settings.groupId,
           planId: settings.planId,
+          syncDirection: settings.syncDirection,
         }),
       })
       const data = await response.json()
@@ -542,6 +543,26 @@ export default function PlannerSettingsPage() {
                 disabled={!canWrite}
                 onCheckedChange={checked =>
                   setSettings(current => ({ ...current, enabled: checked }))
+                }
+              />
+            </div>
+
+            <div className='flex items-center justify-between gap-4 rounded-lg border p-4'>
+              <div>
+                <p className='font-medium'>Recibir cambios hechos en Planner</p>
+                <p className='text-sm text-muted-foreground'>
+                  Si está apagado (recomendado hasta probarlo), la app solo envía tareas a Planner
+                  pero nunca trae de vuelta lo que se cambie ahí directamente.
+                </p>
+              </div>
+              <Switch
+                checked={settings.syncDirection === 'bidirectional'}
+                disabled={!canWrite}
+                onCheckedChange={checked =>
+                  setSettings(current => ({
+                    ...current,
+                    syncDirection: checked ? 'bidirectional' : 'outbound',
+                  }))
                 }
               />
             </div>

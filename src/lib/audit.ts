@@ -12,7 +12,7 @@ export interface AuditLogInput {
   entityType: string
   entityId: string
   action: string
-  userId: string
+  userId: string | null
   changes?: Record<string, any>
   metadata?: Record<string, any>
   ipAddress?: string
@@ -31,7 +31,7 @@ export async function createAuditLog({
   changes,
   metadata,
   ipAddress,
-  userAgent
+  userAgent,
 }: AuditLogInput): Promise<void> {
   try {
     // Usar servicio enriquecido (sin request, pero con contexto del sistema)
@@ -42,11 +42,11 @@ export async function createAuditLog({
       userId,
       details: {
         changes,
-        metadata
+        metadata,
       },
       ipAddress,
       userAgent,
-      result: 'SUCCESS'
+      result: 'SUCCESS',
       // Sin request = contexto del sistema automáticamente
     })
   } catch (error) {
@@ -58,16 +58,12 @@ export async function createAuditLog({
 /**
  * Obtiene logs de auditoría para una entidad
  */
-export async function getAuditLogs(
-  entityType: string,
-  entityId: string,
-  limit: number = 50
-) {
+export async function getAuditLogs(entityType: string, entityId: string, limit: number = 50) {
   try {
     const logs = await prisma.audit_logs.findMany({
       where: {
         entityType,
-        entityId
+        entityId,
       },
       include: {
         users: {
@@ -75,14 +71,14 @@ export async function getAuditLogs(
             id: true,
             name: true,
             email: true,
-            role: true
-          }
-        }
+            role: true,
+          },
+        },
       },
       orderBy: {
-        createdAt: 'desc'
+        createdAt: 'desc',
       },
-      take: limit
+      take: limit,
     })
 
     return logs.map(log => {
@@ -97,7 +93,7 @@ export async function getAuditLogs(
         metadata: details?.metadata || null,
         ipAddress: log.ipAddress,
         userAgent: log.userAgent,
-        createdAt: log.createdAt.toISOString()
+        createdAt: log.createdAt.toISOString(),
       }
     })
   } catch (error) {
@@ -123,7 +119,7 @@ export async function auditTicketChange(
     action,
     userId,
     changes,
-    metadata
+    metadata,
   })
 }
 
@@ -140,8 +136,8 @@ export async function auditCommentCreated(
     userId,
     metadata: {
       ticketId,
-      isInternal
-    }
+      isInternal,
+    },
   })
 }
 
@@ -160,8 +156,8 @@ export async function auditFileUploaded(
     metadata: {
       ticketId,
       fileName,
-      fileSize
-    }
+      fileSize,
+    },
   })
 }
 
@@ -179,15 +175,15 @@ export async function auditResolutionPlanChange(
     userId,
     changes,
     metadata: {
-      ticketId
-    }
+      ticketId,
+    },
   })
 }
 
 export async function auditTaskChange(
   taskId: string,
   planId: string,
-  userId: string,
+  userId: string | null,
   action: string,
   changes?: Record<string, any>
 ) {
@@ -198,7 +194,7 @@ export async function auditTaskChange(
     userId,
     changes,
     metadata: {
-      planId
-    }
+      planId,
+    },
   })
 }

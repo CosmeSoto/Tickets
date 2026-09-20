@@ -53,6 +53,14 @@ export interface PlannerTaskResult {
   bucketId: string | null
 }
 
+export interface PlannerTaskSummary {
+  id: string
+  etag: string
+  title: string
+  percentComplete: number
+  dueDateTime: string | null
+}
+
 export class PlannerGraphService {
   /** Igual que BackupCloudService.getMicrosoftAccessToken, para el scope de Planner. */
   static async getAccessToken(): Promise<string> {
@@ -140,6 +148,25 @@ export class PlannerGraphService {
     if (!res.ok) throw new Error(`No se pudieron listar los buckets del plan: ${res.status}`)
     const data = await res.json()
     return (data.value ?? []).map((b: any) => ({ id: b.id, name: b.name }))
+  }
+
+  /**
+   * Todas las tareas del plan (v1.0, sin delta — la API de delta de Planner
+   * solo existe en /beta, que Microsoft marca como no apto para producción).
+   * El etag de cada tarea permite detectar cambios sin volver a escribir en
+   * la base de datos las que siguen igual desde el último sondeo.
+   */
+  static async listTasks(accessToken: string, planId: string): Promise<PlannerTaskSummary[]> {
+    const res = await this.graphFetch(`/planner/plans/${planId}/tasks`, accessToken)
+    if (!res.ok) throw new Error(`No se pudieron listar las tareas del plan: ${res.status}`)
+    const data = await res.json()
+    return (data.value ?? []).map((t: any) => ({
+      id: t.id,
+      etag: t['@odata.etag'] ?? '',
+      title: t.title,
+      percentComplete: t.percentComplete ?? 0,
+      dueDateTime: t.dueDateTime ?? null,
+    }))
   }
 
   static async getOrCreateBucket(

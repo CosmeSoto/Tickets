@@ -45,7 +45,8 @@ export interface AuditLogData {
     | 'planner_task'
     | 'planner_oauth'
   entityId?: string
-  userId: string
+  /** null para acciones sin actor humano (p. ej. el pull automático de Fase 2 de Planner) */
+  userId: string | null
   details?: Record<string, any>
   ipAddress?: string
   userAgent?: string

@@ -69,6 +69,9 @@ interface ModuleAccessCardProps {
     /** Accesos: puede emitir y revocar pases QR */
     canManageAccess?: boolean
     onToggleManageAccess?: (v: boolean) => void
+    /** Tareas (Planner): puede crear/editar tareas y moverlas en el tablero */
+    canManagePlanner?: boolean
+    onToggleManagePlanner?: (v: boolean) => void
   }
   /** Familias de solo lectura (fuera del scope del admin) */
   readOnlyFamilyIds?: string[]
@@ -414,6 +417,25 @@ export function ModuleAccessCard({
                   <Switch
                     checked={options.canManageAccess ?? false}
                     onCheckedChange={options.onToggleManageAccess}
+                    disabled={disabled}
+                    className='scale-90 shrink-0'
+                  />
+                </div>
+              )}
+              {options.onToggleManagePlanner !== undefined && (
+                <div className='flex items-center justify-between gap-2'>
+                  <div className='min-w-0'>
+                    <div className='flex items-center gap-1.5'>
+                      <span className='text-xs'>📋</span>
+                      <p className='text-[11px] font-medium'>Crear y gestionar tareas</p>
+                    </div>
+                    <p className='text-[10px] text-muted-foreground mt-0.5 pl-5'>
+                      Sin esto, solo puede ver y mover tarjetas asignadas a él.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={options.canManagePlanner ?? false}
+                    onCheckedChange={options.onToggleManagePlanner}
                     disabled={disabled}
                     className='scale-90 shrink-0'
                   />

@@ -12,6 +12,8 @@ import { PlannerGraphService } from './planner-graph-service'
 import { getPlannerModuleSettings } from '@/lib/planner/settings'
 import { AuditServiceComplete, AuditActionsComplete } from './audit-service-complete'
 import { notifyAdmins } from '@/lib/api/notify'
+// Import dinámico (no estático) para evitar un ciclo de módulos: este archivo
+// es importado por resolution-task-service.ts (pushTask allí mismo).
 
 const ERROR_NOTIFY_THROTTLE_KEY = 'plannerLastErrorNotifiedAt'
 
@@ -25,8 +27,23 @@ interface ResolutionTaskForSync {
   assignedTo: string | null
 }
 
-/** userId del actor que disparó el guardado — solo para dejar rastro en auditoría. */
-type ActorId = string
+/** userId del actor que disparó el guardado — solo para dejar rastro en auditoría.
+ *  null cuando el origen es el pull automático de Fase 2 (sin actor humano). */
+type ActorId = string | null
+
+function toUtcDateOnly(isoDateTime: string): string {
+  const d = new Date(isoDateTime)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`
+}
+
+function statusFromPercentComplete(percentComplete: number): string {
+  if (percentComplete >= 100) return 'completed'
+  if (percentComplete > 0) return 'in_progress'
+  // Nunca 'blocked': Planner no tiene ese concepto, así que un pull nunca lo
+  // asigna (ver limitación documentada en el plan de la Fase 2).
+  return 'pending'
+}
 
 function percentCompleteFor(status: string): number {
   if (status === 'completed') return 100
@@ -236,5 +253,114 @@ export class PlannerSyncService {
       console.error('[PLANNER SYNC] Error eliminando tarea en Planner', sourceId, message)
       await markLinkError(sourceId, message, actorId)
     }
+  }
+
+  /**
+   * Fase 2 — trae de vuelta cambios hechos directo en Planner (estado/progreso,
+   * título, fecha límite). Solo corre si syncDirection==='bidirectional' (el
+   * admin lo activa explícitamente en Configuración → Tareas/Planner).
+   *
+   * Una sola llamada a Graph por corrida (lista completa de tareas del plan,
+   * no una por tarea) — el etag de cada tarea evita reescribir en la base de
+   * datos las que no cambiaron desde el último sondeo. Nunca lanza.
+   */
+  static async pullChanges(): Promise<{ applied: number; skipped: number; errors: number }> {
+    const result = { applied: 0, skipped: 0, errors: 0 }
+    try {
+      const settings = await getPlannerModuleSettings()
+      if (!settings.enabled || !settings.planId || settings.syncDirection !== 'bidirectional') {
+        return result
+      }
+
+      const accessToken = await PlannerGraphService.getAccessToken()
+      const graphTasks = await PlannerGraphService.listTasks(accessToken, settings.planId)
+      const graphTaskById = new Map(graphTasks.map(t => [t.id, t]))
+
+      const links = await prisma.planner_task_links.findMany({
+        where: { sourceType: 'resolution_task', plannerPlanId: settings.planId },
+      })
+
+      const { applyResolutionTaskUpdate } = await import('./resolution-task-service')
+
+      for (const link of links) {
+        const graphTask = graphTaskById.get(link.plannerTaskId)
+
+        // Ya no existe en Planner: no se borra la tarea local (podría ser un
+        // borrado accidental del lado de Planner) — solo se marca el enlace
+        // para que un admin lo vea en Configuración → Tareas/Planner.
+        if (!graphTask) {
+          if (link.syncStatus !== 'error') {
+            await prisma.planner_task_links
+              .update({
+                where: { id: link.id },
+                data: {
+                  syncStatus: 'error',
+                  syncError: 'Eliminada en Planner',
+                  lastSyncedAt: new Date(),
+                },
+              })
+              .catch(() => {})
+          }
+          continue
+        }
+
+        // Sin cambios desde el último sondeo/push — nada que hacer.
+        if (graphTask.etag && graphTask.etag === link.etag) {
+          result.skipped++
+          continue
+        }
+
+        try {
+          const task = await prisma.resolution_tasks.findUnique({
+            where: { id: link.sourceId },
+            include: { plan: { include: { ticket: true } } },
+          })
+          if (!task) continue
+
+          // La app gana si se editó después del último sondeo — evita pisar
+          // una edición reciente del técnico con un dato más viejo de Planner.
+          if (link.lastSyncedAt && task.updatedAt > link.lastSyncedAt) {
+            result.skipped++
+            continue
+          }
+
+          await applyResolutionTaskUpdate({
+            task,
+            ticketId: task.plan.ticketId,
+            body: {
+              title: graphTask.title,
+              status: statusFromPercentComplete(graphTask.percentComplete),
+              // Graph entrega dueDateTime en UTC medianoche (fecha sin hora
+              // real) — se extrae solo la fecha en UTC, nunca en hora local,
+              // para no correr el día al combinarla de nuevo más abajo.
+              dueDate: graphTask.dueDateTime ? toUtcDateOnly(graphTask.dueDateTime) : null,
+            },
+            actorUserId: null,
+            skipPlannerPush: true,
+          })
+
+          await prisma.planner_task_links.update({
+            where: { id: link.id },
+            data: {
+              etag: graphTask.etag,
+              syncStatus: 'synced',
+              syncError: null,
+              lastSyncedAt: new Date(),
+            },
+          })
+          result.applied++
+        } catch (err) {
+          result.errors++
+          const message = err instanceof Error ? err.message : 'Error desconocido'
+          console.error('[PLANNER SYNC] Error aplicando cambio entrante', link.sourceId, message)
+          await markLinkError(link.sourceId, message, null)
+        }
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Error desconocido'
+      console.error('[PLANNER SYNC] Error en pullChanges:', message)
+      await notifyAdminsOfSyncErrorOncePerDay(message)
+    }
+    return result
   }
 }

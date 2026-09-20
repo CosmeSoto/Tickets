@@ -146,6 +146,8 @@ export function CreateUserModal({
             canManageProcesses: true,
             accessEnabled: true,
             canManageAccess: true,
+            plannerEnabled: true,
+            canManagePlanner: true,
             canRequestAssets: false,
             canAccessKnowledge: true,
           }
@@ -165,6 +167,8 @@ export function CreateUserModal({
             canManageProcesses: false,
             accessEnabled: false,
             canManageAccess: false,
+            plannerEnabled: false,
+            canManagePlanner: false,
             canRequestAssets: false,
             canAccessKnowledge: true,
           }

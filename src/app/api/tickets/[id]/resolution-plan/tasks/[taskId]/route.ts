@@ -3,9 +3,11 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { auditTaskChange } from '@/lib/audit'
-import { calculateDuration, validateTimeRange, combineDateAndTime } from '@/lib/time-utils'
-import { ResolutionNotificationService } from '@/lib/services/resolution-notification-service'
 import { PlannerSyncService } from '@/lib/services/planner-sync-service'
+import {
+  applyResolutionTaskUpdate,
+  ResolutionTaskValidationError,
+} from '@/lib/services/resolution-task-service'
 import {
   assertTicketAccess,
   TicketAccessError,
@@ -75,236 +77,19 @@ export async function PATCH(
       throw err
     }
 
-    // Preparar datos de actualización
-    const updateData: any = {
-      updatedAt: new Date(),
-    }
-
-    const changes: Record<string, any> = {}
-    const oldStatus = task.status
-
-    if (body.title !== undefined && body.title.trim()) {
-      updateData.title = body.title.trim()
-      changes.title = { old: task.title, new: body.title.trim() }
-    }
-
-    if (body.description !== undefined) {
-      updateData.description = body.description?.trim() || null
-      changes.description = { old: task.description, new: body.description }
-    }
-
-    if (body.status !== undefined) {
-      // El plan debe estar activo para poder completar/cambiar el estado de sus
-      // tareas — mientras está en "borrador" todavía se está armando (se pueden
-      // agregar/editar/eliminar tareas) y no debería poder cerrarse trabajo que
-      // formalmente no ha arrancado. La UI ya deshabilita esto (task-list.tsx);
-      // esta es la validación real, para no depender solo del cliente.
-      if (task.plan.status === 'draft') {
-        return NextResponse.json(
-          {
-            success: false,
-            message: 'El plan está en borrador. Actívalo antes de completar sus tareas.',
-          },
-          { status: 400 }
-        )
-      }
-
-      updateData.status = body.status
-      changes.status = { old: task.status, new: body.status }
-
-      // Si se marca como completada, registrar fecha
-      if (body.status === 'completed' && task.status !== 'completed') {
-        updateData.completedAt = new Date()
-      }
-      // Si se desmarca como completada, limpiar fecha
-      if (body.status !== 'completed' && task.status === 'completed') {
-        updateData.completedAt = null
-      }
-    }
-
-    if (body.priority !== undefined) {
-      updateData.priority = body.priority
-      changes.priority = { old: task.priority, new: body.priority }
-    }
-
-    if (body.estimatedHours !== undefined) {
-      updateData.estimatedHours = body.estimatedHours
-      changes.estimatedHours = { old: task.estimatedHours, new: body.estimatedHours }
-    }
-
-    // Manejar actualización de horarios
-    if (body.startTime !== undefined || body.endTime !== undefined) {
-      const newStartTime = body.startTime !== undefined ? body.startTime : task.startTime
-      const newEndTime = body.endTime !== undefined ? body.endTime : task.endTime
-
-      // Validar si ambos horarios están presentes
-      if (newStartTime && newEndTime) {
-        if (!validateTimeRange(newStartTime, newEndTime)) {
-          return NextResponse.json(
-            { success: false, message: 'La hora de fin debe ser posterior a la hora de inicio' },
-            { status: 400 }
-          )
-        }
-
-        // Calcular duración automáticamente
-        const calculatedDuration = calculateDuration(newStartTime, newEndTime)
-        updateData.estimatedHours = calculatedDuration
-        changes.estimatedHours = { old: task.estimatedHours, new: calculatedDuration }
-      }
-
-      if (body.startTime !== undefined) {
-        updateData.startTime = body.startTime
-        changes.startTime = { old: task.startTime, new: body.startTime }
-      }
-
-      if (body.endTime !== undefined) {
-        updateData.endTime = body.endTime
-        changes.endTime = { old: task.endTime, new: body.endTime }
-      }
-    }
-
-    if (body.actualHours !== undefined) {
-      updateData.actualHours = body.actualHours
-      changes.actualHours = { old: task.actualHours, new: body.actualHours }
-    }
-
-    if (body.assignedTo !== undefined) {
-      updateData.assignedTo = body.assignedTo
-      changes.assignedTo = { old: task.assignedTo, new: body.assignedTo }
-    }
-
-    // Fecha límite: SIEMPRE combinar fecha+hora con combineDateAndTime (hora local),
-    // nunca `new Date(dateOnlyString)` a secas — eso se interpreta como medianoche UTC
-    // y en husos horarios negativos la fecha guardada queda un día antes.
-    // Este bloque reemplaza la lógica anterior, que quedaba duplicada y la segunda
-    // pasada pisaba silenciosamente el valor ya calculado arriba.
-    if (body.dueDate !== undefined) {
-      if (body.dueDate) {
-        const effectiveStartTime = body.startTime !== undefined ? body.startTime : task.startTime
-        updateData.dueDate = combineDateAndTime(body.dueDate, effectiveStartTime || '00:00')
-      } else {
-        updateData.dueDate = null
-      }
-    } else if (body.startTime !== undefined && task.dueDate) {
-      // No cambió la fecha, solo la hora de inicio: mantener el día (en local, no UTC)
-      // y recombinar con la nueva hora.
-      const d = task.dueDate
-      const pad = (n: number) => String(n).padStart(2, '0')
-      const currentDate = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-      updateData.dueDate = combineDateAndTime(currentDate, body.startTime || '00:00')
-    }
-
-    if (body.notes !== undefined) {
-      updateData.notes = body.notes?.trim() || null
-      changes.notes = { old: task.notes, new: body.notes }
-    }
-
-    // Actualizar tarea
-    const updatedTask = await prisma.resolution_tasks.update({
-      where: { id: taskId },
-      data: updateData,
-      include: {
-        assignee: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-      },
-    })
-
-    // Si cambió el estado de completitud, actualizar contador en el plan
-    if (body.status !== undefined && body.status !== oldStatus) {
-      // Registrar el cambio de estado de la tarea en el historial del ticket —
-      // antes solo se registraba la creación de la tarea y (si completaba TODO
-      // el plan) el cierre del plan, así que marcar una tarea individual como
-      // completada/en progreso/bloqueada era invisible en "Historial".
-      try {
-        await prisma.ticket_history.create({
-          data: {
-            id: crypto.randomUUID(),
-            ticketId: task.plan.ticketId,
-            userId: session.user.id,
-            action: 'resolution_task_updated',
-            field: 'resolution_task',
-            oldValue: oldStatus,
-            newValue: body.status,
-            comment: JSON.stringify({
-              planTitle: task.plan.title,
-              taskTitle: updatedTask.title,
-              priority: updatedTask.priority,
-              status: updatedTask.status,
-              dueDate: updatedTask.dueDate?.toISOString() || null,
-              estimatedHours: updatedTask.estimatedHours,
-              completedAt: updatedTask.completedAt?.toISOString() || null,
-            }),
-            createdAt: new Date(),
-          },
-        })
-      } catch (historyError) {
-        console.error('[API] Error creating task status history:', historyError)
-      }
-
-      const allTasks = await prisma.resolution_tasks.findMany({
-        where: { planId: task.planId },
-      })
-
-      const completedCount = allTasks.filter(t =>
-        t.id === taskId ? body.status === 'completed' : t.status === 'completed'
-      ).length
-
-      const planUpdateData: any = {
-        completedTasks: completedCount,
-        updatedAt: new Date(),
-      }
-
-      // A propósito NO se autocompleta el plan aquí aunque completedCount === totalTasks:
-      // el técnico puede seguir agregando tareas sobre la marcha (no siempre se conocen
-      // todas de antelación) y cerrar el plan solo cuando lo considere terminado, con
-      // "Marcar como Completado" (resolution-plan/route.ts, PATCH status:'completed').
-      // Antes esto sí autocompletaba el plan, lo que lo cerraba de golpe apenas se
-      // terminaba la última tarea del momento — sin dar chance a agregar más — y además
-      // dejaba al cliente (esta ruta solo actualiza la tarea) desincronizado del estado
-      // real del plan hasta el siguiente refetch.
-      await prisma.resolution_plans.update({
-        where: { id: task.planId },
-        data: planUpdateData,
-      })
-    }
-
-    // Auditoría
-    if (Object.keys(changes).length > 0) {
-      await auditTaskChange(taskId, task.planId, session.user.id, 'updated', changes)
-    }
-
-    notifyTicketChanged(ticketId, 'plan_task_updated')
-
-    // Sincronización con Microsoft Planner — nunca lanza, ver planner-sync-service.ts
-    void PlannerSyncService.pushTask(
-      {
-        id: updatedTask.id,
-        title: updatedTask.title,
-        status: updatedTask.status,
-        dueDate: updatedTask.dueDate,
-        assignedTo: updatedTask.assignedTo,
-      },
-      session.user.id
-    )
-
-    // ── Notificar al técnico si cambia la asignación ─────────────────────
-    const newAssignedTo = body.assignedTo !== undefined ? body.assignedTo : null
-    const assigneeChanged = body.assignedTo !== undefined && body.assignedTo !== task.assignedTo
-    if (assigneeChanged && newAssignedTo) {
-      ResolutionNotificationService.notifyTaskAssigned({
-        taskId: updatedTask.id,
-        taskTitle: updatedTask.title,
-        dueDate: updatedTask.dueDate ?? new Date(),
-        assignedTo: newAssignedTo,
-        planTitle: task.plan.title,
+    let updatedTask
+    try {
+      updatedTask = await applyResolutionTaskUpdate({
+        task,
         ticketId,
-        ticketTitle: task.plan.ticket.title,
-      }).catch(err => console.error('[API] Error notifying reassigned technician:', err))
+        body,
+        actorUserId: session.user.id,
+      })
+    } catch (err) {
+      if (err instanceof ResolutionTaskValidationError) {
+        return NextResponse.json({ success: false, message: err.message }, { status: 400 })
+      }
+      throw err
     }
 
     return NextResponse.json({

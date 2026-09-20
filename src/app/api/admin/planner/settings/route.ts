@@ -11,6 +11,7 @@ const schema = z.object({
   enabled: z.boolean().optional(),
   groupId: z.string().trim().optional(),
   planId: z.string().trim().optional(),
+  syncDirection: z.enum(['outbound', 'bidirectional']).optional(),
 })
 
 function canWriteSettings(session: { user?: { role?: string; isSuperAdmin?: boolean } } | null) {
