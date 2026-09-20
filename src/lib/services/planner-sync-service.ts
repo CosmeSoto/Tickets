@@ -324,7 +324,18 @@ export class PlannerSyncService {
    *
    * Una sola llamada a Graph por corrida (lista completa de tareas del plan,
    * no una por tarea) — el etag de cada tarea evita reescribir en la base de
-   * datos las que no cambiaron desde el último sondeo. Nunca lanza.
+   * datos las que no cambiaron desde el último sondeo.
+   *
+   * A diferencia de pushTask/removeTask (que sí nunca lanzan: van embebidos
+   * en respuestas HTTP interactivas, y un fallo de Microsoft no debe romper
+   * el guardado de una tarea), esta función SÍ relanza el error de nivel
+   * superior después de notificar — igual que el resto de los jobs de cron
+   * del proyecto (ver CheckLicenseExpirationJob.run) — para que la ruta
+   * /api/cron/planner-pull-changes devuelva success:false/500 y cualquier
+   * monitor de cron externo note la falla, en vez de reportar éxito con
+   * contadores en cero cada vez que Microsoft esté caído. Los errores por
+   * tarea puntual dentro del bucle sí se toleran (no relanzan) para que una
+   * tarea con problemas no detenga el resto del sondeo.
    */
   static async pullChanges(): Promise<{ applied: number; skipped: number; errors: number }> {
     const result = { applied: 0, skipped: 0, errors: 0 }
@@ -435,6 +446,7 @@ export class PlannerSyncService {
       const message = err instanceof Error ? err.message : 'Error desconocido'
       console.error('[PLANNER SYNC] Error en pullChanges:', message)
       await notifyAdminsOfSyncErrorOncePerDay(message)
+      throw err
     }
     return result
   }
