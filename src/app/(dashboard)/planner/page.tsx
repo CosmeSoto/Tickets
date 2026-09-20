@@ -91,7 +91,11 @@ export default function PlannerPage() {
       }
     >
       {view === 'board' && (
-        <PlannerBoard tasks={tasks} onStatusChange={(t, s) => void updateStatus(t, s)} />
+        <PlannerBoard
+          tasks={tasks}
+          onStatusChange={(t, s) => void updateStatus(t, s)}
+          canManage={canManagePlanner}
+        />
       )}
 
       {view === 'month' && (

@@ -12,6 +12,7 @@ import { PlannerGraphService } from './planner-graph-service'
 import { getPlannerModuleSettings } from '@/lib/planner/settings'
 import { AuditServiceComplete, AuditActionsComplete } from './audit-service-complete'
 import { notifyAdmins } from '@/lib/api/notify'
+import { queueNotificationEmail } from '@/lib/notifications/queue-notification-email'
 // Import dinámico (no estático) para evitar un ciclo de módulos: este archivo
 // es importado por resolution-task-service.ts (pushTask allí mismo).
 
@@ -31,10 +32,20 @@ interface ResolutionTaskForSync {
  *  null cuando el origen es el pull automático de Fase 2 (sin actor humano). */
 type ActorId = string | null
 
+/** Graph entrega dueDateTime como una fecha (sin hora real) anclada a
+ *  medianoche UTC — se decodifica con getters UTC para no correr el día. */
 function toUtcDateOnly(isoDateTime: string): string {
   const d = new Date(isoDateTime)
   const pad = (n: number) => String(n).padStart(2, '0')
   return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`
+}
+
+/** task.dueDate se guardó con combineDateAndTime (hora local del servidor) —
+ *  se decodifica con getters locales, igual que el resto de la app (ver
+ *  PATCH .../resolution-plan/tasks/[taskId] y resolution-task-service.ts). */
+function toLocalDateOnly(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
 function statusFromPercentComplete(percentComplete: number): string {
@@ -65,10 +76,15 @@ async function resolveAssigneeAadId(userId: string | null): Promise<string | nul
 }
 
 async function markLinkError(sourceId: string, message: string, actorId: ActorId) {
+  // Importante: NO se toca lastSyncedAt aquí — solo debe reflejar la última
+  // sincronización que realmente tuvo éxito. Si un push fallido lo pisara con
+  // "ahora", la regla de conflicto de pullChanges (Fase 2) creería que la
+  // edición local ya quedó respaldada en Planner cuando en realidad nunca
+  // llegó, y podría descartarla si Planner cambia mientras tanto.
   await prisma.planner_task_links
     .upsert({
       where: { sourceType_sourceId: { sourceType: 'resolution_task', sourceId } },
-      update: { syncStatus: 'error', syncError: message.slice(0, 500), lastSyncedAt: new Date() },
+      update: { syncStatus: 'error', syncError: message.slice(0, 500) },
       create: {
         sourceType: 'resolution_task',
         sourceId,
@@ -76,7 +92,6 @@ async function markLinkError(sourceId: string, message: string, actorId: ActorId
         plannerPlanId: '',
         syncStatus: 'error',
         syncError: message.slice(0, 500),
-        lastSyncedAt: new Date(),
       },
     })
     .catch(err => console.error('[PLANNER SYNC] Error registrando fallo de sync:', err))
@@ -97,6 +112,14 @@ async function markLinkError(sourceId: string, message: string, actorId: ActorId
  * fallaría y generaría una notificación — se avisa como máximo una vez por día
  * en vez de una por cada tarea (mismo criterio de dedup diario que las alertas
  * de stock bajo, ver src/lib/inventory/notifications.ts).
+ *
+ * `notifyAdmins` solo entrega in-app + web push (ver NotificationService.deliver)
+ * — nunca correo ni Telegram, esos son canales aparte que hay que encolar
+ * explícitamente. Este error está registrado como 'important' en
+ * email-policy.ts (y 'optional' — excluido a propósito — en telegram-policy.ts),
+ * así que se encola el correo aquí mismo; si no se hiciera, esa política
+ * quedaría sin efecto y un admin que no revise la campanita nunca se enteraría
+ * de una caída prolongada de la sincronización.
  */
 async function notifyAdminsOfSyncErrorOncePerDay(message: string): Promise<void> {
   const today = new Date()
@@ -113,6 +136,24 @@ async function notifyAdminsOfSyncErrorOncePerDay(message: string): Promise<void>
     `Una o más tareas no se pudieron sincronizar con Planner: ${message.slice(0, 200)}`,
     { metadata: { link: '/admin/planner/settings' } }
   ).catch(() => {})
+
+  const admins = await prisma.users.findMany({
+    where: { role: 'ADMIN', isActive: true },
+    select: { id: true, email: true },
+  })
+  if (admins.length > 0) {
+    await queueNotificationEmail({
+      recipients: admins.map(a => ({ userId: a.id, email: a.email })),
+      subject: 'Error sincronizando tareas con Microsoft Planner',
+      html:
+        `<p>Una o más tareas no se pudieron sincronizar con Microsoft Planner.</p>` +
+        `<p><strong>Error:</strong> ${message.slice(0, 300)}</p>` +
+        `<p>Revisa Configuración → Tareas/Planner para reconectar la cuenta o revisar el plan configurado.</p>`,
+      module: 'planner',
+      event: 'plannerSyncError',
+      priority: 'important',
+    }).catch(err => console.error('[PLANNER SYNC] Error encolando correo de alerta:', err))
+  }
 
   await prisma.system_settings
     .upsert({
@@ -242,11 +283,11 @@ export class PlannerSyncService {
       await prisma.planner_task_links.delete({ where: { id: link.id } })
 
       await AuditServiceComplete.log({
-        action: AuditActionsComplete.PLANNER_TASK_PUSHED,
+        action: AuditActionsComplete.PLANNER_TASK_REMOVED,
         entityType: 'planner_task',
         entityId: sourceId,
         userId: actorId,
-        details: { plannerTaskId: link.plannerTaskId, mode: 'delete' },
+        details: { plannerTaskId: link.plannerTaskId },
       }).catch(() => {})
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Error desconocido'
@@ -293,11 +334,7 @@ export class PlannerSyncService {
             await prisma.planner_task_links
               .update({
                 where: { id: link.id },
-                data: {
-                  syncStatus: 'error',
-                  syncError: 'Eliminada en Planner',
-                  lastSyncedAt: new Date(),
-                },
+                data: { syncStatus: 'error', syncError: 'Eliminada en Planner' },
               })
               .catch(() => {})
           }
@@ -324,21 +361,39 @@ export class PlannerSyncService {
             continue
           }
 
-          await applyResolutionTaskUpdate({
-            task,
-            ticketId: task.plan.ticketId,
-            body: {
-              title: graphTask.title,
-              status: statusFromPercentComplete(graphTask.percentComplete),
-              // Graph entrega dueDateTime en UTC medianoche (fecha sin hora
-              // real) — se extrae solo la fecha en UTC, nunca en hora local,
-              // para no correr el día al combinarla de nuevo más abajo.
-              dueDate: graphTask.dueDateTime ? toUtcDateOnly(graphTask.dueDateTime) : null,
-            },
-            actorUserId: null,
-            skipPlannerPush: true,
-          })
+          // Solo se incluye lo que realmente cambió respecto al valor local —
+          // el etag de Planner cambia también por campos que esta integración
+          // no sincroniza (descripción, checklist, adjuntos, asignado). Si se
+          // mandara siempre status/dueDate aunque no hayan cambiado: (a) se
+          // registraría en auditoría un "cambio" de estado ficticio, y (b) si
+          // el plan del ticket está en borrador, un simple cambio de título en
+          // Planner fallaría con "el plan está en borrador" por incluir un
+          // status sin cambios de verdad.
+          const newStatus = statusFromPercentComplete(graphTask.percentComplete)
+          const newDueDate = graphTask.dueDateTime ? toUtcDateOnly(graphTask.dueDateTime) : null
+          const currentDueDate = task.dueDate ? toLocalDateOnly(task.dueDate) : null
 
+          const body: { title?: string; status?: string; dueDate?: string | null } = {}
+          if (graphTask.title && graphTask.title !== task.title) body.title = graphTask.title
+          if (newStatus !== task.status) body.status = newStatus
+          if (newDueDate !== currentDueDate) body.dueDate = newDueDate
+
+          if (Object.keys(body).length > 0) {
+            await applyResolutionTaskUpdate({
+              task,
+              ticketId: task.plan.ticketId,
+              body,
+              actorUserId: null,
+              skipPlannerPush: true,
+            })
+            result.applied++
+          } else {
+            result.skipped++
+          }
+
+          // Se actualiza el etag igual aunque no hubiera nada que aplicar —
+          // evita volver a detectar el mismo cambio (de un campo no
+          // sincronizado) en cada sondeo siguiente.
           await prisma.planner_task_links.update({
             where: { id: link.id },
             data: {
@@ -348,7 +403,6 @@ export class PlannerSyncService {
               lastSyncedAt: new Date(),
             },
           })
-          result.applied++
         } catch (err) {
           result.errors++
           const message = err instanceof Error ? err.message : 'Error desconocido'

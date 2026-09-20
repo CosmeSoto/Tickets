@@ -16,6 +16,7 @@ import { requireSuperAdmin } from '@/lib/auth/require-super-admin'
 import { getOAuthCredentials } from '@/lib/oauth-config'
 import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
+import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 
 const REDIRECT_URI_BASE = process.env.NEXTAUTH_URL ?? 'http://localhost:3000'
 const REDIRECT_URI = `${REDIRECT_URI_BASE}/api/admin/planner/cloud-auth/callback`
@@ -95,6 +96,14 @@ export async function GET(request: NextRequest) {
     })
 
     console.log('[PLANNER CLOUD AUTH] Cuenta de Microsoft Planner autorizada correctamente')
+
+    await AuditServiceComplete.log({
+      action: AuditActionsComplete.PLANNER_OAUTH_CONNECTED,
+      entityType: 'planner_oauth',
+      entityId: session!.user!.id,
+      userId: session!.user!.id,
+    }).catch(() => {})
+
     return NextResponse.redirect(SUCCESS_REDIRECT)
   } catch (err) {
     console.error('[PLANNER CLOUD AUTH] Token exchange error:', err)

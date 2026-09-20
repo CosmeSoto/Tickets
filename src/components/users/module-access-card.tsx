@@ -430,7 +430,8 @@ export function ModuleAccessCard({
                       <p className='text-[11px] font-medium'>Crear y gestionar tareas</p>
                     </div>
                     <p className='text-[10px] text-muted-foreground mt-0.5 pl-5'>
-                      Sin esto, solo puede ver y mover tarjetas asignadas a él.
+                      Sin esto, solo puede consultar el tablero y calendario (sin arrastrar tarjetas
+                      ni cambiar su estado).
                     </p>
                   </div>
                   <Switch

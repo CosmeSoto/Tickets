@@ -25,17 +25,22 @@ const COLUMNS: { status: PlannerTaskStatus; label: string }[] = [
   { status: 'blocked', label: 'Bloqueada' },
 ]
 
-function DraggableCard({ task }: { task: PlannerTask }) {
+function DraggableCard({ task, canManage }: { task: PlannerTask; canManage: boolean }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: task.id,
     data: { task },
+    // Sin permiso de gestión, la tarjeta se ve pero no se puede arrastrar —
+    // ver "Crear y gestionar tareas" en module-access-card.tsx: sin ese
+    // permiso el usuario solo puede consultar el tablero, igual que
+    // Procesos/Accesos con su propio canManage.
+    disabled: !canManage,
   })
   return (
     <div
       ref={setNodeRef}
-      {...attributes}
-      {...listeners}
-      className='cursor-grab active:cursor-grabbing'
+      {...(canManage ? attributes : {})}
+      {...(canManage ? listeners : {})}
+      className={canManage ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}
     >
       <PlannerTaskCard task={task} isDragging={isDragging} />
     </div>
@@ -46,12 +51,14 @@ function DroppableColumn({
   status,
   label,
   tasks,
+  canManage,
 }: {
   status: PlannerTaskStatus
   label: string
   tasks: PlannerTask[]
+  canManage: boolean
 }) {
-  const { setNodeRef, isOver } = useDroppable({ id: status })
+  const { setNodeRef, isOver } = useDroppable({ id: status, disabled: !canManage })
   return (
     <div className='flex min-w-[260px] flex-1 flex-col rounded-lg border bg-muted/20'>
       <div
@@ -68,7 +75,7 @@ function DroppableColumn({
         style={{ minHeight: 200, maxHeight: 'calc(100vh - 320px)' }}
       >
         {tasks.map(task => (
-          <DraggableCard key={task.id} task={task} />
+          <DraggableCard key={task.id} task={task} canManage={canManage} />
         ))}
         {tasks.length === 0 && (
           <p className='py-6 text-center text-xs text-muted-foreground'>Sin tareas</p>
@@ -81,18 +88,23 @@ function DroppableColumn({
 interface PlannerBoardProps {
   tasks: PlannerTask[]
   onStatusChange: (task: PlannerTask, status: PlannerTaskStatus) => void
+  /** Sin esto, el tablero es de solo lectura (ver toggle "Crear y gestionar
+   *  tareas" del módulo Planner) — puede consultar pero no arrastrar tarjetas. */
+  canManage: boolean
 }
 
-export function PlannerBoard({ tasks, onStatusChange }: PlannerBoardProps) {
+export function PlannerBoard({ tasks, onStatusChange, canManage }: PlannerBoardProps) {
   const [activeTask, setActiveTask] = useState<PlannerTask | null>(null)
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))
 
   const handleDragStart = (event: DragStartEvent) => {
+    if (!canManage) return
     setActiveTask((event.active.data.current?.task as PlannerTask) ?? null)
   }
 
   const handleDragEnd = (event: DragEndEvent) => {
     setActiveTask(null)
+    if (!canManage) return
     const { active, over } = event
     if (!over) return
     const task = active.data.current?.task as PlannerTask | undefined
@@ -115,6 +127,7 @@ export function PlannerBoard({ tasks, onStatusChange }: PlannerBoardProps) {
             status={col.status}
             label={col.label}
             tasks={tasks.filter(t => t.status === col.status)}
+            canManage={canManage}
           />
         ))}
       </div>

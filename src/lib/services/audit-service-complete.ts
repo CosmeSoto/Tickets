@@ -1025,6 +1025,7 @@ export const AuditActionsComplete = {
 
   // Planner / sincronización de tareas
   PLANNER_TASK_PUSHED: 'planner_task_pushed',
+  PLANNER_TASK_REMOVED: 'planner_task_removed',
   PLANNER_SYNC_ERROR: 'planner_sync_error',
   PLANNER_OAUTH_CONNECTED: 'planner_oauth_connected',
   PLANNER_OAUTH_REVOKED: 'planner_oauth_revoked',

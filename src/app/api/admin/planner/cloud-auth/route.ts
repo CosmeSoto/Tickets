@@ -14,6 +14,7 @@ import { authOptions } from '@/lib/auth'
 import { requireSuperAdmin } from '@/lib/auth/require-super-admin'
 import { getOAuthCredentials } from '@/lib/oauth-config'
 import prisma from '@/lib/prisma'
+import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 
 const REDIRECT_URI_BASE = process.env.NEXTAUTH_URL ?? 'http://localhost:3000'
 const REDIRECT_URI = `${REDIRECT_URI_BASE}/api/admin/planner/cloud-auth/callback`
@@ -61,6 +62,13 @@ export async function DELETE() {
   }
 
   await prisma.system_settings.deleteMany({ where: { key: REFRESH_TOKEN_KEY } })
+
+  await AuditServiceComplete.log({
+    action: AuditActionsComplete.PLANNER_OAUTH_REVOKED,
+    entityType: 'planner_oauth',
+    entityId: session!.user!.id,
+    userId: session!.user!.id,
+  }).catch(() => {})
 
   return NextResponse.json({ success: true, message: 'Conexión con Microsoft Planner revocada' })
 }

@@ -21,12 +21,14 @@ export async function GET() {
   const access = await getPlannerAccess(session.user.id, session.user.role)
 
   // La escritura (PATCH .../resolution-plan/tasks/[taskId]) solo la permite
-  // assertTicketAccess a: el técnico asignado al ticket, un colaborador, o un
-  // ADMIN con alcance de familia (ver canManageResolutionPlanTasks en
-  // ticket-access.ts) — nunca a "cualquier técnico de la familia". Mostrar acá
-  // tareas de otros técnicos que después no se pueden arrastrar en el tablero
-  // sería una tarjeta que parece editable pero siempre falla con 403; se
-  // acota la vista a lo que ese rol realmente puede operar.
+  // assertTicketAccess a: el técnico asignado AL TICKET, un colaborador del
+  // ticket, o un ADMIN con alcance de familia (ver canManageResolutionPlanTasks
+  // en ticket-access.ts) — esa función solo recibe el ticket, nunca la tarea
+  // puntual, así que NO alcanza con que la tarea esté asignada a este técnico
+  // si no es también asignado/colaborador del ticket. El filtro de acá debe
+  // calcar exactamente esa regla (no solo "assignedTo = yo") — de lo contrario
+  // una tarea asignada a un técnico que no es dueño ni colaborador del ticket
+  // aparecería en su tablero pero fallaría con 403 al intentar arrastrarla.
   const isSuperAdmin = (session.user as any).isSuperAdmin === true
   const restrictToOwn = session.user.role !== 'ADMIN' && !isSuperAdmin
 
@@ -39,16 +41,18 @@ export async function GET() {
         // hace la ficha del ticket (ver comentario en esa ruta) — mostrar acá
         // una tarjeta que no se puede arrastrar sería confuso.
         status: { in: ['active', 'completed'] },
-        ticket: access.familyIds ? { familyId: { in: access.familyIds } } : undefined,
+        ticket: {
+          familyId: access.familyIds ? { in: access.familyIds } : undefined,
+          ...(restrictToOwn
+            ? {
+                OR: [
+                  { assigneeId: session.user.id },
+                  { ticket_collaborators: { some: { collaboratorId: session.user.id } } },
+                ],
+              }
+            : {}),
+        },
       },
-      ...(restrictToOwn
-        ? {
-            OR: [
-              { assignedTo: session.user.id },
-              { plan: { ticket: { assigneeId: session.user.id } } },
-            ],
-          }
-        : {}),
     },
     select: {
       id: true,
