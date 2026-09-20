@@ -16,7 +16,10 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
-import { OAuthCredentialsStatusLink } from '@/components/settings/oauth-credentials-fields'
+import {
+  OAuthCredentialsStatusLink,
+  RedirectUriNote,
+} from '@/components/settings/oauth-credentials-fields'
 
 type PlannerSettings = {
   enabled: boolean
@@ -299,6 +302,11 @@ export default function PlannerSettingsPage() {
                 )}
               </div>
             </div>
+            {!connected && (
+              <div className='mt-3'>
+                <RedirectUriNote path='/api/admin/planner/cloud-auth/callback' />
+              </div>
+            )}
           </CardContent>
         </Card>
 

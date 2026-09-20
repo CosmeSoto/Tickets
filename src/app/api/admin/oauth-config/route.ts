@@ -3,11 +3,11 @@ import { getServerSession } from 'next-auth'
 import { authOptions, invalidateOAuthProvidersCache } from '@/lib/auth'
 import { requireSuperAdmin } from '@/lib/auth/require-super-admin'
 import prisma from '@/lib/prisma'
-import { encrypt, decrypt } from '@/lib/crypto'
+import { encrypt } from '@/lib/crypto'
 import { randomUUID } from 'crypto'
 
 // GET - Obtener configuraciones OAuth
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const session = await getServerSession(authOptions)
     const check = await requireSuperAdmin(session)
@@ -113,22 +113,26 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 'azure-ad-sharepoint' usa client_credentials, que no acepta el
-    // endpoint multi-tenant "common" (a diferencia de los otros tres
-    // providers, delegados) — sin Tenant ID, cada subida fallaría con un
-    // error de Microsoft mucho más críptico que decirlo aquí al guardar.
-    if (
-      provider === 'azure-ad-sharepoint' &&
-      isEnabled &&
-      !(tenantId || existingConfig?.tenantId)
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'SharePoint requiere el Tenant ID del directorio — no se puede usar "common"',
-        },
-        { status: 400 }
-      )
+    // 'azure-ad-sharepoint' usa client_credentials, que Microsoft no admite
+    // contra los alias multi-tenant "common"/"organizations"/"consumers" (a
+    // diferencia de los otros tres providers, delegados) — sin un Tenant ID
+    // real, cada subida fallaría con un error de Microsoft mucho más
+    // críptico que decirlo aquí al guardar. Se valida el valor, no solo que
+    // no esté vacío: escribir "common" por costumbre (es el valor sugerido
+    // para los demás providers) pasaría la comprobación de "no vacío" pero
+    // fallaría igual al usarlo de verdad.
+    if (provider === 'azure-ad-sharepoint' && isEnabled) {
+      const effectiveTenant = (tenantId || existingConfig?.tenantId || '').trim().toLowerCase()
+      if (!effectiveTenant || ['common', 'organizations', 'consumers'].includes(effectiveTenant)) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              'SharePoint requiere el Tenant ID real del directorio — no se puede usar "common", "organizations" ni "consumers"',
+          },
+          { status: 400 }
+        )
+      }
     }
 
     // Preparar datos de actualización

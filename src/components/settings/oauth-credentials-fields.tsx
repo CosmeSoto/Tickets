@@ -430,3 +430,49 @@ export function OAuthCredentialsStatusLink({
     </div>
   )
 }
+
+interface RedirectUriNoteProps {
+  path: string
+  label?: string
+}
+
+/**
+ * Estas pantallas reusan el MISMO registro de app que el login (Google
+ * 'google' / Microsoft 'azure-ad'), pero cada flujo delegado adicional
+ * (adjuntos, backups) usa su propia ruta de callback — hay que registrar
+ * esa Redirect URI aparte en el portal, además de la del login. Antes esto
+ * no se mostraba en ningún lado: si el admin solo registraba la del login,
+ * "Autorizar acceso" fallaba con un redirect_uri_mismatch sin pista de cuál
+ * URL faltaba.
+ */
+export function RedirectUriNote({ path, label }: RedirectUriNoteProps) {
+  const [copied, setCopied] = useState(false)
+  const uri = typeof window !== 'undefined' ? `${window.location.origin}${path}` : path
+
+  const copy = () => {
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(uri).catch(() => {})
+    }
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <div className='flex items-center gap-2 rounded-md border bg-muted/30 px-2 py-1.5 text-xs'>
+      <Globe className='h-3.5 w-3.5 shrink-0 text-muted-foreground' />
+      <span className='shrink-0 text-muted-foreground'>
+        {label ?? 'Redirect URI adicional a registrar en el portal:'}
+      </span>
+      <code className='truncate font-mono'>{uri}</code>
+      <Button
+        type='button'
+        variant='ghost'
+        size='sm'
+        className='ml-auto h-6 shrink-0 px-2'
+        onClick={copy}
+      >
+        {copied ? <Check className='h-3.5 w-3.5' /> : <Copy className='h-3.5 w-3.5' />}
+      </Button>
+    </div>
+  )
+}

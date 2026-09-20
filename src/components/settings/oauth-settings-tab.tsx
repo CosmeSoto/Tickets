@@ -63,6 +63,21 @@ export function OAuthSettingsTab() {
         </AlertDescription>
       </Alert>
 
+      <Alert className='border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800'>
+        <AlertDescription className='text-amber-900 dark:text-amber-200 text-sm space-y-1'>
+          <p className='font-medium'>Si cambias de dominio/IP más adelante</p>
+          <p>
+            Cada Redirect URI que ves abajo se calcula a partir de la URL con la que accedes ahora
+            mismo — pero el servidor usa la variable <code className='font-mono'>NEXTAUTH_URL</code>{' '}
+            para negociar de verdad con Google/Microsoft. Si algún día cambias de IP o pasas a un
+            dominio propio, actualiza <code className='font-mono'>NEXTAUTH_URL</code> en el servidor
+            y reconstruye el contenedor primero; luego vuelve a entrar a esta pantalla ya desde el
+            dominio nuevo y registra en Google Cloud Console / Azure Portal las URIs que te muestre
+            en ese momento (las viejas puedes dejarlas o quitarlas después).
+          </p>
+        </AlertDescription>
+      </Alert>
+
       {(() => {
         const origin = typeof window !== 'undefined' ? window.location.origin : ''
         const isLocal =
@@ -225,6 +240,14 @@ export function OAuthSettingsTab() {
                 permiso <code className='font-mono'>Sites.Selected</code> sobre el sitio específico
                 — un paso aparte que se hace con PowerShell o Graph Explorer, fuera de esta app. Sin
                 ese paso, conectar el sitio en Ajustes → Almacenamiento fallará con error 403.
+              </p>
+              <p>
+                Importante: el permiso debe otorgarse con rol{' '}
+                <code className='font-mono'>write</code>, no solo{' '}
+                <code className='font-mono'>read</code>. Con solo lectura, conectar el sitio va a
+                funcionar (son llamadas de consulta) pero subir un archivo real va a fallar después
+                con otro error 403 — más difícil de relacionar con el permiso si no se sabe de
+                antemano.
               </p>
             </AlertDescription>
           </Alert>

@@ -127,9 +127,10 @@ export function SharePointStorageCard({
             SharePoint usa credenciales de <strong>aplicación</strong>, no un usuario que autoriza —
             se configuran una sola vez en Ajustes → OAuth (no acá). Después de guardarlas, un
             administrador de Microsoft 365 debe otorgarle a esa app el permiso{' '}
-            <code className='font-mono'>Sites.Selected</code> sobre el sitio específico — un paso
-            aparte que se hace con PowerShell o Graph Explorer. Sin ese paso, conectar el sitio
-            abajo va a fallar con un error 403.
+            <code className='font-mono'>Sites.Selected</code> con rol{' '}
+            <code className='font-mono'>write</code> (no solo lectura) sobre el sitio específico —
+            un paso aparte que se hace con PowerShell o Graph Explorer. Con solo lectura, conectar
+            el sitio funciona pero subir un archivo real va a fallar con otro error 403.
           </AlertDescription>
         </Alert>
 

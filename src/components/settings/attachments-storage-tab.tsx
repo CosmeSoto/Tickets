@@ -22,6 +22,9 @@ import { Label } from '@/components/ui/label'
 import { Cloud, HardDrive, CheckCircle2, RefreshCw } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { SharePointStorageCard } from '@/components/settings/sharepoint-storage-card'
+import { RedirectUriNote } from '@/components/settings/oauth-credentials-fields'
+
+const ATTACHMENTS_CALLBACK_PATH = '/api/admin/attachments/cloud-auth/callback'
 
 type ProviderId = 'local' | 'google-drive' | 'onedrive' | 'sharepoint'
 
@@ -253,15 +256,18 @@ function ProviderCard({
         </div>
         <Switch checked={enabled} disabled={saving} onCheckedChange={onToggle} />
       </CardHeader>
-      <CardContent>
+      <CardContent className='space-y-3'>
         {authorized ? (
           <Button variant='outline' size='sm' onClick={onRevoke}>
             <HardDrive className='h-4 w-4 mr-2' /> Revocar acceso
           </Button>
         ) : (
-          <Button variant='outline' size='sm' onClick={onAuthorize}>
-            <Cloud className='h-4 w-4 mr-2' /> Autorizar acceso
-          </Button>
+          <>
+            <Button variant='outline' size='sm' onClick={onAuthorize}>
+              <Cloud className='h-4 w-4 mr-2' /> Autorizar acceso
+            </Button>
+            <RedirectUriNote path={ATTACHMENTS_CALLBACK_PATH} />
+          </>
         )}
       </CardContent>
     </Card>

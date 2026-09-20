@@ -32,6 +32,15 @@ async function verifyAzureTenant(tenantId: string): Promise<{ ok: boolean; error
   }
 }
 
+// Microsoft documenta explícitamente que el endpoint multi-tenant no debe
+// usarse con el flujo client_credentials: es un flujo desatendido que
+// necesita saber para qué tenant específico emitir el token, cosa que
+// 'common'/'organizations'/'consumers' no resuelven. Probar credenciales
+// delegadas (login, Planner) con ese grant contra esos alias no valida nada
+// de forma confiable — puede fallar o pasar sin relación real con si el
+// Client Secret es correcto.
+const MULTI_TENANT_ALIASES = new Set(['common', 'organizations', 'consumers'])
+
 // Verifica clientId + clientSecret contra Azure AD usando client_credentials
 // (no requiere usuario, es una verificación pura de las credenciales de la app)
 async function verifyAzureCredentials(
@@ -199,6 +208,7 @@ export async function POST(request: NextRequest) {
     }
 
     const diagnostics: string[] = []
+    let secretVerified = true
 
     if (
       provider === 'azure-ad' ||
@@ -222,20 +232,34 @@ export async function POST(request: NextRequest) {
       }
       diagnostics.push(`Tenant verificado: ${tenant}`)
 
-      // Paso 2: verificar clientId + clientSecret
-      const credsCheck = await verifyAzureCredentials(tenant, config.clientId, plainSecret)
-      if (!credsCheck.ok) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: credsCheck.error,
-            step: 'credentials',
-            diagnostics,
-          },
-          { status: 400 }
+      // Paso 2: verificar clientId + clientSecret — solo es fiable contra un
+      // tenant específico. Con un alias multi-tenant, client_credentials no
+      // es el flujo que este proveedor va a usar de verdad (login/Planner
+      // usan authorization_code + refresh_token), así que no lo probamos:
+      // decirlo explícitamente es mejor que dar un resultado que no
+      // significa lo que el admin cree que significa.
+      if (MULTI_TENANT_ALIASES.has(tenant.toLowerCase())) {
+        secretVerified = false
+        diagnostics.push(
+          `Client Secret no verificado: con el tenant "${tenant}" Microsoft no admite comprobarlo ` +
+            'sin interacción de un usuario (client_credentials no funciona con tenants multi-tenant). ' +
+            'Confírmalo completando el inicio de sesión real (Conectar cuenta / probar el login).'
         )
+      } else {
+        const credsCheck = await verifyAzureCredentials(tenant, config.clientId, plainSecret)
+        if (!credsCheck.ok) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: credsCheck.error,
+              step: 'credentials',
+              diagnostics,
+            },
+            { status: 400 }
+          )
+        }
+        diagnostics.push('Client ID y Client Secret verificados correctamente')
       }
-      diagnostics.push('Client ID y Client Secret verificados correctamente')
     }
 
     if (provider === 'google') {
@@ -284,7 +308,9 @@ export async function POST(request: NextRequest) {
       provider,
       diagnostics,
       redirectUri,
-      message: `Credenciales de ${label} verificadas correctamente. Asegúrate de que la Redirect URI esté registrada en el portal.`,
+      message: secretVerified
+        ? `Credenciales de ${label} verificadas correctamente. Asegúrate de que la Redirect URI esté registrada en el portal.`
+        : `Tenant y Client ID de ${label} verificados. El Client Secret no se pudo comprobar por API (ver detalle abajo) — confírmalo completando el inicio de sesión real. Asegúrate de que la Redirect URI esté registrada en el portal.`,
     })
   } catch (error) {
     console.error('Error testing OAuth config:', error)

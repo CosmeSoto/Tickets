@@ -535,12 +535,15 @@ export class CloudStorageService {
     }
 
     // A diferencia del flujo delegado (Google/OneDrive), client_credentials
-    // no acepta el endpoint multi-tenant "common" — Microsoft exige el
-    // Tenant ID real del directorio. Sin esto, el error de Microsoft más
-    // abajo sería mucho más críptico que decirlo aquí directamente.
-    if (!creds.tenantId) {
+    // no acepta los alias multi-tenant "common"/"organizations"/"consumers"
+    // — Microsoft exige el Tenant ID real del directorio. Sin esto, el
+    // error de Microsoft más abajo sería mucho más críptico que decirlo
+    // aquí directamente. Se revalida acá (no solo al guardar) por si un
+    // registro guardado antes de esta validación quedó con un alias.
+    const tenant = creds.tenantId?.trim().toLowerCase()
+    if (!tenant || ['common', 'organizations', 'consumers'].includes(tenant)) {
       throw new Error(
-        'Falta el Tenant ID en las credenciales de aplicación de SharePoint (no se puede usar "common" para credenciales de aplicación). Configúralo en Ajustes → Almacenamiento de adjuntos.'
+        'El Tenant ID de las credenciales de aplicación de SharePoint es inválido (no puede ser "common", "organizations" ni "consumers"). Configúralo en Ajustes → OAuth.'
       )
     }
 

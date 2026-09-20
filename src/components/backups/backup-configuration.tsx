@@ -29,6 +29,9 @@ import {
   RotateCcw,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { RedirectUriNote } from '@/components/settings/oauth-credentials-fields'
+
+const BACKUPS_CALLBACK_PATH = '/api/admin/backups/cloud-auth/callback'
 
 const WEEKDAYS = [
   { value: 0, label: 'Domingo' },
@@ -678,6 +681,8 @@ export function BackupConfiguration({ onConfigChange }: BackupConfigurationProps
                 </div>
               </div>
 
+              {!cloudAuthStatus.googleDrive && <RedirectUriNote path={BACKUPS_CALLBACK_PATH} />}
+
               {cloudAuthStatus.googleDrive && (
                 <div className='flex items-center justify-between pt-1 border-t border-border'>
                   <Label className='text-xs text-muted-foreground'>Usar para backups</Label>
@@ -739,6 +744,8 @@ export function BackupConfiguration({ onConfigChange }: BackupConfigurationProps
                   )}
                 </div>
               </div>
+
+              {!cloudAuthStatus.oneDrive && <RedirectUriNote path={BACKUPS_CALLBACK_PATH} />}
 
               {cloudAuthStatus.oneDrive && (
                 <div className='flex items-center justify-between pt-1 border-t border-border'>
