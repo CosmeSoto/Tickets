@@ -224,27 +224,72 @@ export class PlannerGraphService {
     }
   }
 
+  /**
+   * Tarea puntual con sus asignaciones actuales — necesario antes de un
+   * update para saber a quién hay que "soltar" (ver updateTask: Graph exige
+   * `{ [aadId]: null }` explícito por cada persona a desasignar; un objeto
+   * vacío no quita a nadie, y agregar solo el nuevo asignado sin soltar al
+   * anterior los deja a AMBOS asignados en Planner).
+   */
+  static async getTask(
+    accessToken: string,
+    taskId: string
+  ): Promise<{ etag: string; assigneeAadIds: string[] }> {
+    const res = await this.graphFetch(`/planner/tasks/${taskId}`, accessToken)
+    if (!res.ok) throw new Error(`No se pudo obtener la tarea de Planner: ${res.status}`)
+    const data = await res.json()
+    return {
+      etag: res.headers.get('etag') ?? data['@odata.etag'] ?? '',
+      assigneeAadIds: Object.keys(data.assignments ?? {}),
+    }
+  }
+
+  /**
+   * Construye el objeto `assignments` a enviar en un PATCH a partir de quién
+   * está asignado ahora en Planner y quién debería quedar asignado — nulea a
+   * los que sobran y agrega al nuevo si falta. `undefined` si no hay nada que
+   * cambiar (evita un PATCH de assignments vacío/no-op).
+   */
+  static buildAssignmentsPatch(
+    currentAssigneeAadIds: string[],
+    desiredAssigneeAadId: string | null
+  ): Record<string, unknown> | undefined {
+    const alreadyAssigned = desiredAssigneeAadId
+      ? currentAssigneeAadIds.includes(desiredAssigneeAadId)
+      : false
+    const toRemove = currentAssigneeAadIds.filter(id => id !== desiredAssigneeAadId)
+    if (toRemove.length === 0 && (alreadyAssigned || !desiredAssigneeAadId)) return undefined
+
+    const assignments: Record<string, unknown> = {}
+    for (const id of toRemove) assignments[id] = null
+    if (desiredAssigneeAadId && !alreadyAssigned) {
+      assignments[desiredAssigneeAadId] = {
+        '@odata.type': '#microsoft.graph.plannerAssignment',
+        orderHint: ' !',
+      }
+    }
+    return assignments
+  }
+
   static async updateTask(
     accessToken: string,
     taskId: string,
     etag: string,
-    patch: Partial<Omit<PlannerTaskInput, 'planId'>>
+    patch: {
+      title?: string
+      dueDateTime?: string | null
+      percentComplete?: number
+      bucketId?: string
+      /** Ya resuelto con buildAssignmentsPatch — no una simple lista de "a quién asignar". */
+      assignments?: Record<string, unknown>
+    }
   ): Promise<PlannerTaskResult> {
     const body: Record<string, unknown> = {}
     if (patch.title !== undefined) body.title = patch.title
     if (patch.dueDateTime !== undefined) body.dueDateTime = patch.dueDateTime
     if (patch.percentComplete !== undefined) body.percentComplete = patch.percentComplete
     if (patch.bucketId !== undefined) body.bucketId = patch.bucketId
-    if (patch.assigneeAadId !== undefined) {
-      body.assignments = patch.assigneeAadId
-        ? {
-            [patch.assigneeAadId]: {
-              '@odata.type': '#microsoft.graph.plannerAssignment',
-              orderHint: ' !',
-            },
-          }
-        : {}
-    }
+    if (patch.assignments !== undefined) body.assignments = patch.assignments
 
     const res = await this.graphFetch(`/planner/tasks/${taskId}`, accessToken, {
       method: 'PATCH',

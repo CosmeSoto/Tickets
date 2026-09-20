@@ -31,7 +31,7 @@ export const BACKUP_MODULE_REGISTRY: Record<BackupModuleId, BackupModuleDefiniti
     id: 'tickets',
     label: 'Tickets',
     description:
-      'Tickets, comentarios, adjuntos, historial, colaboradores, calificaciones, planes de resolución, enlaces a conocimiento, notificaciones ligadas al ticket, cola pendiente del digest de correo agrupado, seguimiento de SLA por ticket (deadlines, cumplimiento, violaciones) y configuración de tickets por familia (prefijo de código, horario laboral, techo de prioridad). No incluye el catálogo de políticas SLA globales/por familia.',
+      'Tickets, comentarios, adjuntos, historial, colaboradores, calificaciones, planes de resolución (con sus enlaces de sincronización a Microsoft Planner, si el módulo Tareas está activo), enlaces a conocimiento, notificaciones ligadas al ticket, cola pendiente del digest de correo agrupado, seguimiento de SLA por ticket (deadlines, cumplimiento, violaciones) y configuración de tickets por familia (prefijo de código, horario laboral, techo de prioridad). No incluye el catálogo de políticas SLA globales/por familia. Los enlaces de Planner no se sobrescriben si ya existe uno para la misma tarea en el destino (gana el estado de sincronización real y vigente, no el del backup).',
   },
   news: {
     id: 'news',
@@ -121,6 +121,7 @@ export const TICKETS_MODULE_RESTORE_ORDER = [
   'ticket_collaborators',
   'resolution_plans',
   'resolution_tasks',
+  'planner_task_links',
   'knowledge_articles',
   'article_votes',
   'ticket_knowledge_articles',
@@ -142,6 +143,7 @@ const EMPTY_TICKETS_PAYLOAD: Record<TicketsModuleTable, unknown[]> = {
   ticket_collaborators: [],
   resolution_plans: [],
   resolution_tasks: [],
+  planner_task_links: [],
   knowledge_articles: [],
   article_votes: [],
   ticket_knowledge_articles: [],
@@ -200,6 +202,17 @@ export async function exportTicketsModuleData(): Promise<Record<TicketsModuleTab
       ? await prisma.resolution_tasks.findMany({ where: { planId: { in: planIds } } })
       : []
 
+  // Enlaces de sincronización con Microsoft Planner de esas mismas tareas
+  // (módulo Tareas) — sourceId no tiene FK real (sourceType es polimórfico,
+  // ver planner_task_links en schema.prisma), así que se filtra a mano.
+  const taskIds = resolution_tasks.map(t => t.id)
+  const planner_task_links =
+    taskIds.length > 0
+      ? await prisma.planner_task_links.findMany({
+          where: { sourceType: 'resolution_task', sourceId: { in: taskIds } },
+        })
+      : []
+
   const articleIdFromLinks = new Set(ticket_knowledge_articles.map(l => l.articleId))
   const sourceLinked = await prisma.knowledge_articles.findMany({
     where: { sourceTicketId: { in: ticketIds } },
@@ -233,6 +246,7 @@ export async function exportTicketsModuleData(): Promise<Record<TicketsModuleTab
     ticket_collaborators: ticket_collaborators as unknown[],
     resolution_plans: resolution_plans as unknown[],
     resolution_tasks: resolution_tasks as unknown[],
+    planner_task_links: planner_task_links as unknown[],
     knowledge_articles: knowledge_articles as unknown[],
     article_votes: article_votes as unknown[],
     ticket_knowledge_articles: ticket_knowledge_articles as unknown[],

@@ -185,6 +185,27 @@ export class PlannerSyncService {
       })
 
       if (existingLink?.plannerTaskId) {
+        // Graph exige nulear explícitamente a cada persona que deja de estar
+        // asignada (un objeto assignments vacío no desasigna a nadie, y
+        // agregar solo al nuevo sin nulear al anterior deja a ambos asignados
+        // a la vez) — hace falta leer quién está asignado ahora mismo antes
+        // de decidir el patch. Si esta lectura falla, se sigue actualizando
+        // título/fecha/estado igual y simplemente no se toca la asignación
+        // esta vez (mejor que fallar toda la sincronización por esto).
+        let assignmentsPatch: Record<string, unknown> | undefined
+        try {
+          const current = await PlannerGraphService.getTask(accessToken, existingLink.plannerTaskId)
+          assignmentsPatch = PlannerGraphService.buildAssignmentsPatch(
+            current.assigneeAadIds,
+            assigneeAadId
+          )
+        } catch (assigneeErr) {
+          console.error(
+            '[PLANNER SYNC] No se pudo leer la asignación actual en Planner, se omite este cambio:',
+            assigneeErr instanceof Error ? assigneeErr.message : assigneeErr
+          )
+        }
+
         const result = await PlannerGraphService.updateTask(
           accessToken,
           existingLink.plannerTaskId,
@@ -193,7 +214,7 @@ export class PlannerSyncService {
             title: task.title,
             dueDateTime: task.dueDate ? task.dueDate.toISOString() : null,
             percentComplete: percentCompleteFor(task.status),
-            assigneeAadId,
+            ...(assignmentsPatch !== undefined ? { assignments: assignmentsPatch } : {}),
           }
         )
         await prisma.planner_task_links.update({

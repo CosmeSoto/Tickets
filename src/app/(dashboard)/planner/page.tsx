@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import { Settings, LayoutGrid, CalendarDays } from 'lucide-react'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { Button } from '@/components/ui/button'
@@ -10,11 +11,13 @@ import { usePlannerTasks } from '@/hooks/use-planner-tasks'
 import { PlannerBoard } from '@/components/planner/planner-board'
 import { PlannerCalendarMonth } from '@/components/planner/planner-calendar-month'
 import { PlannerCalendarWeek } from '@/components/planner/planner-calendar-week'
+import { ticketUrlForRole } from '@/lib/utils/ticket-role-url'
 
 type ViewMode = 'board' | 'month' | 'week' | 'day'
 
 export default function PlannerPage() {
   const router = useRouter()
+  const { data: session } = useSession()
   const { canManagePlanner } = useUserModules()
   const { tasks, loading, error, reload, updateStatus } = usePlannerTasks()
 
@@ -24,7 +27,7 @@ export default function PlannerPage() {
 
   const goToTicket = (taskId: string) => {
     const task = tasks.find(t => t.id === taskId)
-    if (task) router.push(`/tickets/${task.ticketId}`)
+    if (task) router.push(ticketUrlForRole(session?.user?.role, task.ticketId))
   }
 
   return (

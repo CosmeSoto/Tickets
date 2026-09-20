@@ -1,9 +1,11 @@
 'use client'
 
 import Link from 'next/link'
+import { useSession } from 'next-auth/react'
 import { CalendarClock, User } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { getPriorityColor, getPriorityLabel } from '@/components/ui/resolution-plan/plan-helpers'
+import { ticketUrlForRole } from '@/lib/utils/ticket-role-url'
 import type { PlannerTask } from '@/hooks/use-planner-tasks'
 
 function formatDueDate(iso: string | null): string | null {
@@ -32,6 +34,7 @@ interface PlannerTaskCardProps {
  * reusando la misma paleta ya usada en la ficha del ticket (plan-helpers.ts)
  * en vez de inventar colores nuevos. */
 export function PlannerTaskCard({ task, dragHandleProps, isDragging }: PlannerTaskCardProps) {
+  const { data: session } = useSession()
   const dueLabel = formatDueDate(task.dueDate)
   const isOverdue = dueLabel?.includes('vencida')
 
@@ -51,7 +54,7 @@ export function PlannerTaskCard({ task, dragHandleProps, isDragging }: PlannerTa
       </div>
 
       <Link
-        href={`/tickets/${task.ticketId}`}
+        href={ticketUrlForRole(session?.user?.role, task.ticketId)}
         className='mt-1 block truncate text-xs text-muted-foreground hover:underline'
         onClick={e => e.stopPropagation()}
       >
