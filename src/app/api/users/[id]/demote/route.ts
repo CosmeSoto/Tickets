@@ -54,8 +54,7 @@ export async function POST(_request: NextRequest, context: { params: Promise<{ i
 
     // Validar que no tenga trabajo activo en ningún módulo habilitado
     try {
-      const { UserModuleGuardService, ModuleDisableBlockedError } =
-        await import('@/lib/services/user-module-guard.service')
+      const { UserModuleGuardService } = await import('@/lib/services/user-module-guard.service')
       await UserModuleGuardService.assertCanChangeRole({
         userId,
         userName: user.name,

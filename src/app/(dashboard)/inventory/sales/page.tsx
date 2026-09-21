@@ -382,7 +382,6 @@ export default function SalesPage() {
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [search, setSearch] = useState('')
 
-  const role = session?.user?.role
   const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
   const canManageInventory = (session?.user as any)?.canManageInventory === true
   const canAccess = isSuperAdmin || canManageInventory

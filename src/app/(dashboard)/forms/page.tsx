@@ -51,7 +51,7 @@ export default function PublicFormsPage() {
 
   // Gestión (solo si canManage)
   const [users, setUsers] = useState<UserOption[]>([])
-  const [departments, setDepartments] = useState<DepartmentOption[]>([])
+  const [, setDepartments] = useState<DepartmentOption[]>([])
   const [families, setFamilies] = useState<FamilyOption[]>([])
   const [allowedRoles, setAllowedRoles] = useState<string[]>(['ADMIN', 'TECHNICIAN', 'CLIENT'])
   const [requireFamilyRestriction, setRequireFamilyRestriction] = useState(false)

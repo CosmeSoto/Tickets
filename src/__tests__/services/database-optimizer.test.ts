@@ -8,7 +8,7 @@ describe('Database Optimizer', () => {
     it('should analyze query performance', async () => {
       const mockQueryFn = jest.fn().mockResolvedValue([
         { id: 1, name: 'Test 1' },
-        { id: 2, name: 'Test 2' }
+        { id: 2, name: 'Test 2' },
       ])
 
       // Simulate query analysis
@@ -41,7 +41,9 @@ describe('Database Optimizer', () => {
         const recommendations: string[] = []
 
         if (executionTime > 1000) {
-          recommendations.push('Query is very slow (>1s). Consider adding indexes or optimizing the query structure.')
+          recommendations.push(
+            'Query is very slow (>1s). Consider adding indexes or optimizing the query structure.'
+          )
         } else if (executionTime > 500) {
           recommendations.push('Query is slow (>500ms). Review for potential optimizations.')
         } else if (executionTime > 100) {
@@ -49,17 +51,23 @@ describe('Database Optimizer', () => {
         }
 
         if (resultCount > 1000) {
-          recommendations.push('Large result set. Consider implementing pagination or limiting results.')
+          recommendations.push(
+            'Large result set. Consider implementing pagination or limiting results.'
+          )
         }
 
         return recommendations
       }
 
       const slowQueryRecs = generateRecommendations(1500, 100)
-      expect(slowQueryRecs).toContain('Query is very slow (>1s). Consider adding indexes or optimizing the query structure.')
+      expect(slowQueryRecs).toContain(
+        'Query is very slow (>1s). Consider adding indexes or optimizing the query structure.'
+      )
 
       const largeResultRecs = generateRecommendations(200, 2000)
-      expect(largeResultRecs).toContain('Large result set. Consider implementing pagination or limiting results.')
+      expect(largeResultRecs).toContain(
+        'Large result set. Consider implementing pagination or limiting results.'
+      )
 
       const goodQueryRecs = generateRecommendations(50, 10)
       expect(goodQueryRecs).toHaveLength(0)
@@ -74,22 +82,22 @@ describe('Database Optimizer', () => {
           columns: ['status', 'priority'],
           type: 'btree',
           reason: 'Frequently filtered by status and priority in dashboard queries',
-          estimatedImprovement: '60-80% faster filtering'
+          estimatedImprovement: '60-80% faster filtering',
         },
         {
           table: 'Ticket',
           columns: ['userId'],
           type: 'btree',
           reason: 'User-specific ticket queries are common',
-          estimatedImprovement: '70-90% faster user ticket lookups'
+          estimatedImprovement: '70-90% faster user ticket lookups',
         },
         {
           table: 'User',
           columns: ['email'],
           type: 'btree',
           reason: 'Authentication and user lookup by email',
-          estimatedImprovement: '95-99% faster login queries'
-        }
+          estimatedImprovement: '95-99% faster login queries',
+        },
       ]
 
       expect(indexRecommendations).toHaveLength(3)
@@ -99,7 +107,12 @@ describe('Database Optimizer', () => {
     })
 
     it('should generate SQL for index creation', () => {
-      const generateIndexSQL = (name: string, table: string, columns: string[], type: string = 'btree') => {
+      const generateIndexSQL = (
+        name: string,
+        table: string,
+        columns: string[],
+        type: string = 'btree'
+      ) => {
         if (type === 'gin') {
           return `CREATE INDEX "${name}" ON "${table}" USING gin(to_tsvector('english', ${columns.join(" || ' ' || ")}));`
         } else {
@@ -110,23 +123,21 @@ describe('Database Optimizer', () => {
       const btreeIndex = generateIndexSQL('idx_ticket_status', 'Ticket', ['status'])
       expect(btreeIndex).toBe('CREATE INDEX "idx_ticket_status" ON "Ticket"("status");')
 
-      const ginIndex = generateIndexSQL('idx_ticket_search', 'Ticket', ['title', 'description'], 'gin')
-      expect(ginIndex).toBe(`CREATE INDEX "idx_ticket_search" ON "Ticket" USING gin(to_tsvector('english', title || ' ' || description));`)
+      const ginIndex = generateIndexSQL(
+        'idx_ticket_search',
+        'Ticket',
+        ['title', 'description'],
+        'gin'
+      )
+      expect(ginIndex).toBe(
+        `CREATE INDEX "idx_ticket_search" ON "Ticket" USING gin(to_tsvector('english', title || ' ' || description));`
+      )
     })
   })
 
   describe('Query Optimization Patterns', () => {
     it('should optimize SELECT queries', () => {
       // Original query pattern
-      const originalQuery = {
-        include: {
-          user: true,
-          category: true,
-          comments: { include: { user: true } },
-          attachments: true
-        }
-      }
-
       // Optimized query pattern
       const optimizedQuery = {
         select: {
@@ -135,8 +146,8 @@ describe('Database Optimizer', () => {
           status: true,
           user: { select: { id: true, name: true, email: true } },
           category: { select: { id: true, name: true, color: true } },
-          _count: { select: { comments: true, attachments: true } }
-        }
+          _count: { select: { comments: true, attachments: true } },
+        },
       }
 
       expect(optimizedQuery.select).toBeDefined()
@@ -149,14 +160,14 @@ describe('Database Optimizer', () => {
       const offsetPagination = (page: number, limit: number) => ({
         skip: page * limit,
         take: limit,
-        orderBy: { createdAt: 'desc' }
+        orderBy: { createdAt: 'desc' },
       })
 
       // Cursor-based pagination (more efficient)
       const cursorPagination = (cursor: string | null, limit: number) => ({
         take: limit,
         ...(cursor && { cursor: { id: cursor }, skip: 1 }),
-        orderBy: { createdAt: 'desc' }
+        orderBy: { createdAt: 'desc' },
       })
 
       const offsetQuery = offsetPagination(5, 10)
@@ -178,13 +189,13 @@ describe('Database Optimizer', () => {
       const separateQueries = [
         { where: { status: 'OPEN' } },
         { where: { status: 'IN_PROGRESS' } },
-        { where: { status: 'CLOSED' } }
+        { where: { status: 'CLOSED' } },
       ]
 
       // Single groupBy query (efficient)
       const groupByQuery = {
         by: ['status'],
-        _count: { id: true }
+        _count: { id: true },
       }
 
       expect(separateQueries).toHaveLength(3)
@@ -200,7 +211,7 @@ describe('Database Optimizer', () => {
         misses: 0,
         totalQueries: 0,
         avgExecutionTime: 0,
-        slowQueries: 0
+        slowQueries: 0,
       }
 
       // Simulate query execution
@@ -211,19 +222,18 @@ describe('Database Optimizer', () => {
         } else {
           queryStats.misses++
         }
-        
-        queryStats.avgExecutionTime = (
-          (queryStats.avgExecutionTime * (queryStats.totalQueries - 1) + executionTime) / 
+
+        queryStats.avgExecutionTime =
+          (queryStats.avgExecutionTime * (queryStats.totalQueries - 1) + executionTime) /
           queryStats.totalQueries
-        )
-        
+
         if (executionTime > 500) {
           queryStats.slowQueries++
         }
       }
 
       recordQuery(100, false) // New query
-      recordQuery(10, true)   // Cached query
+      recordQuery(10, true) // Cached query
       recordQuery(600, false) // Slow query
 
       expect(queryStats.totalQueries).toBe(3)
@@ -252,12 +262,12 @@ describe('Database Optimizer', () => {
         single: { queries: 1, overhead: 10 },
         sequential: { queries: 5, overhead: 50 },
         transaction: { queries: 5, overhead: 15 },
-        pool: { queries: 10, overhead: 20 }
+        pool: { queries: 10, overhead: 20 },
       }
 
-      const calculateEfficiency = (pattern: { queries: number, overhead: number }) => {
+      const calculateEfficiency = (pattern: { queries: number; overhead: number }) => {
         const queryTime = 50 // Base query time
-        const totalTime = (queryTime * pattern.queries) + pattern.overhead
+        const totalTime = queryTime * pattern.queries + pattern.overhead
         return Math.round((queryTime / (totalTime / pattern.queries)) * 100)
       }
 
@@ -284,19 +294,19 @@ describe('Database Optimizer', () => {
     it('should provide fallback recommendations on errors', () => {
       const getErrorRecommendations = (error: string) => {
         const recommendations = []
-        
+
         if (error.includes('connection')) {
           recommendations.push('Check database connection and connection pool settings')
         }
-        
+
         if (error.includes('timeout')) {
           recommendations.push('Optimize query performance or increase timeout limits')
         }
-        
+
         if (error.includes('syntax')) {
           recommendations.push('Review query syntax and fix SQL errors')
         }
-        
+
         return recommendations
       }
 

@@ -303,11 +303,6 @@ export class UserService {
     const passwordHash = await bcrypt.hash(data.password, 12)
 
     const createDeptId = data.departmentId || data.department || null
-    const nativeFamilyIdForTech =
-      data.role === 'TECHNICIAN' && createDeptId
-        ? await getDepartmentNativeFamilyId(createDeptId)
-        : null
-
     // Defaults por rol (catálogo): Admin → todos ON; Técnico/Cliente → solo tickets
     const isAdminRole = data.role === 'ADMIN'
     const ticketsEnabled = data.ticketsEnabled ?? true
@@ -579,11 +574,6 @@ export class UserService {
       (updateData.departmentId as string | null | undefined) !== undefined
         ? (updateData.departmentId as string | null)
         : user.departmentId
-    const nativeFamilyIdForTech =
-      effectiveRole === 'TECHNICIAN' && deptIdForNative
-        ? await getDepartmentNativeFamilyId(deptIdForNative)
-        : null
-
     // Actualizar usuario en una transacción para manejar las asignaciones de categorías
     let result
     try {

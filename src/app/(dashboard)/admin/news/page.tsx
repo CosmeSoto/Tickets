@@ -74,12 +74,6 @@ interface FamilyOption {
   departments: DepartmentOption[]
 }
 
-const ROLE_OPTIONS = [
-  { value: 'ADMIN', label: 'Administradores' },
-  { value: 'TECHNICIAN', label: 'Técnicos' },
-  { value: 'CLIENT', label: 'Clientes' },
-]
-
 interface NewsItem {
   id: string
   title: string
@@ -173,7 +167,7 @@ export default function AdminNewsPage() {
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table')
   const [selectedNews, setSelectedNews] = useState<NewsItem | null>(null)
   const [users, setUsers] = useState<UserOption[]>([])
-  const [departments, setDepartments] = useState<DepartmentOption[]>([])
+  const [, setDepartments] = useState<DepartmentOption[]>([])
 
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [editingNews, setEditingNews] = useState<NewsItem | null>(null)

@@ -18,13 +18,13 @@ import {
 } from '@/components/ui/select'
 import { UserCombobox } from '@/components/ui/user-combobox'
 import { FamilyCombobox, type FamilyOption } from '@/components/ui/family-combobox'
-import { 
-  STATUS_OPTIONS, 
-  PRIORITY_OPTIONS, 
+import {
+  STATUS_OPTIONS,
+  PRIORITY_OPTIONS,
   DATE_FILTER_OPTIONS,
   type StatusFilter,
   type PriorityFilter,
-  type DateFilter
+  type DateFilter,
 } from '@/lib/constants/filter-options'
 import { cn } from '@/lib/utils'
 
@@ -83,14 +83,12 @@ export function TicketFilters({
   onClearFilters,
   categories = [],
   families = [],
-  variant = 'admin',
   loading = false,
   className,
   showAssigneeFilter = true,
   showDateFilter = false,
   searchPlaceholder = 'Buscar por título, descripción o cliente...',
 }: TicketFiltersProps) {
-
   const showFamilyFilter = families.length > 1 && !!onFamilyChange
 
   // Calcular filtros activos
@@ -108,44 +106,43 @@ export function TicketFilters({
 
   return (
     <Card className={cn('w-full', className)}>
-      <CardContent className="pt-4 pb-4">
-        <div className="space-y-4">
-
+      <CardContent className='pt-4 pb-4'>
+        <div className='space-y-4'>
           {/* Barra superior: Búsqueda y acciones */}
-          <div className="flex flex-col sm:flex-row gap-3">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+          <div className='flex flex-col sm:flex-row gap-3'>
+            <div className='flex-1'>
+              <div className='relative'>
+                <Search className='absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4' />
                 <Input
                   placeholder={searchPlaceholder}
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
+                  onChange={e => setSearchTerm(e.target.value)}
+                  className='pl-10'
                   disabled={loading}
                 />
               </div>
             </div>
 
-            <div className="flex gap-2 shrink-0">
+            <div className='flex gap-2 shrink-0'>
               {hasActiveFilters && (
                 <Button
-                  variant="outline"
-                  size="sm"
+                  variant='outline'
+                  size='sm'
                   onClick={onClearFilters}
                   disabled={loading}
-                  className="flex items-center gap-2"
+                  className='flex items-center gap-2'
                 >
-                  <X className="h-4 w-4" />
+                  <X className='h-4 w-4' />
                   Limpiar
                 </Button>
               )}
 
               <Button
-                variant="outline"
-                size="sm"
+                variant='outline'
+                size='sm'
                 onClick={onRefresh}
                 disabled={loading}
-                className="flex items-center gap-2"
+                className='flex items-center gap-2'
               >
                 <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
                 Actualizar
@@ -154,12 +151,11 @@ export function TicketFilters({
           </div>
 
           {/* Filtros principales */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-
+          <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3'>
             {/* Área (familia) — combobox con buscador */}
             {showFamilyFilter && (
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-muted-foreground">Área</label>
+              <div className='space-y-1'>
+                <label className='text-sm font-medium text-muted-foreground'>Área</label>
                 <FamilyCombobox
                   families={families}
                   value={familyFilter}
@@ -167,20 +163,20 @@ export function TicketFilters({
                   allowAll
                   allowClear
                   disabled={loading}
-                  popoverWidth="260px"
+                  popoverWidth='260px'
                 />
               </div>
             )}
 
             {/* Estado */}
-            <div className="space-y-1">
-              <label className="text-sm font-medium text-muted-foreground">Estado</label>
+            <div className='space-y-1'>
+              <label className='text-sm font-medium text-muted-foreground'>Estado</label>
               <Select value={statusFilter} onValueChange={onStatusChange} disabled={loading}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {STATUS_OPTIONS.map((option) => (
+                  {STATUS_OPTIONS.map(option => (
                     <SelectItem key={option.value} value={option.value}>
                       {option.label}
                     </SelectItem>
@@ -190,14 +186,14 @@ export function TicketFilters({
             </div>
 
             {/* Prioridad */}
-            <div className="space-y-1">
-              <label className="text-sm font-medium text-muted-foreground">Prioridad</label>
+            <div className='space-y-1'>
+              <label className='text-sm font-medium text-muted-foreground'>Prioridad</label>
               <Select value={priorityFilter} onValueChange={onPriorityChange} disabled={loading}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {PRIORITY_OPTIONS.map((option) => (
+                  {PRIORITY_OPTIONS.map(option => (
                     <SelectItem key={option.value} value={option.value}>
                       {option.label}
                     </SelectItem>
@@ -207,15 +203,15 @@ export function TicketFilters({
             </div>
 
             {/* Categoría — derivada de los tickets visibles */}
-            <div className="space-y-1">
-              <label className="text-sm font-medium text-muted-foreground">Categoría</label>
+            <div className='space-y-1'>
+              <label className='text-sm font-medium text-muted-foreground'>Categoría</label>
               <Select value={categoryFilter} onValueChange={onCategoryChange} disabled={loading}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todas las categorías</SelectItem>
-                  {categories.map((category) => (
+                  <SelectItem value='all'>Todas las categorías</SelectItem>
+                  {categories.map(category => (
                     <SelectItem key={category.id} value={category.id}>
                       {category.name}
                     </SelectItem>
@@ -226,13 +222,13 @@ export function TicketFilters({
 
             {/* Técnico asignado (solo para admin) */}
             {showAssigneeFilter && onAssigneeChange && (
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-muted-foreground">Asignado a</label>
+              <div className='space-y-1'>
+                <label className='text-sm font-medium text-muted-foreground'>Asignado a</label>
                 <UserCombobox
                   value={assigneeFilter === 'all' ? '' : assigneeFilter}
-                  onValueChange={(value) => onAssigneeChange(value || 'all')}
-                  role="TECHNICIAN"
-                  placeholder="Todos"
+                  onValueChange={value => onAssigneeChange(value || 'all')}
+                  role='TECHNICIAN'
+                  placeholder='Todos'
                   allowClear
                   disabled={loading}
                 />
@@ -241,9 +237,9 @@ export function TicketFilters({
 
             {/* Filtro de fecha */}
             {showDateFilter && onDateChange && (
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-muted-foreground">
-                  <Calendar className="inline h-4 w-4 mr-1" />
+              <div className='space-y-1'>
+                <label className='text-sm font-medium text-muted-foreground'>
+                  <Calendar className='inline h-4 w-4 mr-1' />
                   Fecha
                 </label>
                 <Select value={dateFilter} onValueChange={onDateChange} disabled={loading}>
@@ -251,7 +247,7 @@ export function TicketFilters({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {DATE_FILTER_OPTIONS.map((option) => (
+                    {DATE_FILTER_OPTIONS.map(option => (
                       <SelectItem key={option.value} value={option.value}>
                         {option.label}
                       </SelectItem>
@@ -264,10 +260,11 @@ export function TicketFilters({
 
           {/* Indicador de filtros activos */}
           {hasActiveFilters && (
-            <div className="flex items-center gap-2 pt-2 border-t">
-              <Filter className="h-4 w-4 text-muted-foreground" />
-              <Badge variant="secondary" className="text-xs">
-                {activeFilters} filtro{activeFilters !== 1 ? 's' : ''} activo{activeFilters !== 1 ? 's' : ''}
+            <div className='flex items-center gap-2 pt-2 border-t'>
+              <Filter className='h-4 w-4 text-muted-foreground' />
+              <Badge variant='secondary' className='text-xs'>
+                {activeFilters} filtro{activeFilters !== 1 ? 's' : ''} activo
+                {activeFilters !== 1 ? 's' : ''}
               </Badge>
             </div>
           )}

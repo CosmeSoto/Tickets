@@ -20,7 +20,6 @@ export function KnowledgeCard({
   article,
   onView,
   onDelete,
-  canEdit = false,
   canDelete = false,
 }: KnowledgeCardProps) {
   const helpfulPercentage = article.helpfulPercentage || 0

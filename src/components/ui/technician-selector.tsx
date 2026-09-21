@@ -63,7 +63,6 @@ export function TechnicianSelector({
   onUpdateMaxTickets,
   onToggleAutoAssign,
   disabled = false,
-  categoryLevel = 1,
 }: TechnicianSelectorProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
@@ -163,21 +162,6 @@ export function TechnicianSelector({
   }, [highlightedIndex])
 
   // Obtener descripción por nivel de categoría
-  const getLevelDescription = (level: number): string => {
-    switch (level) {
-      case 1:
-        return 'Técnicos generalistas - Manejan cualquier tipo de problema'
-      case 2:
-        return 'Técnicos especializados - Expertos en esta área específica'
-      case 3:
-        return 'Técnicos expertos - Conocimiento profundo en esta tecnología'
-      case 4:
-        return 'Técnicos súper especializados - Problemas muy específicos'
-      default:
-        return `Técnicos de nivel ${level}`
-    }
-  }
-
   // Obtener icono de experiencia basado en asignaciones
   const getExperienceIcon = (technician: Technician) => {
     const assignmentCount = technician._count?.technicianAssignments || 0

@@ -19,7 +19,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
-  const isSuperAdmin = (session.user as any).isSuperAdmin === true
   const isAdmin = session.user.role === 'ADMIN'
 
   // Solo gestores (canManageInventory) o admins pueden elevar

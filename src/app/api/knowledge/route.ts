@@ -75,8 +75,7 @@ export async function POST(request: NextRequest) {
     const familyId = category.familyId ?? category.departments?.familyId ?? null
 
     try {
-      const { assertCanWriteKnowledgeFamily, KnowledgeAccessError } =
-        await import('@/lib/knowledge/article-access')
+      const { assertCanWriteKnowledgeFamily } = await import('@/lib/knowledge/article-access')
       await assertCanWriteKnowledgeFamily(
         {
           id: session.user.id,

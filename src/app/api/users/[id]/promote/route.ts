@@ -83,8 +83,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     // Validar que no tenga trabajo activo en ningún módulo habilitado
     try {
-      const { UserModuleGuardService, ModuleDisableBlockedError } =
-        await import('@/lib/services/user-module-guard.service')
+      const { UserModuleGuardService } = await import('@/lib/services/user-module-guard.service')
       await UserModuleGuardService.assertCanChangeRole({
         userId: id,
         userName: user.name,
@@ -135,9 +134,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     // Solo Super Admin puede reasignar departamento al promover
     const nextDepartmentId =
-      isSuperAdmin && validatedData.departmentId
-        ? validatedData.departmentId
-        : user.departmentId
+      isSuperAdmin && validatedData.departmentId ? validatedData.departmentId : user.departmentId
 
     // Promover usuario a técnico
     const promotedUser = await prisma.users.update({

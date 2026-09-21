@@ -46,7 +46,7 @@ interface HelpConfig {
 
 export default function ContactSupportPage() {
   const { toast } = useToast()
-  const [loading, setLoading] = useState(false)
+  const [loading] = useState(false)
   const [configLoading, setConfigLoading] = useState(true)
   const [config, setConfig] = useState<HelpConfig | null>(null)
   const [formData, setFormData] = useState({

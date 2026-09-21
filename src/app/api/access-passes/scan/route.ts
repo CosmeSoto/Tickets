@@ -116,7 +116,7 @@ export async function POST(request: NextRequest) {
     details: { result, familyId: pass.familyId, credentialCode: pass.credentialCode },
     request,
   })
-  const { photoPath: _photoPath, ...subject } = pass.subject
+  const { ...subject } = pass.subject
   return NextResponse.json({
     result,
     valid: result === 'VALID',

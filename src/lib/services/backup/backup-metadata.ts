@@ -119,7 +119,6 @@ export async function extractMetadataFromDump(filepath: string): Promise<BackupM
 
         if (dumpSql) {
           // Parsear bloques COPY para contar filas por tabla
-          const copyRegex = /^COPY\s+(?:public\.)?("?[\w]+"?)\s*\([^)]+\)\s+FROM\s+stdin\s*;/im
           let currentTable: string | null = null
           let rowCount = 0
 

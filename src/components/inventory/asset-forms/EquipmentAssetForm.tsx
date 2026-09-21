@@ -200,7 +200,7 @@ export function EquipmentAssetForm({
   const [manageAttributesAutoCreate, setManageAttributesAutoCreate] = useState(false)
   const [attributesReloadToken, setAttributesReloadToken] = useState(0)
   // Configuración del tipo seleccionado
-  const [selectedTypeConfig, setSelectedTypeConfig] = useState<{
+  const [, setSelectedTypeConfig] = useState<{
     trackMaintenance: boolean
   }>({
     trackMaintenance: false,
@@ -344,10 +344,8 @@ export function EquipmentAssetForm({
   const [maintenanceTechnicianId, setMaintenanceTechnicianId] = useState('')
   const [maintenanceSupplierId, setMaintenanceSupplierId] = useState('')
   const [maintenanceDescription, setMaintenanceDescription] = useState('')
-  const [techniciansList, setTechniciansList] = useState<
-    { id: string; name: string; email: string }[]
-  >([])
-  const [loadingTechnicians, setLoadingTechnicians] = useState(false)
+  const [, setTechniciansList] = useState<{ id: string; name: string; email: string }[]>([])
+  const [, setLoadingTechnicians] = useState(false)
 
   // ✅ Departamentos desde contexto global — solo para referencia (no editable)
   const { departments: allDepartments } = useActiveDepartments()
@@ -478,7 +476,7 @@ export function EquipmentAssetForm({
   const [assignableUsersList, setAssignableUsersList] = useState<
     { id: string; name: string; email: string; department?: { id: string; name: string } | null }[]
   >([])
-  const [loadingAssignableUsers, setLoadingAssignableUsers] = useState(false)
+  const [, setLoadingAssignableUsers] = useState(false)
 
   useEffect(() => {
     if (equipmentStatus !== 'ASSIGNED') return
@@ -501,12 +499,6 @@ export function EquipmentAssetForm({
   }))
 
   // Al seleccionar usuario, auto-completar departamento
-  const handleAssignedUserChange = (userId: string) => {
-    setAssignedUserId(userId)
-    const user = assignableUsersList.find(u => u.id === userId)
-    setAssignedUserDept(user?.department ?? null)
-  }
-
   // Limpiar asignación al cambiar estado
   useEffect(() => {
     if (equipmentStatus !== 'ASSIGNED') {

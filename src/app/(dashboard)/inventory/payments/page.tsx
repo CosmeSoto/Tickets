@@ -358,7 +358,6 @@ function StatusBadge({ status, cfg }: { status: string; cfg: typeof CONTRACT_STA
 
 function StatsRow({
   items,
-  isCurrency = false,
 }: {
   items: { label: string; value: string | number; cls: string }[]
   isCurrency?: boolean

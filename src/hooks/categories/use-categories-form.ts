@@ -167,7 +167,7 @@ export function useCategoriesForm(options: UseCategoriesFormOptions = {}) {
 
         const method = editingCategory ? 'PUT' : 'POST'
 
-        const { technician_assignments, familyId: _familyId, ...restFormData } = formData
+        const { technician_assignments, ...restFormData } = formData
 
         // Calcular nivel basado en categoría padre
         const level = calculateLevel(restFormData.parentId, availableParents)

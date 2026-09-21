@@ -18,12 +18,6 @@ interface DepreciationCardProps {
   usedUnits?: number | null
 }
 
-const METHOD_LABELS: Record<string, string> = {
-  LINEAR: 'Línea Recta',
-  DECLINING_BALANCE: 'Saldo Decreciente Acelerado',
-  UNITS_OF_PRODUCTION: 'Por Uso',
-}
-
 function fmt(n: number) {
   return n.toLocaleString('es-EC', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }

@@ -55,8 +55,6 @@ export async function checkRateLimit(
   windowMs = 60_000
 ): Promise<RateLimitResult> {
   const windowSec = Math.ceil(windowMs / 1000)
-  const resetAt = Date.now() + windowMs
-
   try {
     const { redis } = await import('@/lib/redis')
     const key = `rl:${identifier}`

@@ -652,7 +652,7 @@ describe('useModuleData', () => {
     it('should use cached data when available', async () => {
       ;(global.fetch as jest.Mock).mockImplementation(() => mockFetchSuccess(mockUsers))
 
-      const { result: result1, unmount: unmount1 } = renderHook(() =>
+      const { result: result1 } = renderHook(() =>
         useModuleData<TestUser>({
           endpoint: '/api/users-cache-test',
           initialLoad: true,
@@ -738,8 +738,6 @@ describe('useModuleData', () => {
         expect(result.current.loading).toBe(false)
       })
 
-      const fetchCountAfterLoad = (global.fetch as jest.Mock).mock.calls.length
-
       await act(async () => {
         await result.current.create({ name: 'Alice' })
       })
@@ -774,8 +772,6 @@ describe('useModuleData', () => {
         expect(result.current.loading).toBe(false)
       })
 
-      const fetchCountAfterLoad = (global.fetch as jest.Mock).mock.calls.length
-
       await act(async () => {
         await result.current.update('1', { name: 'Updated' })
       })
@@ -809,8 +805,6 @@ describe('useModuleData', () => {
       await waitFor(() => {
         expect(result.current.loading).toBe(false)
       })
-
-      const fetchCountAfterLoad = (global.fetch as jest.Mock).mock.calls.length
 
       await act(async () => {
         await result.current.remove('1')

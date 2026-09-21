@@ -187,7 +187,6 @@ export function FormDetail({
   const embedUrl = form.fileUrl ? getEmbedUrl(form.fileUrl) : null
   const previewSrc = isLocal ? `/api/forms/${form.id}/file` : embedUrl || form.fileUrl
 
-  const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
   const isOwner = form.createdBy.id === session?.user?.id
   const isAdmin = session?.user?.role === 'ADMIN'
   // Admin (normal o super) puede modificar cualquier documento.

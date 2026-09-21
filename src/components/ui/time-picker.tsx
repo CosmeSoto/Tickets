@@ -26,7 +26,6 @@ export function TimePicker({
   value = '',
   onChange,
   disabled = false,
-  placeholder = '--:--',
   className,
   id,
 }: TimePickerProps) {

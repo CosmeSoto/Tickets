@@ -116,7 +116,6 @@ export function EditUserModal({
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   const {
-    // Estados
     allFamilies,
     ticketFamilies,
     inventoryFamilies,
@@ -135,13 +134,8 @@ export function EditUserModal({
     plannerFamilyIds,
     adminFamilyIds,
     contentFamilyIds,
-    adminScopeIds,
     loadingFamilies,
-    familyError,
     confirmUnassign,
-    pendingUnassignFamilyId,
-
-    // Read-only ids
     ticketReadOnlyIds,
     inventoryReadOnlyIds,
     patrolReadOnlyIds,
@@ -150,8 +144,6 @@ export function EditUserModal({
     accessReadOnlyIds,
     plannerReadOnlyIds,
     adminScopeReadOnlyIds,
-
-    // Handlers
     handleAssignTechnicianFamily,
     handleUnassignTechnicianFamily,
     handleConfirmUnassignTechnician,

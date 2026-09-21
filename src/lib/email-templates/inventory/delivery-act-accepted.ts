@@ -39,7 +39,6 @@ export function generateDeliveryActAcceptedEmail(data: DeliveryActAcceptedEmailD
     minute: '2-digit',
   })
 
-  const roleText = recipientRole === 'deliverer' ? 'entregador' : 'receptor'
   const otherParty = recipientRole === 'deliverer' ? act.receiverInfo.name : act.delivererInfo.name
 
   const subject = `Acta de Entrega Aceptada - ${act.folio}`

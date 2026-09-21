@@ -111,7 +111,6 @@ describe('Cache Service Basic Tests', () => {
   describe('Cache Patterns', () => {
     it('should implement getOrSet pattern logic', async () => {
       // Simulate getOrSet pattern
-      const cacheKey = 'test-key'
       let cachedValue = null
 
       // First call - cache miss

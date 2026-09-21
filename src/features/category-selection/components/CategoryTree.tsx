@@ -44,7 +44,7 @@ export function CategoryTree({
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(
     () => new Set([...selectedPath, ...defaultExpandedIds])
   )
-  const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null)
+  const [, setFocusedNodeId] = useState<string | null>(null)
 
   useEffect(() => {
     if (defaultExpandedIds.length === 0) return

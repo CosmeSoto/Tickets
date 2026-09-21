@@ -10,18 +10,12 @@ const voteSchema = z.object({
 })
 
 // POST /api/knowledge/[id]/vote - Votar artículo
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user) {
-      return NextResponse.json(
-        { error: 'No autorizado' },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
     const { id: articleId } = await params
@@ -32,15 +26,11 @@ export async function POST(
     })
 
     if (!article) {
-      return NextResponse.json(
-        { error: 'Artículo no encontrado' },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: 'Artículo no encontrado' }, { status: 404 })
     }
 
     try {
-      const { assertCanAccessKnowledgeArticle, KnowledgeAccessError } =
-        await import('@/lib/knowledge/article-access')
+      const { assertCanAccessKnowledgeArticle } = await import('@/lib/knowledge/article-access')
       await assertCanAccessKnowledgeArticle(
         {
           id: session.user.id,
@@ -58,7 +48,7 @@ export async function POST(
     }
 
     const body = await request.json()
-    
+
     // Validar datos
     const validationResult = voteSchema.safeParse(body)
     if (!validationResult.success) {
@@ -156,9 +146,14 @@ export async function POST(
       },
     })
 
-    const helpfulPercentage = updatedArticle && updatedArticle.helpfulVotes + updatedArticle.notHelpfulVotes > 0
-      ? Math.round((updatedArticle.helpfulVotes / (updatedArticle.helpfulVotes + updatedArticle.notHelpfulVotes)) * 100)
-      : 0
+    const helpfulPercentage =
+      updatedArticle && updatedArticle.helpfulVotes + updatedArticle.notHelpfulVotes > 0
+        ? Math.round(
+            (updatedArticle.helpfulVotes /
+              (updatedArticle.helpfulVotes + updatedArticle.notHelpfulVotes)) *
+              100
+          )
+        : 0
 
     return NextResponse.json({
       message: existingVote ? 'Voto actualizado' : 'Voto registrado',
@@ -170,10 +165,7 @@ export async function POST(
     })
   } catch (error) {
     console.error('Error al votar artículo:', error)
-    return NextResponse.json(
-      { error: 'Error al votar artículo' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Error al votar artículo' }, { status: 500 })
   }
 }
 
@@ -184,12 +176,9 @@ export async function DELETE(
 ) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user) {
-      return NextResponse.json(
-        { error: 'No autorizado' },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
     const { id: articleId } = await params
@@ -205,10 +194,7 @@ export async function DELETE(
     })
 
     if (!existingVote) {
-      return NextResponse.json(
-        { error: 'No has votado este artículo' },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: 'No has votado este artículo' }, { status: 404 })
     }
 
     // Eliminar voto
@@ -233,9 +219,6 @@ export async function DELETE(
     return NextResponse.json({ message: 'Voto eliminado exitosamente' })
   } catch (error) {
     console.error('Error al eliminar voto:', error)
-    return NextResponse.json(
-      { error: 'Error al eliminar voto' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Error al eliminar voto' }, { status: 500 })
   }
 }

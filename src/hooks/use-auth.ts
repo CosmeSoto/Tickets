@@ -57,11 +57,7 @@ interface UseAuthReturn {
 }
 
 export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
-  const {
-    redirectOnSuccess = true,
-    enableRememberMe = false,
-    enableNetworkDetection = true,
-  } = options
+  const { redirectOnSuccess = true, enableNetworkDetection = true } = options
 
   const { data: session, status } = useSession()
   const router = useRouter()

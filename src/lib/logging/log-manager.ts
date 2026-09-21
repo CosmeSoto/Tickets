@@ -335,7 +335,6 @@ export class LogManager {
 
         case 'threshold':
           // For threshold alerts, we need to check aggregated data
-          const windowKey = `${alert.id}_${Math.floor(now.getTime() / alert.condition.timeWindow)}`
           if (alert.condition.pattern && alert.condition.pattern.test(logMessage)) {
             const count = this.getAlertCount(alert.id, alert.condition.timeWindow)
             if (count >= (alert.condition.threshold || 1)) {
@@ -555,7 +554,7 @@ export class LogManager {
     }
 
     // Calculate metrics from aggregated data
-    for (const [key, data] of this.aggregatedData.entries()) {
+    for (const [, data] of this.aggregatedData.entries()) {
       if (data.timestamp >= range.start && data.timestamp <= range.end) {
         metrics.totalLogs += data.count
 
@@ -572,7 +571,6 @@ export class LogManager {
     }
 
     // Calculate error rate
-    const totalNonErrors = metrics.totalLogs - (metrics.logsByLevel.ERROR || 0)
     metrics.errorRate =
       metrics.totalLogs > 0 ? (metrics.logsByLevel.ERROR || 0) / metrics.totalLogs : 0
 

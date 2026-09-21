@@ -24,7 +24,7 @@ export default function PatrolCheckpointDisplayClient({
   qrWindowMinutes: initialQrWindowMinutes,
 }: Props) {
   const [isMounted, setIsMounted] = useState(false)
-  const [loading, setLoading] = useState(!checkpoint)
+  const [loading] = useState(!checkpoint)
   const [timeLeft, setTimeLeft] = useState(initialQrWindowMinutes * 60)
   const [qrKey, setQrKey] = useState(0)
   const [qrWindowMinutes, setQrWindowMinutes] = useState(initialQrWindowMinutes)

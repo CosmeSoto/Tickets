@@ -1,49 +1,39 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import prisma from '@/lib/prisma';
+import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import prisma from '@/lib/prisma'
 
 /**
  * POST /api/knowledge-articles/[id]/vote
- * 
+ *
  * Registra un voto (útil/no útil) para un artículo
  */
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
-      return NextResponse.json(
-        { success: false, error: 'No autorizado' },
-        { status: 401 }
-      );
+      return NextResponse.json({ success: false, error: 'No autorizado' }, { status: 401 })
     }
 
-    const body = await request.json();
-    const { isHelpful } = body;
+    const body = await request.json()
+    const { isHelpful } = body
 
     if (typeof isHelpful !== 'boolean') {
       return NextResponse.json(
         { success: false, error: 'isHelpful debe ser un booleano' },
         { status: 400 }
-      );
+      )
     }
 
-    const { id } = await params;
+    const { id } = await params
 
-    const article = await prisma.knowledge_articles.findUnique({ where: { id } });
+    const article = await prisma.knowledge_articles.findUnique({ where: { id } })
     if (!article) {
-      return NextResponse.json(
-        { success: false, error: 'Artículo no encontrado' },
-        { status: 404 }
-      );
+      return NextResponse.json({ success: false, error: 'Artículo no encontrado' }, { status: 404 })
     }
 
     try {
-      const { assertCanAccessKnowledgeArticle, KnowledgeAccessError } =
-        await import('@/lib/knowledge/article-access');
+      const { assertCanAccessKnowledgeArticle } = await import('@/lib/knowledge/article-access')
       await assertCanAccessKnowledgeArticle(
         {
           id: session.user.id,
@@ -51,16 +41,13 @@ export async function POST(
           isSuperAdmin: (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true,
         },
         article
-      );
+      )
     } catch (err) {
-      const { KnowledgeAccessError } = await import('@/lib/knowledge/article-access');
+      const { KnowledgeAccessError } = await import('@/lib/knowledge/article-access')
       if (err instanceof KnowledgeAccessError) {
-        return NextResponse.json(
-          { success: false, error: err.message },
-          { status: err.statusCode }
-        );
+        return NextResponse.json({ success: false, error: err.message }, { status: err.statusCode })
       }
-      throw err;
+      throw err
     }
 
     // Verificar si el usuario ya votó
@@ -69,7 +56,7 @@ export async function POST(
         articleId: id,
         userId: session.user.id,
       },
-    });
+    })
 
     if (existingVote) {
       // Si ya votó, actualizar el voto
@@ -84,14 +71,24 @@ export async function POST(
           where: { id },
           data: {
             helpfulVotes: {
-              increment: isHelpful && !existingVote.isHelpful ? 1 : !isHelpful && existingVote.isHelpful ? -1 : 0,
+              increment:
+                isHelpful && !existingVote.isHelpful
+                  ? 1
+                  : !isHelpful && existingVote.isHelpful
+                    ? -1
+                    : 0,
             },
             notHelpfulVotes: {
-              increment: !isHelpful && existingVote.isHelpful ? 1 : isHelpful && !existingVote.isHelpful ? -1 : 0,
+              increment:
+                !isHelpful && existingVote.isHelpful
+                  ? 1
+                  : isHelpful && !existingVote.isHelpful
+                    ? -1
+                    : 0,
             },
           },
         }),
-      ]);
+      ])
     } else {
       // Crear nuevo voto
       await prisma.$transaction([
@@ -113,20 +110,20 @@ export async function POST(
             },
           },
         }),
-      ]);
+      ])
     }
 
     return NextResponse.json({
       success: true,
-    });
+    })
   } catch (error) {
-    console.error('Error voting on article:', error);
+    console.error('Error voting on article:', error)
     return NextResponse.json(
       {
         success: false,
         error: 'Error al registrar voto',
       },
       { status: 500 }
-    );
+    )
   }
 }

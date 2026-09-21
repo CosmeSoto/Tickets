@@ -163,7 +163,6 @@ export function DataTableAdvanced<T>({
   getRowId = (item: any) => item.id,
   title,
   description,
-  filters = [],
   searchConfig,
   pagination,
   onRowClick,
@@ -177,14 +176,12 @@ export function DataTableAdvanced<T>({
   sortable = true,
   defaultSort,
   userRole = 'CLIENT',
-  variant = 'default',
   height,
   className,
   onRefresh,
   onFiltersChange,
   onSearchChange,
   emptyMessage = 'No hay datos para mostrar',
-  showStats = false,
   exportable = false,
 }: DataTableAdvancedProps<T>) {
   const { data: session } = useSession()

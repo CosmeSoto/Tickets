@@ -98,7 +98,6 @@ export default function TechnicianTicketsPage() {
   }, [createdTickets, debouncedFilters, session?.user?.id])
 
   const activeTickets = activeTab === 'assigned' ? filteredAssigned : filteredCreated
-  const loading = activeTab === 'assigned' ? loadingAssigned : loadingCreated
   const error = activeTab === 'assigned' ? errorAssigned : errorCreated
   const reload = activeTab === 'assigned' ? reloadAssigned : reloadCreated
 

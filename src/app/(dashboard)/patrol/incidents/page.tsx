@@ -47,19 +47,6 @@ import {
 
 const PAGE_SIZE = 20
 
-const SEVERITY_LABELS: Record<string, string> = {
-  LOW: 'Baja',
-  MEDIUM: 'Media',
-  HIGH: 'Alta',
-  CRITICAL: 'Crítica',
-}
-
-const STATUS_LABELS: Record<string, string> = {
-  OPEN: 'Abierta',
-  RESOLVED: 'Resuelta',
-  ESCALATED: 'Escalada',
-}
-
 // ── Interfaces ────────────────────────────────────────────────────────────────
 
 interface Incident {

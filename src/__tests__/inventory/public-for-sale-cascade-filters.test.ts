@@ -114,7 +114,6 @@ describe('PublicForSalePage - Cascade Filters', () => {
       }
 
       // Initial state: family-1 selected with type-1
-      const selectedFamilyId = 'family-1'
       let selectedTypeId = 'type-1'
 
       // Act: Switch to family-2
@@ -162,7 +161,6 @@ describe('PublicForSalePage - Cascade Filters', () => {
       }
 
       // Initial state: family-1 selected with type-1
-      const initialFamilyId = 'family-1'
       let selectedTypeId = 'type-1'
 
       // Act: Switch to family-2 which also has type-1
@@ -197,7 +195,6 @@ describe('PublicForSalePage - Cascade Filters', () => {
       }
 
       // Initial state: family-1 selected with type-1
-      const initialFamilyId = 'family-1'
       let selectedTypeId = 'type-1'
 
       // Act: Switch to "all families" (empty string)

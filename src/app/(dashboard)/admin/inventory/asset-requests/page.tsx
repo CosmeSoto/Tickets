@@ -52,7 +52,7 @@ export default function AdminAssetRequestsPage() {
 
   // Filtros
   const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [statusFilter] = useState<string>('all')
   const [typeFilter, setTypeFilter] = useState<string>('all')
   const [activeTab, setActiveTab] = useState('all')
 

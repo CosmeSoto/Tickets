@@ -133,15 +133,12 @@ export default function CategoriesPage() {
   }
 
   const {
-    // Estados principales
     categories,
     availableParents,
     availableTechnicians,
     departments,
     loading,
     error,
-
-    // Estados de filtros del hook
     searchTerm,
     setSearchTerm,
     levelFilter,
@@ -152,8 +149,6 @@ export default function CategoriesPage() {
     setDepartmentFilter,
     viewMode,
     setViewMode,
-
-    // Estados de formulario
     isDialogOpen,
     setIsDialogOpen,
     editingCategory,
@@ -164,17 +159,9 @@ export default function CategoriesPage() {
     formErrors,
     submitting,
     deleting,
-
-    // Datos procesados (ya filtrados)
     filteredCategories,
     stats,
-
-    // Paginación y acciones masivas
     pagination,
-    massActions,
-
-    // Funciones principales
-    loadCategories,
     loadAvailableParents,
     loadAvailableTechnicians,
     loadDepartments,
@@ -182,9 +169,6 @@ export default function CategoriesPage() {
     handleDelete,
     handleEdit,
     handleNew,
-    resetForm,
-
-    // Funciones de utilidad
     refresh,
   } = useCategories({
     cacheTTL: 5 * 60 * 1000, // 5 minutos

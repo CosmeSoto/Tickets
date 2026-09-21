@@ -124,7 +124,7 @@ export function BulkEquipmentForm({
   // ── Pasos ──────────────────────────────────────────────────────────────────
   const [step, setStep] = useState<1 | 2 | 3>(1)
   const [selectedFamilyId, setSelectedFamilyId] = useState<string | null>(null)
-  const [selectedFamilyCode, setSelectedFamilyCode] = useState<string | null>(null)
+  const [, setSelectedFamilyCode] = useState<string | null>(null)
   const [selectedSubtype, setSelectedSubtype] = useState<AssetSubtype>('EQUIPMENT')
   const [familyConfig, setFamilyConfig] = useState<FamilyConfig | null>(null)
   const [loadingConfig, setLoadingConfig] = useState(false)

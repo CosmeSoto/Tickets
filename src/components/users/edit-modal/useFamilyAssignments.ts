@@ -109,10 +109,6 @@ export function useFamilyAssignments({ user, isOpen }: UseFamilyAssignmentsProps
     ]),
   ]
 
-  const showApiError = (title: string, result: any, fallback?: string) => {
-    toast({ title, description: extractApiError(result, fallback), variant: 'destructive' })
-  }
-
   const showNetworkError = (err: unknown) => {
     toast({
       title: 'Error de conexión',

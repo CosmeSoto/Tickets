@@ -245,8 +245,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     // Bloquea si el usuario tiene trabajo activo que depende del módulo.
     if (session.user.role === 'ADMIN') {
       try {
-        const { UserModuleGuardService, ModuleDisableBlockedError } =
-          await import('@/lib/services/user-module-guard.service')
+        const { UserModuleGuardService } = await import('@/lib/services/user-module-guard.service')
         await UserModuleGuardService.assertCanDisableModules({
           userId: targetId,
           userName: currentUser.name,
@@ -313,8 +312,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       validatedData.role !== currentUser.role
     ) {
       try {
-        const { UserModuleGuardService, ModuleDisableBlockedError } =
-          await import('@/lib/services/user-module-guard.service')
+        const { UserModuleGuardService } = await import('@/lib/services/user-module-guard.service')
         await UserModuleGuardService.assertCanChangeRole({
           userId: targetId,
           userName: currentUser.name,

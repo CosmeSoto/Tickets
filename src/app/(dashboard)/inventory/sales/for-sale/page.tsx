@@ -523,7 +523,6 @@ export default function ForSalePage() {
   const [selectedEquipment, setSelectedEquipment] = useState<ForSaleEquipment | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
 
-  const role = session?.user?.role
   const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
   const canManageInventory = (session?.user as any)?.canManageInventory === true
   const canAccess = isSuperAdmin || canManageInventory

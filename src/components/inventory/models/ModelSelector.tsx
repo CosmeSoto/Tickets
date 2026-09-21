@@ -64,7 +64,6 @@ export function ModelSelector({
   familyId,
   disabled = false,
   placeholder = 'Seleccionar modelo...',
-  showStock = false,
   onCreateNew,
 }: ModelSelectorProps) {
   const [open, setOpen] = useState(false)

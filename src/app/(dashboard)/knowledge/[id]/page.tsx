@@ -39,7 +39,7 @@ export default function KnowledgeDetailPage() {
   const { toast } = useToast()
   const [article, setArticle] = useState<Article | null>(null)
   const [loading, setLoading] = useState(true)
-  const [voting, setVoting] = useState(false)
+  const [, setVoting] = useState(false)
   const [userVote, setUserVote] = useState<boolean | null>(null)
   const [similarArticles, setSimilarArticles] = useState<Article[]>([])
   // Evita recargar el artículo (y, con ello, inflar el contador de vistas —
@@ -112,56 +112,6 @@ export default function KnowledgeDetailPage() {
       }
     } catch (err) {
       console.error('Error loading similar articles:', err)
-    }
-  }
-
-  const handleVote = async (isHelpful: boolean) => {
-    if (!article) return
-
-    try {
-      setVoting(true)
-
-      // Si ya votó lo mismo, remover voto
-      if (userVote === isHelpful) {
-        const response = await fetch(`/api/knowledge/${article.id}/vote`, {
-          method: 'DELETE',
-        })
-
-        if (response.ok) {
-          setUserVote(null)
-          toast({
-            title: 'Voto removido',
-            description: 'Tu voto ha sido removido',
-          })
-          loadArticle()
-        }
-      } else {
-        // Votar
-        const response = await fetch(`/api/knowledge/${article.id}/vote`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ isHelpful }),
-        })
-
-        if (response.ok) {
-          setUserVote(isHelpful)
-          toast({
-            title: 'Gracias por tu voto',
-            description: isHelpful
-              ? 'Has marcado este artículo como útil'
-              : 'Gracias por tu feedback',
-          })
-          loadArticle()
-        }
-      }
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'No se pudo registrar tu voto',
-        variant: 'destructive',
-      })
-    } finally {
-      setVoting(false)
     }
   }
 

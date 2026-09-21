@@ -118,7 +118,6 @@ export class PDFGeneratorService {
       }
 
       // Generar QR code para verificación
-      const verificationUrl = `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/inventory/acts/${actId}/verify`
       const qrCodeDataUrl = await QRCodeService.generateActVerificationQR(
         actId,
         act.folio,
@@ -186,7 +185,6 @@ export class PDFGeneratorService {
       }
 
       // Generar QR code para verificación
-      const verificationUrl = `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/inventory/return-acts/${actId}/verify`
       const qrCodeDataUrl = await QRCodeService.generateActVerificationQR(
         actId,
         (act as any).folio || actId,

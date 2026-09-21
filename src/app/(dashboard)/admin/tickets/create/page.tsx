@@ -93,16 +93,14 @@ export default function CreateTicketPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitSuccess, setSubmitSuccess] = useState(false)
   const [selectedClient, setSelectedClient] = useState<User | null>(null)
-  const [loadError, setLoadError] = useState('')
-  const [createdTicketId, setCreatedTicketId] = useState<string | null>(null)
+  const [loadError] = useState('')
+  const [, setCreatedTicketId] = useState<string | null>(null)
 
   // ✅ Usuarios desde contexto global — sin petición extra
   const { users: allUsers } = useUsers()
 
   const [selectedFamilyId, setSelectedFamilyId] = useState<string>('')
   const skipCategoryResetRef = useRef(false)
-  const isSuperAdmin = !!(session?.user as any)?.isSuperAdmin
-
   // Estados para archivos
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
   const [isDragging, setIsDragging] = useState(false)

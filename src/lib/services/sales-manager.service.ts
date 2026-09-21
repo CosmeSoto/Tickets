@@ -60,7 +60,7 @@ export class SalesManagerService {
   // ── Activar equipos para venta ─────────────────────────────────────────────
 
   static async activateForSale(params: ActivateForSaleParams) {
-    const { equipmentIds, salePrice, saleCurrency = 'USD', saleNotes, userId } = params
+    const { equipmentIds, salePrice, saleCurrency = 'USD', userId } = params
 
     // Validaciones
     if (equipmentIds.length === 0) {

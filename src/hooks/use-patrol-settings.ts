@@ -219,7 +219,7 @@ export function usePatrolSettings() {
     if (!selectedFamilyId) return
     setSaving(true)
     try {
-      const { patrolsEnabled: _ignored, ...operationalForm } = form
+      const { ...operationalForm } = form
       const payload = isSuperAdmin ? form : operationalForm
       const res = await fetch(`/api/patrols/family-config/${selectedFamilyId}`, {
         method: 'PUT',

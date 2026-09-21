@@ -219,7 +219,6 @@ export function createApiRoute(
 
         return response
       } catch (error) {
-        const duration = performance.now() - startTime
         const err = error instanceof Error ? error : new Error(String(error))
 
         ApplicationLogger.apiRequestError(method, path, err, {

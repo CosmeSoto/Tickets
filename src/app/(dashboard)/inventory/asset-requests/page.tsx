@@ -80,7 +80,7 @@ export default function AssetRequestsPage() {
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [limit, setLimit] = useState(20)
-  const [totalPages, setTotalPages] = useState(1)
+  const [, setTotalPages] = useState(1)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 

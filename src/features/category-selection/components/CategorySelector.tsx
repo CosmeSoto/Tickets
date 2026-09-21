@@ -120,7 +120,6 @@ export function CategorySelector({
   clientId,
   categories,
   error,
-  disabled = false,
   className,
   showFrequentCategories = true,
   showSuggestions = true,
@@ -510,8 +509,6 @@ export function CategorySelector({
   }
 
   const confidenceIndicator = getConfidenceIndicator()
-  const ConfidenceIcon = confidenceIndicator.icon
-
   return (
     <div className={cn('space-y-3 w-full min-w-[320px]', className)}>
       {/* Screen reader announcements */}

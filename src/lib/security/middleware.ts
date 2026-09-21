@@ -65,8 +65,6 @@ export class SecurityMiddleware {
   ): { allowed: boolean; remaining: number; resetTime: number } {
     const clientId = this.getClientId(request)
     const now = Date.now()
-    const windowStart = now - config.windowMs
-
     // Limpiar entradas expiradas
     for (const [key, value] of rateLimitStore.entries()) {
       if (value.resetTime < now) {

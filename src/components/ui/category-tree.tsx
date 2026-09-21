@@ -129,21 +129,6 @@ function CategoryNode({
   }
 
   // Colores por nivel — usando variables del tema
-  const getLevelColors = (level: number) => {
-    switch (level) {
-      case 1:
-        return 'border-l-primary border-l-4'
-      case 2:
-        return 'border-l-green-500 dark:border-l-green-400 border-l-4'
-      case 3:
-        return 'border-l-amber-500 dark:border-l-amber-400 border-l-4'
-      case 4:
-        return 'border-l-purple-500 dark:border-l-purple-400 border-l-4'
-      default:
-        return 'border-l-muted-foreground border-l-4'
-    }
-  }
-
   // Padding por nivel para mejor jerarquía visual
   const getLevelPadding = (level: number) => {
     return `${level * 12}px`
@@ -306,9 +291,7 @@ function CategoryNode({
 
 export function CategoryTree({ categories, onEdit, onDelete, searchTerm }: CategoryTreeProps) {
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set())
-  const [globalExpandState, setGlobalExpandState] = useState<'expanded' | 'collapsed' | 'mixed'>(
-    'mixed'
-  )
+  const [, setGlobalExpandState] = useState<'expanded' | 'collapsed' | 'mixed'>('mixed')
 
   // Inicializar nodos expandidos (primeros 2 niveles)
   React.useEffect(() => {

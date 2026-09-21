@@ -123,7 +123,6 @@ export default function AdminTicketsPage() {
   }, [createdTicketsRaw, debouncedFilters, session?.user?.id])
 
   const activeTickets = activeTab === 'all' ? filteredAll : filteredCreated
-  const loading = activeTab === 'all' ? loadingAll : loadingCreated
   const error = activeTab === 'all' ? errorAll : errorCreated
   const reload = activeTab === 'all' ? reloadAll : reloadCreated
 
