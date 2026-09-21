@@ -52,7 +52,7 @@ interface SystemMetrics {
 }
 
 export default function ClientDashboard() {
-  const { news: hasNews } = useUserModules()
+  useUserModules()
   const { data: landingData } = useLandingData()
   const supportLabel = landingData.heroTitle || DEFAULT_HERO_TITLE
   const {

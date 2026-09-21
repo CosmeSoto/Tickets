@@ -341,9 +341,6 @@ export function EquipmentAttachments({ equipmentId, canManage }: EquipmentAttach
   const baseUrl = `/api/inventory/equipment/${equipmentId}/attachments`
 
   const images = attachments.filter(a => a.mimeType.startsWith('image/'))
-  const previewable = attachments.filter(
-    a => a.mimeType.startsWith('image/') || a.mimeType === 'application/pdf'
-  )
 
   useEffect(() => {
     loadAttachments()

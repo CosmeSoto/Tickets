@@ -37,7 +37,7 @@ export class ApiLoggingMiddleware {
   /**
    * Wrap an API handler with logging
    */
-  public withLogging<T>(
+  public withLogging(
     handler: (request: NextRequest, context?: any) => Promise<NextResponse | Response>,
     operationName?: string
   ) {
@@ -280,7 +280,7 @@ export class ApiLoggingMiddleware {
 }
 
 // Export convenience function for wrapping handlers
-export function withApiLogging<T>(
+export function withApiLogging(
   handler: (request: NextRequest, context?: any) => Promise<NextResponse | Response>,
   config?: Partial<ApiLoggingConfig>
 ) {

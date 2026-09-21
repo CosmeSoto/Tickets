@@ -80,8 +80,6 @@ export function ActAcceptanceForm({ actId, token, onSuccess }: ActAcceptanceForm
         throw new Error(error.error || 'Error al aceptar acta')
       }
 
-      const result = await response.json()
-
       toast({
         title: 'Acta Aceptada',
         description: 'Has aceptado el acta de entrega exitosamente',
@@ -129,8 +127,6 @@ export function ActAcceptanceForm({ actId, token, onSuccess }: ActAcceptanceForm
         const error = await response.json()
         throw new Error(error.error || 'Error al rechazar acta')
       }
-
-      const result = await response.json()
 
       toast({
         title: 'Acta Rechazada',

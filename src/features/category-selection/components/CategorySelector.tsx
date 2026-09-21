@@ -137,7 +137,7 @@ export function CategorySelector({
   const [treeBrowseMode, setTreeBrowseMode] = useState<'closed' | 'related' | 'all'>('closed')
 
   const [categoryMetadata, setCategoryMetadata] = useState<CategoryMetadata | null>(null)
-  const [confidenceScore, setConfidenceScore] = useState<number>(0)
+  const [, setConfidenceScore] = useState<number>(0)
   const hasTrackedSelection = useRef(false)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const [announcement, setAnnouncement] = useState<string>('')
@@ -465,50 +465,11 @@ export function CategorySelector({
     [handleCategorySelect]
   )
 
-  // Handle article-based selection
-  const handleArticleSelect = useCallback(
-    (categoryId: string) => {
-      handleCategorySelect(categoryId, 'article')
-    },
-    [handleCategorySelect]
-  )
-
   // Handle edit selection
   const handleEditSelection = () => {
     setState(prev => ({ ...prev, showConfirmation: false }))
   }
 
-  // Get confidence indicator
-  const getConfidenceIndicator = () => {
-    if (confidenceScore >= 80) {
-      return {
-        icon: CheckCircle2,
-        color: 'text-green-600',
-        bgColor: 'bg-green-50 dark:bg-green-950',
-        borderColor: 'border-green-200 dark:border-green-800',
-        message: 'Alta confianza: Esta categoría parece muy apropiada para tu problema.',
-      }
-    } else if (confidenceScore >= 60) {
-      return {
-        icon: Info,
-        color: 'text-blue-600',
-        bgColor: 'bg-blue-50 dark:bg-blue-950',
-        borderColor: 'border-blue-200 dark:border-blue-800',
-        message: 'Confianza media: Esta categoría podría ser apropiada.',
-      }
-    } else {
-      return {
-        icon: AlertCircle,
-        color: 'text-amber-600',
-        bgColor: 'bg-amber-50 dark:bg-amber-950',
-        borderColor: 'border-amber-200 dark:border-amber-800',
-        message:
-          'Confianza baja: Considera revisar tu selección o usar la búsqueda para encontrar una categoría más específica.',
-      }
-    }
-  }
-
-  const confidenceIndicator = getConfidenceIndicator()
   return (
     <div className={cn('space-y-3 w-full min-w-[320px]', className)}>
       {/* Screen reader announcements */}

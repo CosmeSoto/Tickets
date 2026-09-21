@@ -1,5 +1,4 @@
 import { useState, useCallback } from 'react'
-import { useSession } from 'next-auth/react'
 
 export interface Article {
   id: string
@@ -114,7 +113,6 @@ export interface SimilarQuery {
 }
 
 export function useKnowledge() {
-  const { data: session } = useSession()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 

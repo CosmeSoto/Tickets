@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useMemo } from 'react'
 import { useSyncDashboardPageMeta } from '@/contexts/dashboard-shell-context'
-import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -43,7 +42,6 @@ interface ListResponse {
 }
 
 export default function AdminAssetRequestsPage() {
-  const router = useRouter()
   const [requests, setRequests] = useState<AssetRequest[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)

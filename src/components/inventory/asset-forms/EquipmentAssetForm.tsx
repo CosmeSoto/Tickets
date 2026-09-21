@@ -8,7 +8,6 @@ import { SerialNumberInput } from '@/components/ui/serial-number-input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { type SearchableSelectOption } from '@/components/ui/searchable-select'
 import { InlineCreateSelect } from '@/components/ui/inline-create-select'
 import { SimpleSelect } from '@/components/ui/simple-select'
 import { ContractPicker } from '@/components/contracts/contract-picker'
@@ -49,7 +48,6 @@ import {
   normalizeDepreciationMethod,
   type DepreciationMethod,
 } from '@/lib/inventory/depreciation'
-import { useActiveDepartments } from '@/contexts/departments-context'
 import { FormDraftKeys, useFormDraft } from '@/hooks/common/use-form-draft'
 import { FormDraftBanner } from '@/components/common/form-draft-banner'
 import { toLocalDateInputValue } from '@/lib/forms/form-date'
@@ -347,13 +345,6 @@ export function EquipmentAssetForm({
   const [, setTechniciansList] = useState<{ id: string; name: string; email: string }[]>([])
   const [, setLoadingTechnicians] = useState(false)
 
-  // ✅ Departamentos desde contexto global — solo para referencia (no editable)
-  const { departments: allDepartments } = useActiveDepartments()
-  const departments = allDepartments.filter(
-    (dept): dept is typeof dept & { familyId: string } =>
-      !!familyId && (dept.familyId === familyId || dept.family?.id === familyId)
-  )
-
   // departmentId efectivo: solo el del usuario asignado cuando estado = ASSIGNED
   const effectiveDepartmentId = equipmentStatus === 'ASSIGNED' ? (assignedUserDept?.id ?? '') : ''
 
@@ -471,32 +462,6 @@ export function EquipmentAssetForm({
     familyConfig.defaultResidualValuePct,
     familyCode,
   ])
-
-  // Usuarios asignables: cargados desde el endpoint de inventario con lógica de rol/familia
-  const [assignableUsersList, setAssignableUsersList] = useState<
-    { id: string; name: string; email: string; department?: { id: string; name: string } | null }[]
-  >([])
-  const [, setLoadingAssignableUsers] = useState(false)
-
-  useEffect(() => {
-    if (equipmentStatus !== 'ASSIGNED') return
-
-    setLoadingAssignableUsers(true)
-    const params = new URLSearchParams()
-    if (familyId) params.set('familyId', familyId)
-
-    fetch(`/api/inventory/assignable-users?${params}`)
-      .then(r => (r.ok ? r.json() : { users: [] }))
-      .then(data => setAssignableUsersList(data.users ?? []))
-      .catch(() => setAssignableUsersList([]))
-      .finally(() => setLoadingAssignableUsers(false))
-  }, [equipmentStatus, familyId])
-
-  // Convertir a formato SearchableSelectOption
-  const assignableUsers: SearchableSelectOption[] = assignableUsersList.map(u => ({
-    id: u.id,
-    name: u.department ? `${u.name || u.email} — ${u.department.name}` : u.name || u.email || u.id,
-  }))
 
   // Al seleccionar usuario, auto-completar departamento
   // Limpiar asignación al cambiar estado
@@ -683,7 +648,6 @@ export function EquipmentAssetForm({
       toast.error('Selecciona el contrato de arrendamiento')
       return
     }
-    const selectedModel = equipmentModels.find(m => m.id === selectedModelId)
     const payload: Record<string, unknown> = {
       acquisitionMode,
       code: code || undefined,

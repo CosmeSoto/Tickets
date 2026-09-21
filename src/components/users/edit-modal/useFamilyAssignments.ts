@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { useToast } from '@/hooks/use-toast'
 import { type FamilyOption } from '@/components/users/family-assignment-section'
-import { extractApiError, extractCatchError } from '@/lib/utils/api-error'
+import { extractCatchError } from '@/lib/utils/api-error'
 import { type UserData } from '@/hooks/use-users'
 
 interface UseFamilyAssignmentsProps {

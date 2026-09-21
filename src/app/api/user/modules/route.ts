@@ -353,26 +353,6 @@ export async function GET(request: Request) {
       }
     }
 
-    // Consultar configs de módulos (informativo, no se usa para filtrar)
-    const [ticketConfigs, invConfigs, patrolConfigs] = await Promise.all([
-      prisma.ticket_family_config.findMany({
-        where: familyIds.length > 0 ? { familyId: { in: familyIds } } : undefined,
-        select: { familyId: true, ticketsEnabled: true },
-      }),
-      prisma.inventory_family_config.findMany({
-        where: familyIds.length > 0 ? { familyId: { in: familyIds } } : undefined,
-        select: { familyId: true, inventoryEnabled: true },
-      }),
-      prisma.patrol_family_config.findMany({
-        where: familyIds.length > 0 ? { familyId: { in: familyIds } } : undefined,
-        select: { familyId: true, patrolsEnabled: true },
-      }),
-    ])
-
-    const ticketMap = new Map(ticketConfigs.map(c => [c.familyId, c.ticketsEnabled]))
-    const invMap = new Map(invConfigs.map(c => [c.familyId, c.inventoryEnabled]))
-    const patrolMap = new Map(patrolConfigs.map(c => [c.familyId, c.patrolsEnabled]))
-
     // Asignaciones por módulo (capa unificada)
     const ticketFamilyIds: Set<string> = new Set()
     const inventoryFamilyIds: Set<string> = new Set()

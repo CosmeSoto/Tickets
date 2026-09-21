@@ -46,16 +46,16 @@ export interface BaseViewProps<T> {
   data: T[]
   loading?: boolean
   error?: string | null
-  
+
   // Header
   header?: ViewHeader
-  
+
   // Estados vacíos
   emptyState?: EmptyState
-  
+
   // Paginación
   pagination?: PaginationConfig
-  
+
   // Callbacks
   onRefresh?: () => void
 }
@@ -258,7 +258,7 @@ export interface ApiResponse<T> {
 /**
  * Configuración de módulo
  */
-export interface ModuleConfig<T> {
+export interface ModuleConfig {
   name: string
   endpoint: string
   defaultView?: ViewMode

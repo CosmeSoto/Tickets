@@ -194,17 +194,6 @@ function mapActionToType(action: string): string {
   return mapping[action] || 'created'
 }
 
-// Traducción de valores de campos técnicos a español legible
-// — Ahora importado desde @/lib/constants/ticket-labels —
-
-function translateValue(field: string | null, value: string | null): string {
-  return translateFieldValue(field, value)
-}
-
-function translateFields(fields: string): string {
-  return translateFieldNames(fields.split(','))
-}
-
 // Generar título descriptivo basado en la acción
 function generateTitle(
   action: string,

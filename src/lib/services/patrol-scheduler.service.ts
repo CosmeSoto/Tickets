@@ -129,10 +129,7 @@ export class PatrolSchedulerService {
     let durationMs = schedule.scheduledEnd.getTime() - schedule.scheduledStart.getTime()
     if (schedule.recurrence !== PatrolRecurrence.NONE && durationMs > 24 * 60 * 60 * 1000) {
       // scheduledEnd tiene fecha incorrecta — recalcular usando solo la hora local
-      const localStart = toLocal(schedule.scheduledStart)
       const localEnd = toLocal(schedule.scheduledEnd)
-      const localStartHours = Math.floor((localStart % (24 * 3600 * 1000)) / (3600 * 1000))
-      const localStartMinutes = Math.floor((localStart % (3600 * 1000)) / (60 * 1000))
       const localEndHours = Math.floor((localEnd % (24 * 3600 * 1000)) / (3600 * 1000))
       const localEndMinutes = Math.floor((localEnd % (3600 * 1000)) / (60 * 1000))
 

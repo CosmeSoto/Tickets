@@ -138,7 +138,6 @@ export function useCategorySuggestions({
           } else if (textKeyword.length >= 4 && categoryKeyword.length >= 4) {
             // Para palabras de 4+ caracteres, buscar coincidencias parciales
             const minLength = Math.min(textKeyword.length, categoryKeyword.length)
-            const maxLength = Math.max(textKeyword.length, categoryKeyword.length)
 
             // Calcular prefijo común
             let commonPrefixLength = 0

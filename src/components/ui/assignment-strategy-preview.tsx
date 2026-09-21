@@ -25,16 +25,6 @@ interface AssignmentPreview {
   reason: string
 }
 
-interface AssignmentStats {
-  technicianId: string
-  technicianName: string
-  priority: number
-  maxTickets: number
-  currentTickets: number
-  utilization: number
-  autoAssign: boolean
-}
-
 interface AssignmentStrategyPreviewProps {
   categoryId: string | null
   categoryLevel: number

@@ -322,7 +322,6 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
 
       const pdfDir = getUploadDir('decommission-acts')
       if (!existsSync(pdfDir)) await mkdir(pdfDir, { recursive: true })
-      const { systemName } = await getSystemBranding()
 
       const pdfFilename = `${act.folio.replace(/\//g, '-')}_${Date.now()}.pdf`
       const pdfPath = getUploadDir('decommission-acts', pdfFilename)

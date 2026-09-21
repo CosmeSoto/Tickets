@@ -39,8 +39,7 @@ export default function KnowledgeDetailPage() {
   const { toast } = useToast()
   const [article, setArticle] = useState<Article | null>(null)
   const [loading, setLoading] = useState(true)
-  const [, setVoting] = useState(false)
-  const [userVote, setUserVote] = useState<boolean | null>(null)
+  const [, setUserVote] = useState<boolean | null>(null)
   const [similarArticles, setSimilarArticles] = useState<Article[]>([])
   // Evita recargar el artículo (y, con ello, inflar el contador de vistas —
   // GET /api/knowledge/[id] incrementa `views` en cada llamada) cada vez que

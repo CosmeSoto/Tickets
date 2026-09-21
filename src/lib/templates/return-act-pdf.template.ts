@@ -184,7 +184,7 @@ export async function generateReturnActPDF(
     )
     cy = row(col1X, cy, colW, 'N° de Serie', equipment.serialNumber || '—')
     cy = row(col1X, cy, colW, 'Tipo', equipment.type || '—')
-    cy = row(
+    row(
       col1X,
       cy,
       colW,
@@ -236,13 +236,7 @@ export async function generateReturnActPDF(
   if (receiver) {
     dy = row(col2X, dy, colW, 'Nombre', receiver.name || receiver.email || '—')
     dy = row(col2X, dy, colW, 'Email', receiver.email || '—')
-    dy = row(
-      col2X,
-      dy,
-      colW,
-      'Departamento',
-      receiver.department || receiver.departments?.name || '—'
-    )
+    row(col2X, dy, colW, 'Departamento', receiver.department || receiver.departments?.name || '—')
   }
 
   // Recibido por (deliverer del assignment = quien entregó originalmente)
@@ -253,13 +247,7 @@ export async function generateReturnActPDF(
   if (deliverer) {
     ry = row(col2X, ry, colW, 'Nombre', deliverer.name || deliverer.email || '—')
     ry = row(col2X, ry, colW, 'Email', deliverer.email || '—')
-    ry = row(
-      col2X,
-      ry,
-      colW,
-      'Departamento',
-      deliverer.department || deliverer.departments?.name || '—'
-    )
+    row(col2X, ry, colW, 'Departamento', deliverer.department || deliverer.departments?.name || '—')
   }
 
   // Fechas

@@ -262,15 +262,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           .then(async ticketWithUsers => {
             if (!ticketWithUsers) return
             let recipient = null
-            let recipientRole = ''
             if (session.user.role === 'CLIENT') {
               if (ticketWithUsers.users_tickets_assigneeIdTousers) {
                 recipient = ticketWithUsers.users_tickets_assigneeIdTousers
-                recipientRole = 'técnico'
               }
             } else {
               recipient = ticketWithUsers.users_tickets_clientIdTousers
-              recipientRole = 'cliente'
             }
             if (!recipient) return
             const authorName = newComment.users.name

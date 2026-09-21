@@ -25,14 +25,6 @@ import { CLIENT_TICKET_EXPORT_COLUMNS } from '@/lib/utils/ticket-utils'
 import { useFamilies } from '@/contexts/families-context'
 import { useLiveTicketRefresh } from '@/hooks/use-live-ticket-refresh'
 
-interface FamilyOption {
-  id: string
-  name: string
-  code: string
-  color?: string | null
-  isOwnFamily?: boolean
-}
-
 export default function ClientTicketsPage() {
   const { data: session } = useSession()
   const router = useRouter()

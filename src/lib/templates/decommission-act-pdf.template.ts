@@ -196,7 +196,7 @@ export async function generateDecommissionActPDF(data: DecommissionActPDFData): 
     }
   } else if (data.license) {
     cy = row(col1X, cy, colW, 'Nombre', data.license.name)
-    cy = row(col1X, cy, colW, 'Proveedor', data.license.vendor || '—')
+    row(col1X, cy, colW, 'Proveedor', data.license.vendor || '—')
   }
 
   // Motivo de baja
@@ -236,14 +236,14 @@ export async function generateDecommissionActPDF(data: DecommissionActPDFData): 
   let sy = card(col2X, y, colW, solH, 'SOLICITADO POR')
   sy = row(col2X, sy, colW, 'Nombre', data.request.requester.name)
   sy = row(col2X, sy, colW, 'Email', data.request.requester.email)
-  sy = row(col2X, sy, colW, 'Departamento', data.request.requester.department || '—')
+  row(col2X, sy, colW, 'Departamento', data.request.requester.department || '—')
 
   // Aprobado por
   const aprobY = y + solH + 8
   const aprobH = 56
   let ay = card(col2X, aprobY, colW, aprobH, 'APROBADO POR')
   ay = row(col2X, ay, colW, 'Nombre', data.approvedBy.name)
-  ay = row(col2X, ay, colW, 'Email', data.approvedBy.email)
+  row(col2X, ay, colW, 'Email', data.approvedBy.email)
 
   // Fechas
   const fechasY = aprobY + aprobH + 8

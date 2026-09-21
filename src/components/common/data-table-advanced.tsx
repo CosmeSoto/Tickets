@@ -6,7 +6,6 @@
 'use client'
 
 import { useState, useMemo, useCallback } from 'react'
-import { useSession } from 'next-auth/react'
 import { ArrowUpDown, ArrowUp, ArrowDown, RefreshCw } from 'lucide-react'
 import {
   Table,
@@ -184,7 +183,6 @@ export function DataTableAdvanced<T>({
   emptyMessage = 'No hay datos para mostrar',
   exportable = false,
 }: DataTableAdvancedProps<T>) {
-  const { data: session } = useSession()
   const theme = ROLE_THEMES[userRole]
 
   // Estados locales

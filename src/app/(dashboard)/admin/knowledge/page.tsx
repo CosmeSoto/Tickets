@@ -33,13 +33,6 @@ import { useExport } from '@/hooks/common/use-export'
 import type { Article } from '@/hooks/use-knowledge'
 import { useFamilies } from '@/contexts/families-context'
 
-interface FamilyOption {
-  id: string
-  name: string
-  code: string
-  color?: string | null
-}
-
 function filterArticles(articles: Article[], filters: any) {
   return articles.filter(article => {
     if (filters.search) {

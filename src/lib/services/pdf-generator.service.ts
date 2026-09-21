@@ -9,7 +9,6 @@ import { getUploadDir } from '@/lib/upload-path'
 import { DEFAULT_SYSTEM_NAME } from '@/lib/branding-constants'
 import { resolveEquipmentImagePath } from '@/lib/inventory/equipment-image'
 const mkdir = promisify(fs.mkdir)
-const writeFile = promisify(fs.writeFile)
 
 /**
  * Normaliza URLs de logos: /uploads/... → ruta absoluta en filesystem

@@ -2,7 +2,6 @@ import { prisma } from '@/lib/prisma'
 import { UserRole } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import { randomUUID } from 'crypto'
-import { getDepartmentNativeFamilyId } from '@/lib/auth/family-scope'
 import { roleCanBeInventoryManager } from '@/lib/inventory/manager-eligibility'
 import { AuditServiceComplete, AuditActionsComplete } from './audit-service-complete'
 import { isPrismaUniqueViolation } from '@/lib/db/prisma-errors'
@@ -302,7 +301,6 @@ export class UserService {
 
     const passwordHash = await bcrypt.hash(data.password, 12)
 
-    const createDeptId = data.departmentId || data.department || null
     // Defaults por rol (catálogo): Admin → todos ON; Técnico/Cliente → solo tickets
     const isAdminRole = data.role === 'ADMIN'
     const ticketsEnabled = data.ticketsEnabled ?? true
@@ -570,10 +568,6 @@ export class UserService {
 
     console.log('🔧 [UserService] Datos que se enviarán a Prisma:', updateData)
 
-    const deptIdForNative =
-      (updateData.departmentId as string | null | undefined) !== undefined
-        ? (updateData.departmentId as string | null)
-        : user.departmentId
     // Actualizar usuario en una transacción para manejar las asignaciones de categorías
     let result
     try {

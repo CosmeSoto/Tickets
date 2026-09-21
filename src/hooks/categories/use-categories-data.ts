@@ -251,22 +251,6 @@ export function useCategoriesData(options: UseCategoriesDataOptions = {}) {
     [getCacheKey, getFromCache, setToCache]
   )
 
-  // Función para obtener el nombre del nivel
-  const getLevelName = useCallback((level: number): string => {
-    switch (level) {
-      case 1:
-        return 'Principal'
-      case 2:
-        return 'Subcategoría'
-      case 3:
-        return 'Especialidad'
-      case 4:
-        return 'Detalle'
-      default:
-        return 'Máximo'
-    }
-  }, [])
-
   // Función para enriquecer categorías con levelName
   const enrichCategoriesWithLevelName = useCallback(
     (categories: CategoryData[]): CategoryData[] => {

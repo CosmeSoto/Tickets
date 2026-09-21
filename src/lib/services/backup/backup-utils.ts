@@ -314,8 +314,6 @@ export async function decryptFile(encryptedPath: string): Promise<string> {
   }
 
   const { createDecipheriv, createHash: nodeCreateHash } = await import('crypto')
-  const { createWriteStream } = await import('fs')
-  const { pipeline } = await import('stream/promises')
   const { readFile: fsReadFile } = await import('fs/promises')
 
   const keyBuffer = nodeCreateHash('sha256').update(key).digest()

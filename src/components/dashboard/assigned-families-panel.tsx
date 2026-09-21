@@ -64,13 +64,6 @@ export function AssignedFamiliesPanel({
   const allFamilyIds = new Set(families.map(f => f.id))
   const extraInventoryFamilies = (inventoryFamilies ?? []).filter(f => !allFamilyIds.has(f.id))
 
-  // Separar familias por módulos activos
-  const ticketFamilies = families.filter(f => f.modules?.tickets !== false)
-  const inventoryOnlyFamilies = families.filter(
-    f => f.modules?.tickets === false && f.modules?.inventory
-  )
-  const bothModules = families.filter(f => f.modules?.tickets && f.modules?.inventory)
-
   return (
     <Card>
       <CardHeader className='pb-3'>

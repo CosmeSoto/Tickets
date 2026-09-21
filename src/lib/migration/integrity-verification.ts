@@ -766,12 +766,8 @@ export class IntegrityVerification {
 
     // Check for fields that should be indexed
     const indexableFields = ['id', 'email', 'userId', 'categoryId', 'status', 'priority']
-    let recommendations = 0
-
     // This is a placeholder - in real implementation, check actual database indexes
-    for (const field of indexableFields) {
-      recommendations++
-    }
+    const recommendations = indexableFields.length
 
     return {
       id: 'indexable_fields',

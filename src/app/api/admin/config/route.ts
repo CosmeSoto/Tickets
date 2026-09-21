@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
  */
 async function handleReloadConfiguration(userId: string, startTime: number) {
   try {
-    const newConfig = configurationService.reloadConfiguration()
+    configurationService.reloadConfiguration()
     const summary = configurationService.getConfigurationSummary()
 
     ApplicationLogger.businessOperation('reload_configuration', 'configuration', 'system', {

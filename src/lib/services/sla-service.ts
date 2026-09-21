@@ -552,7 +552,7 @@ export class SLAService {
       else severity = 'LOW'
 
       // Crear violación
-      const violation = await prisma.sla_violations.create({
+      await prisma.sla_violations.create({
         data: {
           id: randomUUID(),
           ticketId,
