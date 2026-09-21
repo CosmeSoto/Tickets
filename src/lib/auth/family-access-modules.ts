@@ -36,6 +36,16 @@ export const FAMILY_ACCESS_MODULES: Record<string, FamilyAccessModuleDefinition>
       CLIENT: { canConsume: true, canOperate: false, canView: true },
     },
   },
+  planner: {
+    key: 'planner',
+    label: 'Tareas / Planner',
+    description: 'Áreas adicionales de visibilidad / gestión de tareas sincronizadas con Planner.',
+    defaultsByRole: {
+      ADMIN: { canConsume: false, canOperate: true, canView: true },
+      TECHNICIAN: { canConsume: false, canOperate: true, canView: true },
+      CLIENT: { canConsume: false, canOperate: false, canView: false },
+    },
+  },
   inventory: {
     key: 'inventory',
     label: 'Inventario',
@@ -94,16 +104,6 @@ export const FAMILY_ACCESS_MODULES: Record<string, FamilyAccessModuleDefinition>
       ADMIN: { canConsume: false, canOperate: true, canView: true },
       TECHNICIAN: { canConsume: false, canOperate: false, canView: true },
       CLIENT: { canConsume: false, canOperate: false, canView: true },
-    },
-  },
-  planner: {
-    key: 'planner',
-    label: 'Tareas / Planner',
-    description: 'Áreas adicionales de visibilidad / gestión de tareas sincronizadas con Planner.',
-    defaultsByRole: {
-      ADMIN: { canConsume: false, canOperate: true, canView: true },
-      TECHNICIAN: { canConsume: false, canOperate: true, canView: true },
-      CLIENT: { canConsume: false, canOperate: false, canView: false },
     },
   },
 }

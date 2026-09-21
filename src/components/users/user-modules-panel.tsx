@@ -76,12 +76,12 @@ interface ModulesData {
 
 const MODULE_CHIP_LABELS = [
   { key: 'tickets' as const, label: '🎫 Tickets' },
+  { key: 'planner' as const, label: '📋 Tareas' },
   { key: 'inventory' as const, label: '📦 Inventario' },
   { key: 'patrols' as const, label: '🛡️ Rondas' },
   { key: 'credentials' as const, label: '🔐 Credenciales' },
   { key: 'processes' as const, label: '🔀 Procesos' },
   { key: 'access' as const, label: '🪪 Accesos' },
-  { key: 'planner' as const, label: '📋 Tareas' },
   { key: 'news' as const, label: '📰 Noticias' },
   { key: 'forms' as const, label: '📄 Documentos' },
 ]
@@ -337,6 +337,15 @@ export function UserModulesPanel({
       perms: ticketsPerms,
     },
     {
+      key: 'planner' as const,
+      emoji: '📋',
+      label: 'Tareas',
+      cap: plannerCap,
+      perms: managePlanner
+        ? [{ icon: '✏️', label: 'Crear y gestionar tareas' }]
+        : ([] as Array<{ icon: string; label: string }>),
+    },
+    {
       key: 'inventory' as const,
       emoji: '📦',
       label: 'Inventario',
@@ -375,15 +384,6 @@ export function UserModulesPanel({
       cap: accessCap,
       perms: manageAccess
         ? [{ icon: '✏️', label: 'Emitir y revocar pases' }]
-        : ([] as Array<{ icon: string; label: string }>),
-    },
-    {
-      key: 'planner' as const,
-      emoji: '📋',
-      label: 'Tareas',
-      cap: plannerCap,
-      perms: managePlanner
-        ? [{ icon: '✏️', label: 'Crear y gestionar tareas' }]
         : ([] as Array<{ icon: string; label: string }>),
     },
   ]
