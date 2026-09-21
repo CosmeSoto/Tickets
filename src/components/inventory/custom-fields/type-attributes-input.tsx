@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -62,16 +62,7 @@ export function TypeAttributesInput({
   const [attributes, setAttributes] = useState<TypeAttribute[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
-  useEffect(() => {
-    if (typeId) {
-      loadAttributes()
-    } else {
-      setAttributes([])
-      setIsLoading(false)
-    }
-  }, [typeId, assetType, reloadToken])
-
-  const loadAttributes = async () => {
+  const loadAttributes = useCallback(async () => {
     try {
       setIsLoading(true)
 
@@ -115,7 +106,16 @@ export function TypeAttributesInput({
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [assetType, typeId])
+
+  useEffect(() => {
+    if (typeId) {
+      loadAttributes()
+    } else {
+      setAttributes([])
+      setIsLoading(false)
+    }
+  }, [typeId, assetType, reloadToken, loadAttributes])
 
   const getValue = (fieldName: string): string => {
     return values.find(v => v.fieldName === fieldName)?.fieldValue || ''

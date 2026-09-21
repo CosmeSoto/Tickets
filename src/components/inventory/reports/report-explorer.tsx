@@ -161,6 +161,9 @@ export function ReportExplorer({
       })
       .catch(() => setError('No se pudo cargar el catálogo de reportes'))
       .finally(() => setCatalogLoading(false))
+    // Solo se carga el catálogo una vez al montar; selectedDatasetId/initialSavedId
+    // se leen aquí únicamente para decidir el dataset inicial, no como disparadores.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
@@ -196,6 +199,10 @@ export function ReportExplorer({
     setActiveSavedId(null)
     setActiveSavedName(null)
     setPinned(false)
+    // Se depende solo del id: selectedDataset cambia de referencia cuando el
+    // catálogo se recarga aunque siga siendo el mismo dataset, y no debe
+    // resetear los filtros del usuario en ese caso.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDataset?.id])
 
   const buildParams = useCallback(() => {
@@ -236,7 +243,7 @@ export function ReportExplorer({
     if (selectedDatasetId && !catalogLoading) {
       runReport()
     }
-  }, [selectedDatasetId, page, catalogLoading, familyId, filterValues, visibleColumns])
+  }, [selectedDatasetId, catalogLoading, runReport])
 
   const handleExport = (format: 'csv' | 'xlsx') => {
     const params = buildParams()

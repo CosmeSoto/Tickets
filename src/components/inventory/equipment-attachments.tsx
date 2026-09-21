@@ -7,7 +7,7 @@ import {
   Download,
   Eye,
   FileText,
-  Image,
+  Image as ImageIcon,
   File,
   Loader2,
   Paperclip,
@@ -58,7 +58,7 @@ function formatSize(bytes: number): string {
 }
 
 function FileIcon({ mimeType }: { mimeType: string }) {
-  if (mimeType.startsWith('image/')) return <Image className='h-4 w-4 text-primary' />
+  if (mimeType.startsWith('image/')) return <ImageIcon className='h-4 w-4 text-primary' />
   if (mimeType === 'application/pdf') return <FileText className='h-4 w-4 text-destructive' />
   return <File className='h-4 w-4 text-muted-foreground' />
 }
@@ -487,7 +487,7 @@ export function EquipmentAttachments({ equipmentId, canManage }: EquipmentAttach
               {images.length > 0 && (
                 <div>
                   <p className='text-xs text-muted-foreground mb-2 flex items-center gap-1.5'>
-                    <Image className='h-3.5 w-3.5' />
+                    <ImageIcon className='h-3.5 w-3.5' />
                     Imágenes
                   </p>
                   <div className='grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2'>

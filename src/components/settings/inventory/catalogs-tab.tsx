@@ -49,7 +49,18 @@ export function CatalogsTab({ familyId, familyColor }: CatalogsTabProps) {
       consumableTypes.loadTypes()
       equipmentBrands.loadBrands()
     }
-  }, [familyId])
+    // Las funciones de carga (ya memoizadas dentro de cada hook) son las
+    // dependencias reales; los objetos equipmentTypes/licenseTypes/etc. se
+    // recrean en cada render y depender de ellos completos volvería a
+    // disparar este efecto sin necesidad.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    familyId,
+    equipmentTypes.loadTypes,
+    licenseTypes.loadTypes,
+    consumableTypes.loadTypes,
+    equipmentBrands.loadBrands,
+  ])
 
   // Handlers para Marcas
   const handleCreateBrand = async () => {

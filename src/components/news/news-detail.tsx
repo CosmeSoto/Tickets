@@ -216,7 +216,7 @@ export function NewsDetail({
         })
         .catch(() => {})
     }
-  }, [isOpen, news.id])
+  }, [isOpen, news.id, news.allowReactions, news.news_comments, news.news_reactions])
 
   // Agrupar reacciones por emoji
   const reactionGroups = REACTIONS.map(r => ({

@@ -337,38 +337,35 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
   )
 
   // Función de logout optimizada
-  const logout = useCallback(
-    async (options: { redirect?: boolean } = {}) => {
-      const { redirect = true } = options
+  const logout = useCallback(async (options: { redirect?: boolean } = {}) => {
+    const { redirect = true } = options
 
-      setAuthState(prev => ({ ...prev, isLoading: true }))
+    setAuthState(prev => ({ ...prev, isLoading: true }))
 
-      try {
-        await signOut({
-          redirect: false,
-        })
+    try {
+      await signOut({
+        redirect: false,
+      })
 
-        if (redirect) {
-          window.location.href = '/login'
-        }
-
-        setAuthState(prev => ({
-          ...prev,
-          isLoading: false,
-          error: null,
-          loginStep: 'idle',
-        }))
-      } catch (error) {
-        // En caso de error, forzar redirect
-        if (redirect) {
-          window.location.href = '/login'
-        }
-
-        setAuthState(prev => ({ ...prev, isLoading: false }))
+      if (redirect) {
+        window.location.href = '/login'
       }
-    },
-    [router]
-  )
+
+      setAuthState(prev => ({
+        ...prev,
+        isLoading: false,
+        error: null,
+        loginStep: 'idle',
+      }))
+    } catch (error) {
+      // En caso de error, forzar redirect
+      if (redirect) {
+        window.location.href = '/login'
+      }
+
+      setAuthState(prev => ({ ...prev, isLoading: false }))
+    }
+  }, [])
 
   // Función para limpiar errores
   const clearError = useCallback(() => {

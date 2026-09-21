@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useSyncDashboardPageMeta } from '@/contexts/dashboard-shell-context'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -58,7 +58,7 @@ export default function AdminAssetRequestDetailPage({ params }: { params: { id: 
     action: 'APPROVED' | 'REJECTED'
   }>({ open: false, action: 'APPROVED' })
 
-  const loadRequest = async () => {
+  const loadRequest = useCallback(async () => {
     setIsLoading(true)
     try {
       const response = await fetch(`/api/inventory/asset-requests/${params.id}`)
@@ -79,11 +79,11 @@ export default function AdminAssetRequestDetailPage({ params }: { params: { id: 
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [params.id, router])
 
   useEffect(() => {
     loadRequest()
-  }, [params.id])
+  }, [loadRequest])
 
   const handleReviewSuccess = () => {
     loadRequest()

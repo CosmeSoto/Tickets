@@ -127,7 +127,6 @@ export function AcquisitionPaymentDialog({
   // cada actualización de la misma factura (p. ej. tras registrar un abono,
   // que recalcula paidAmount/installments pero no debe pisar lo que el
   // usuario esté por escribir en el formulario).
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!invoice) return
     setPaidDate(todayISO())
@@ -136,6 +135,7 @@ export function AcquisitionPaymentDialog({
     setBankEntity('')
     setCardLast4('')
     setPayAmount((invoice.amount - invoice.paidAmount).toFixed(2))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [invoice?.id])
 
   async function handleRegisterPayment() {

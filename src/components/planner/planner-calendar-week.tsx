@@ -54,11 +54,11 @@ export function PlannerCalendarWeek({
   onTaskClick,
   singleDay,
 }: PlannerCalendarWeekProps) {
-  const weekStart = startOfWeek(weekAnchor, { weekStartsOn: 1 })
-  const weekEnd = endOfWeek(weekAnchor, { weekStartsOn: 1 })
+  const weekStart = useMemo(() => startOfWeek(weekAnchor, { weekStartsOn: 1 }), [weekAnchor])
+  const weekEnd = useMemo(() => endOfWeek(weekAnchor, { weekStartsOn: 1 }), [weekAnchor])
   const days = useMemo(
     () => (singleDay ? [selectedDay] : eachDayOfInterval({ start: weekStart, end: weekEnd })),
-    [singleDay, selectedDay, weekStart.getTime(), weekEnd.getTime()]
+    [singleDay, selectedDay, weekStart, weekEnd]
   )
 
   const tasksWithDate = useMemo(() => tasks.filter(t => t.dueDate), [tasks])

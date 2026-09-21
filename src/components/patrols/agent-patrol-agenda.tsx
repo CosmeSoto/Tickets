@@ -76,7 +76,7 @@ export function AgentPatrolAgenda() {
     } finally {
       setAgendaLoading(false)
     }
-  }, [agendaRange.from.toISOString(), agendaRange.to.toISOString()])
+  }, [agendaRange])
 
   useEffect(() => {
     void fetchAgenda()

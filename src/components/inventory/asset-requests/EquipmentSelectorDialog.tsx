@@ -120,7 +120,7 @@ export function EquipmentSelectorDialog({
     }
 
     fetchEquipment()
-  }, [open, assetTypeId, quantity, toast])
+  }, [open, assetTypeId, quantity])
 
   const handleToggleSelection = (equipmentId: string) => {
     setSelectedIds(prev => {

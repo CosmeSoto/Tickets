@@ -86,7 +86,7 @@ const HomePageContent = React.memo(function HomePageContent() {
             : '/client'
       router.replace(dest)
     }
-  }, [status, session?.user?.role, router, isPreview])
+  }, [status, session, router, isPreview])
 
   useEffect(() => {
     // Fetch landing page content and services

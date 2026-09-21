@@ -84,9 +84,7 @@ export function MaintenanceGuard() {
           return
         }
 
-        const user = session?.user as
-          | { role?: string; isSuperAdmin?: boolean }
-          | undefined
+        const user = session?.user as { role?: string; isSuperAdmin?: boolean } | undefined
 
         const isSuperAdmin = user?.isSuperAdmin === true
         const isAdmin = user?.role === 'ADMIN'
@@ -112,7 +110,7 @@ export function MaintenanceGuard() {
         /* no bloquear si falla la consulta */
       }
     })()
-  }, [pathname, status, session?.user?.id, session?.user?.role, router, (session?.user as { isSuperAdmin?: boolean } | undefined)?.isSuperAdmin])
+  }, [pathname, status, session, router])
 
   return null
 }

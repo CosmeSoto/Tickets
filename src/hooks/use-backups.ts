@@ -140,6 +140,14 @@ export function useBackups() {
   // restauración en curso (ver efecto de limpieza en BackupRestore).
   const backupsLoadedRef = useRef(false)
 
+  // Extraídos como primitivos (no el objeto `session` completo) por el mismo
+  // motivo del comentario de arriba: no relanzar este efecto en cada
+  // revalidación silenciosa de NextAuth.
+  const sessionUserId = session?.user?.id
+  const sessionUserRole = session?.user?.role
+  const sessionIsSuperAdmin = (session?.user as { isSuperAdmin?: boolean } | undefined)
+    ?.isSuperAdmin
+
   // ── Auth check ──
   useEffect(() => {
     if (status === 'loading') return
@@ -161,13 +169,10 @@ export function useBackups() {
     backupsLoadedRef.current = true
     loadBackups()
     loadStats()
-  }, [
-    status,
-    session?.user?.id,
-    session?.user?.role,
-    (session?.user as { isSuperAdmin?: boolean } | undefined)?.isSuperAdmin,
-    router,
-  ]) // eslint-disable-line react-hooks/exhaustive-deps
+    // loadBackups/loadStats/toast se omiten a propósito: están memoizados (no
+    // cambian) y este efecto ya solo corre una vez gracias a backupsLoadedRef.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, sessionUserId, sessionUserRole, sessionIsSuperAdmin, router])
 
   // ── Load backups ──
   const loadBackups = useCallback(

@@ -71,6 +71,14 @@ export function useCategoriesData(options: UseCategoriesDataOptions = {}) {
     [cache]
   )
 
+  // Función para enriquecer categorías con levelName
+  const enrichCategoriesWithLevelName = useCallback(
+    (categories: CategoryData[]): CategoryData[] => {
+      return enrichCategories(categories)
+    },
+    []
+  )
+
   // Cargar categorías
   const loadCategories = useCallback(
     async (searchTerm = '', levelFilter = 'all', forceRefresh = false) => {
@@ -136,8 +144,8 @@ export function useCategoriesData(options: UseCategoriesDataOptions = {}) {
         setLoading(false)
       }
     },
-    [getCacheKey, getFromCache, setToCache, toast]
-  ) // eslint-disable-line react-hooks/exhaustive-deps
+    [getCacheKey, getFromCache, setToCache, toast, enrichCategoriesWithLevelName]
+  )
 
   // Cargar resolutores de categoría: técnicos + admins (según familia nativa/asignada)
   const loadAvailableTechnicians = useCallback(
@@ -249,14 +257,6 @@ export function useCategoriesData(options: UseCategoriesDataOptions = {}) {
       }
     },
     [getCacheKey, getFromCache, setToCache]
-  )
-
-  // Función para enriquecer categorías con levelName
-  const enrichCategoriesWithLevelName = useCallback(
-    (categories: CategoryData[]): CategoryData[] => {
-      return enrichCategories(categories)
-    },
-    []
   )
 
   // Cargar padres disponibles con información de técnicos

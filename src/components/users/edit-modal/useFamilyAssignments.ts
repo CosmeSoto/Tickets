@@ -753,7 +753,7 @@ export function useFamilyAssignments({ user, isOpen }: UseFamilyAssignmentsProps
     }
 
     void fetchFamiliesAndAssignments()
-  }, [user, isOpen, session?.user?.id, session?.user?.role, session?.user?.isSuperAdmin])
+  }, [user, isOpen, session])
 
   return {
     // Estados

@@ -316,37 +316,34 @@ export function useInventorySettings() {
     } finally {
       setLoadingFamilies(false)
     }
-  }, [toast])
+  }, [])
 
   // ── Load config for selected family ──
-  const loadConfig = useCallback(
-    async (familyId: string) => {
-      setLoadingConfig(true)
-      try {
-        const [configRes, assetRequestsRes] = await Promise.all([
-          fetch(`/api/inventory/family-config/${familyId}`),
-          fetch(`/api/inventory/asset-requests/family-config/${familyId}`),
-        ])
-        const data = await configRes.json()
-        const assetRequestsData = assetRequestsRes.ok ? await assetRequestsRes.json() : null
+  const loadConfig = useCallback(async (familyId: string) => {
+    setLoadingConfig(true)
+    try {
+      const [configRes, assetRequestsRes] = await Promise.all([
+        fetch(`/api/inventory/family-config/${familyId}`),
+        fetch(`/api/inventory/asset-requests/family-config/${familyId}`),
+      ])
+      const data = await configRes.json()
+      const assetRequestsData = assetRequestsRes.ok ? await assetRequestsRes.json() : null
 
-        if (data.success) {
-          setForm(buildForm(data.data, assetRequestsData?.assetRequestsEnabled === true))
-          const modeConfig = normalizeSectionsByMode(data.data?.sectionsByMode)
-          setUseModeConfig(!!modeConfig && Object.keys(modeConfig).length > 0)
-        }
-      } catch {
-        toast({
-          title: 'Error',
-          description: 'Error al cargar configuración',
-          variant: 'destructive',
-        })
-      } finally {
-        setLoadingConfig(false)
+      if (data.success) {
+        setForm(buildForm(data.data, assetRequestsData?.assetRequestsEnabled === true))
+        const modeConfig = normalizeSectionsByMode(data.data?.sectionsByMode)
+        setUseModeConfig(!!modeConfig && Object.keys(modeConfig).length > 0)
       }
-    },
-    [toast]
-  )
+    } catch {
+      toast({
+        title: 'Error',
+        description: 'Error al cargar configuración',
+        variant: 'destructive',
+      })
+    } finally {
+      setLoadingConfig(false)
+    }
+  }, [])
 
   // ── Load global settings ──
   const loadGlobalRules = useCallback(async () => {
@@ -366,7 +363,7 @@ export function useInventorySettings() {
     } finally {
       setLoadingGlobal(false)
     }
-  }, [toast])
+  }, [])
 
   useEffect(() => {
     loadGlobalRules()
@@ -374,11 +371,11 @@ export function useInventorySettings() {
 
   useEffect(() => {
     loadFamilies()
-  }, [])
+  }, [loadFamilies])
 
   useEffect(() => {
     if (selectedFamilyId) loadConfig(selectedFamilyId)
-  }, [selectedFamilyId])
+  }, [selectedFamilyId, loadConfig])
 
   // ── Toggle inventory for a family ──
   const handleToggleInventory = useCallback(
@@ -426,7 +423,7 @@ export function useInventorySettings() {
         toast({ title: 'Error', description: 'Error de conexión', variant: 'destructive' })
       }
     },
-    [selectedFamilyId, loadConfig, toast, isSuperAdmin]
+    [selectedFamilyId, loadConfig, isSuperAdmin]
   )
 
   // ── Save family config ──
@@ -507,7 +504,7 @@ export function useInventorySettings() {
     } finally {
       setSaving(false)
     }
-  }, [selectedFamilyId, residualError, form, useModeConfig, toast, isSuperAdmin, loadConfig])
+  }, [selectedFamilyId, residualError, form, useModeConfig, isSuperAdmin, loadConfig])
 
   // ── Save global rules ──
   const handleSaveGlobal = useCallback(async () => {
@@ -534,7 +531,7 @@ export function useInventorySettings() {
     } finally {
       setSavingGlobal(false)
     }
-  }, [globalRules, toast, loadGlobalRules])
+  }, [globalRules, loadGlobalRules])
 
   const handleReload = useCallback(async () => {
     await loadFamilies()

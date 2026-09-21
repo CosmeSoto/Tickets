@@ -123,7 +123,6 @@ export function StepByStepNavigator({
                 aria-label={`${category.name}${
                   category.description ? `: ${category.description}` : ''
                 }${childrenCount > 0 ? `, ${childrenCount} subcategorías` : ''}`}
-                aria-pressed={isSelected}
                 role='radio'
                 aria-checked={isSelected}
               >

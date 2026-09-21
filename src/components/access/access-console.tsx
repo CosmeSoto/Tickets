@@ -486,73 +486,78 @@ export function AccessConsole() {
     }
   }
 
-  const updatePass = async (
-    passId: string,
-    body: Record<string, unknown>,
-    successMessage: string
-  ) => {
-    setBusyPassId(passId)
-    try {
-      const response = await fetch(`/api/access-passes/${passId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-      const data = await response.json()
-      if (!response.ok) {
-        setResult({
-          result: 'UPDATE_ERROR',
-          valid: false,
-          message: data.error || 'No se pudo actualizar el pase.',
+  const updatePass = useCallback(
+    async (passId: string, body: Record<string, unknown>, successMessage: string) => {
+      setBusyPassId(passId)
+      try {
+        const response = await fetch(`/api/access-passes/${passId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
         })
-        return
+        const data = await response.json()
+        if (!response.ok) {
+          setResult({
+            result: 'UPDATE_ERROR',
+            valid: false,
+            message: data.error || 'No se pudo actualizar el pase.',
+          })
+          return
+        }
+        setResult({
+          result: 'UPDATED',
+          valid: true,
+          message: successMessage,
+        })
+        await loadPasses()
+      } finally {
+        setBusyPassId(null)
       }
-      setResult({
-        result: 'UPDATED',
-        valid: true,
-        message: successMessage,
-      })
-      await loadPasses()
-    } finally {
-      setBusyPassId(null)
-    }
-  }
+    },
+    [loadPasses]
+  )
 
-  const resendPrivacyInvitation = async (passId: string) => {
-    setBusyPassId(passId)
-    try {
-      const response = await fetch(`/api/access-passes/${passId}/privacy-invitation`, {
-        method: 'POST',
-      })
-      const data = await response.json()
-      setResult({
-        result: response.ok ? 'INVITATION_RESENT' : 'INVITATION_ERROR',
-        valid: response.ok,
-        message: data.message || data.error || 'No se pudo reenviar la invitación.',
-      })
-      if (response.ok) await loadPasses()
-    } finally {
-      setBusyPassId(null)
-    }
-  }
+  const resendPrivacyInvitation = useCallback(
+    async (passId: string) => {
+      setBusyPassId(passId)
+      try {
+        const response = await fetch(`/api/access-passes/${passId}/privacy-invitation`, {
+          method: 'POST',
+        })
+        const data = await response.json()
+        setResult({
+          result: response.ok ? 'INVITATION_RESENT' : 'INVITATION_ERROR',
+          valid: response.ok,
+          message: data.message || data.error || 'No se pudo reenviar la invitación.',
+        })
+        if (response.ok) await loadPasses()
+      } finally {
+        setBusyPassId(null)
+      }
+    },
+    [loadPasses]
+  )
 
-  const resendCredentialEmail = async (passId: string) => {
-    setBusyPassId(passId)
-    try {
-      const response = await fetch(`/api/access-passes/${passId}/credential-email`, {
-        method: 'POST',
-      })
-      const data = await response.json()
-      setResult({
-        result: response.ok ? 'CREDENTIAL_RESENT' : 'CREDENTIAL_RESEND_ERROR',
-        valid: response.ok,
-        message: data.message || data.error || 'No se pudo reenviar la credencial.',
-      })
-      if (response.ok) await loadPasses()
-    } finally {
-      setBusyPassId(null)
-    }
-  }
+  const resendCredentialEmail = useCallback(
+    async (passId: string) => {
+      setBusyPassId(passId)
+      try {
+        const response = await fetch(`/api/access-passes/${passId}/credential-email`, {
+          method: 'POST',
+        })
+        const data = await response.json()
+        setResult({
+          result: response.ok ? 'CREDENTIAL_RESENT' : 'CREDENTIAL_RESEND_ERROR',
+          valid: response.ok,
+          message: data.message || data.error || 'No se pudo reenviar la credencial.',
+        })
+        if (response.ok) await loadPasses()
+      } finally {
+        setBusyPassId(null)
+      }
+    },
+    [loadPasses]
+  )
 
   const confirmDeletePasses = async () => {
     if (!deletePassIds?.length || !canDelete) return

@@ -130,6 +130,10 @@ export function NewsFeed({ className }: NewsFeedProps) {
     } else if (!modulesLoading && !canViewNews) {
       setLoading(false)
     }
+    // activeTab/period se excluyen a propósito: sus cambios ya disparan
+    // loadNews directamente desde handleTabChange/handlePeriodChange; volver
+    // a incluirlos aquí duplicaría la petición en cada cambio de filtro.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, canViewNews, modulesLoading])
 
   const handleTabChange = (tab: string) => {

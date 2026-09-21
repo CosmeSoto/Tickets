@@ -109,7 +109,7 @@ export function useTypeManagement<T extends AnyType = AnyType>(
     } finally {
       setLoading(false)
     }
-  }, [familyId, getEndpoint, toast])
+  }, [familyId, getEndpoint])
 
   // ── Create type ──
   const createType = useCallback(
@@ -165,7 +165,7 @@ export function useTypeManagement<T extends AnyType = AnyType>(
         setSaving(false)
       }
     },
-    [familyId, getEndpoint, toast, typeKind]
+    [familyId, getEndpoint, typeKind]
   )
 
   // ── Update type ──
@@ -206,7 +206,7 @@ export function useTypeManagement<T extends AnyType = AnyType>(
         setSaving(false)
       }
     },
-    [getEndpoint, toast]
+    [getEndpoint]
   )
 
   // ── Delete type ──
@@ -251,7 +251,7 @@ export function useTypeManagement<T extends AnyType = AnyType>(
         setSaving(false)
       }
     },
-    [getEndpoint, toast]
+    [getEndpoint]
   )
 
   // ── Toggle active status ──
@@ -310,7 +310,7 @@ export function useTypeManagement<T extends AnyType = AnyType>(
         setSaving(false)
       }
     },
-    [getEndpoint, loadTypes, toast, types]
+    [getEndpoint, loadTypes, types]
   )
 
   // Auto-load when familyId changes
@@ -318,7 +318,7 @@ export function useTypeManagement<T extends AnyType = AnyType>(
     if (familyId) {
       loadTypes()
     }
-  }, [familyId])
+  }, [familyId, loadTypes])
 
   return {
     // Data

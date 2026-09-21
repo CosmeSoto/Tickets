@@ -309,14 +309,3 @@ export class CacheInvalidation {
     return stats
   }
 }
-
-export default {
-  createCacheMiddleware,
-  CacheResponse,
-  setStaticCacheHeaders,
-  setDynamicCacheHeaders,
-  generateETag,
-  handleETag,
-  setCompressionHeaders,
-  CacheInvalidation,
-}

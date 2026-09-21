@@ -117,6 +117,13 @@ interface FamilyDepreciationConfig {
   defaultResidualValuePct: number | null
 }
 
+// Estados permitidos por condición
+const ALLOWED_STATUSES_BY_CONDITION: Record<string, string[]> = {
+  NEW: ['AVAILABLE', 'ASSIGNED', 'MAINTENANCE', 'FOR_SALE'],
+  USED: ['AVAILABLE', 'ASSIGNED', 'MAINTENANCE', 'FOR_SALE'],
+  DAMAGED: ['DAMAGED', 'FOR_SALE', 'RETIRED'],
+}
+
 export function EquipmentAssetForm({
   familyId,
   familyCode,
@@ -379,7 +386,7 @@ export function EquipmentAssetForm({
         if (initialEquipment.modelId) setSelectedModelId(initialEquipment.modelId)
       }
     })
-  }, [familyId, isEditMode])
+  }, [familyId, isEditMode, initialEquipment])
 
   // Cargar modelos y configuración cuando se selecciona un tipo de equipo o marca
   useEffect(() => {
@@ -553,13 +560,6 @@ export function EquipmentAssetForm({
   const supplierRequired = acquisitionMode === 'RENTAL' || acquisitionMode === 'LOAN'
   const requireFinancialForNew = familyConfig.requireFinancialForNew ?? true
 
-  // Estados permitidos por condición
-  const allowedStatusesByCondition: Record<string, string[]> = {
-    NEW: ['AVAILABLE', 'ASSIGNED', 'MAINTENANCE', 'FOR_SALE'],
-    USED: ['AVAILABLE', 'ASSIGNED', 'MAINTENANCE', 'FOR_SALE'],
-    DAMAGED: ['DAMAGED', 'FOR_SALE', 'RETIRED'],
-  }
-
   // Mensajes informativos por condición
   const conditionMessage: Record<string, string> = {
     NEW: 'Activo nuevo — información financiera obligatoria.',
@@ -588,11 +588,11 @@ export function EquipmentAssetForm({
 
   // Estado actualizado solo si es permitido por la condición
   useEffect(() => {
-    const allowed = allowedStatusesByCondition[condition] || []
+    const allowed = ALLOWED_STATUSES_BY_CONDITION[condition] || []
     if (!allowed.includes(equipmentStatus)) {
       setEquipmentStatus(allowed[0] || 'AVAILABLE')
     }
-  }, [condition])
+  }, [condition, equipmentStatus])
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -1130,7 +1130,7 @@ export function EquipmentAssetForm({
               onChange={e => setEquipmentStatus(e.target.value)}
               disabled={hasActiveAssignment}
             >
-              {(allowedStatusesByCondition[condition] || []).map(status => (
+              {(ALLOWED_STATUSES_BY_CONDITION[condition] || []).map(status => (
                 <option key={status} value={status}>
                   {status === 'AVAILABLE'
                     ? 'Disponible'

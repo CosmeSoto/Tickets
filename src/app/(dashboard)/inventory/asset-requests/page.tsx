@@ -152,9 +152,12 @@ export default function AssetRequestsPage() {
     // Already handled by useEffect
   }, [])
 
-  const handleViewRequest = (request: AssetRequest) => {
-    router.push(`/inventory/asset-requests/${request.id}`)
-  }
+  const handleViewRequest = useCallback(
+    (request: AssetRequest) => {
+      router.push(`/inventory/asset-requests/${request.id}`)
+    },
+    [router]
+  )
 
   const handleClearFilters = () => {
     setSearch('')
@@ -185,7 +188,10 @@ export default function AssetRequestsPage() {
     columns: EXPORT_COLUMNS,
   })
 
-  const columns = useMemo(() => createAssetRequestColumns({ onView: handleViewRequest }), [])
+  const columns = useMemo(
+    () => createAssetRequestColumns({ onView: handleViewRequest }),
+    [handleViewRequest]
+  )
 
   return (
     <ModuleLayout

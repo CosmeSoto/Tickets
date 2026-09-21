@@ -191,7 +191,7 @@ export default function PatrolDashboardPage() {
     } finally {
       setAgendaLoading(false)
     }
-  }, [agendaRange.from.toISOString(), agendaRange.to.toISOString(), filterAgentId, filterFamilyId])
+  }, [agendaRange, filterAgentId, filterFamilyId])
 
   const fetchAgents = useCallback(async () => {
     try {

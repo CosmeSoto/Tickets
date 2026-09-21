@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -51,7 +51,7 @@ export default function AssetRequestDetailPage({ params }: { params: { id: strin
   const [request, setRequest] = useState<AssetRequestDetailData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
-  const loadRequest = async () => {
+  const loadRequest = useCallback(async () => {
     setIsLoading(true)
     try {
       const response = await fetch(`/api/inventory/asset-requests/${params.id}`)
@@ -72,11 +72,11 @@ export default function AssetRequestDetailPage({ params }: { params: { id: strin
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [params.id, router])
 
   useEffect(() => {
     loadRequest()
-  }, [params.id])
+  }, [loadRequest])
 
   if (isLoading) {
     return (

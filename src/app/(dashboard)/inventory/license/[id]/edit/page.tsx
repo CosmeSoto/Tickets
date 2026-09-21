@@ -1,6 +1,6 @@
 'use client'
 
-import { use, useState, useEffect } from 'react'
+import { use, useState, useEffect, useCallback } from 'react'
 import { useAuthReady } from '@/hooks/auth/use-auth-ready'
 import { useRouter } from 'next/navigation'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
@@ -35,12 +35,7 @@ export default function EditLicensePage({ params }: EditLicensePageProps) {
     }
   }, [status, canEdit, router, id])
 
-  useEffect(() => {
-    if (!id) return
-    loadData()
-  }, [id])
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true)
       const licenseRes = await fetch(`/api/inventory/licenses/${id}`)
@@ -62,7 +57,12 @@ export default function EditLicensePage({ params }: EditLicensePageProps) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [id])
+
+  useEffect(() => {
+    if (!id) return
+    loadData()
+  }, [id, loadData])
 
   const handleSubmit = async (payload: Record<string, unknown>) => {
     try {

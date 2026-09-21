@@ -308,6 +308,9 @@ export default function AdminNewsPage() {
     }
 
     checkAccess()
+    // Verificación de acceso de una sola vez por montaje (guardada por accessChecked.current);
+    // loadNews/loadUsersAndDepartments se omiten a propósito para no relanzar este efecto.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, status, router])
 
   const loadUsersAndDepartments = async () => {

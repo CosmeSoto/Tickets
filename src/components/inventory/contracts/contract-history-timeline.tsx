@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -17,10 +17,7 @@ import {
   RefreshCw,
   FilePenLine,
 } from 'lucide-react'
-import {
-  CONTRACT_AMENDMENT_TYPE_LABELS,
-  type ContractAmendment,
-} from '@/types/contracts'
+import { CONTRACT_AMENDMENT_TYPE_LABELS, type ContractAmendment } from '@/types/contracts'
 import { cn } from '@/lib/utils'
 
 interface ContractInChain {
@@ -69,11 +66,7 @@ export function ContractHistoryTimeline({ contractId }: ContractHistoryTimelineP
   const [amendments, setAmendments] = useState<ContractAmendment[]>([])
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    loadHistory()
-  }, [contractId])
-
-  const loadHistory = async () => {
+  const loadHistory = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
@@ -92,7 +85,11 @@ export function ContractHistoryTimeline({ contractId }: ContractHistoryTimelineP
     } finally {
       setLoading(false)
     }
-  }
+  }, [contractId])
+
+  useEffect(() => {
+    loadHistory()
+  }, [loadHistory])
 
   const formatDate = (date: Date | null) => {
     if (!date) return 'N/A'

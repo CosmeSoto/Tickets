@@ -85,7 +85,7 @@ export function useAttributeManagement(typeKind: TypeKind, typeId: string | null
     } finally {
       setLoading(false)
     }
-  }, [typeKind, typeId, toast])
+  }, [typeKind, typeId])
 
   // ── Create attribute ──
   const createAttribute = useCallback(
@@ -127,7 +127,7 @@ export function useAttributeManagement(typeKind: TypeKind, typeId: string | null
         setSaving(false)
       }
     },
-    [typeKind, typeId, toast]
+    [typeKind, typeId]
   )
 
   // ── Update attribute ──
@@ -170,47 +170,44 @@ export function useAttributeManagement(typeKind: TypeKind, typeId: string | null
         setSaving(false)
       }
     },
-    [toast]
+    []
   )
 
   // ── Delete attribute ──
-  const deleteAttribute = useCallback(
-    async (attributeId: string): Promise<boolean> => {
-      setSaving(true)
-      try {
-        const res = await fetch(`/api/admin/inventory/attributes/${attributeId}`, {
-          method: 'DELETE',
-        })
-        const result = await res.json()
+  const deleteAttribute = useCallback(async (attributeId: string): Promise<boolean> => {
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/admin/inventory/attributes/${attributeId}`, {
+        method: 'DELETE',
+      })
+      const result = await res.json()
 
-        if (res.ok && result.success) {
-          setAttributes(prev => prev.filter(attr => attr.id !== attributeId))
-          toast({
-            title: 'Éxito',
-            description: 'Atributo eliminado correctamente',
-          })
-          return true
-        } else {
-          toast({
-            title: 'Error',
-            description: result.error || 'Error al eliminar atributo',
-            variant: 'destructive',
-          })
-          return false
-        }
-      } catch (error) {
+      if (res.ok && result.success) {
+        setAttributes(prev => prev.filter(attr => attr.id !== attributeId))
+        toast({
+          title: 'Éxito',
+          description: 'Atributo eliminado correctamente',
+        })
+        return true
+      } else {
         toast({
           title: 'Error',
-          description: 'Error de conexión al eliminar atributo',
+          description: result.error || 'Error al eliminar atributo',
           variant: 'destructive',
         })
         return false
-      } finally {
-        setSaving(false)
       }
-    },
-    [toast]
-  )
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Error de conexión al eliminar atributo',
+        variant: 'destructive',
+      })
+      return false
+    } finally {
+      setSaving(false)
+    }
+  }, [])
 
   // ── Reorder attributes ──
   const reorderAttributes = useCallback(
@@ -264,7 +261,7 @@ export function useAttributeManagement(typeKind: TypeKind, typeId: string | null
         setSaving(false)
       }
     },
-    [typeKind, typeId, attributes, loadAttributes, toast]
+    [typeKind, typeId, attributes, loadAttributes]
   )
 
   return {

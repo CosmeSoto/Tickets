@@ -242,7 +242,9 @@ export function useModuleData<T extends { id: string }>(
 
   useEffect(() => {
     if (initialLoad) loadData(true)
-  }, []) // Solo en mount // eslint-disable-line react-hooks/exhaustive-deps
+    // Solo en mount — initialLoad/loadData se omiten a propósito.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   return { data, loading, error, create, update, remove, reload, reloadSilent, findById, setData }
 }

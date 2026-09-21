@@ -78,5 +78,9 @@ export function useSyncDashboardPageMeta(meta: DashboardPageMeta): void {
     return () => {
       setMeta({ headerActions: undefined })
     }
+    // Se depende de los campos primitivos de `meta`, no del objeto en sí:
+    // los llamadores pasan un objeto literal nuevo en cada render, y depender
+    // de `meta` completo relanzaría este efecto en cada render del padre.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setMeta, meta.title, meta.subtitle, meta.headerActions])
 }

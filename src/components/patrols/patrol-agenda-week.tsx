@@ -62,11 +62,11 @@ export function PatrolAgendaWeek({
   loading,
   onEventClick,
 }: PatrolAgendaWeekProps) {
-  const weekStart = startOfWeek(weekAnchor, { weekStartsOn: 1 })
-  const weekEnd = endOfWeek(weekAnchor, { weekStartsOn: 1 })
+  const weekStart = useMemo(() => startOfWeek(weekAnchor, { weekStartsOn: 1 }), [weekAnchor])
+  const weekEnd = useMemo(() => endOfWeek(weekAnchor, { weekStartsOn: 1 }), [weekAnchor])
   const days = useMemo(
     () => eachDayOfInterval({ start: weekStart, end: weekEnd }),
-    [weekStart.getTime(), weekEnd.getTime()]
+    [weekStart, weekEnd]
   )
 
   const byDay = useMemo(() => {

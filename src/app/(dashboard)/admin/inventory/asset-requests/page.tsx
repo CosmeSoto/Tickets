@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
 import { useSyncDashboardPageMeta } from '@/contexts/dashboard-shell-context'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -63,7 +63,7 @@ export default function AdminAssetRequestsPage() {
     fulfilled: 0,
   })
 
-  const loadRequests = async () => {
+  const loadRequests = useCallback(async () => {
     setIsLoading(true)
     try {
       const params = new URLSearchParams({
@@ -95,9 +95,9 @@ export default function AdminAssetRequestsPage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [page, search, statusFilter, typeFilter, activeTab])
 
-  const loadStats = async () => {
+  const loadStats = useCallback(async () => {
     try {
       const response = await fetch('/api/inventory/asset-requests?limit=1000')
       if (response.ok) {
@@ -115,11 +115,14 @@ export default function AdminAssetRequestsPage() {
     } catch (error) {
       console.error('Error loading stats:', error)
     }
-  }
+  }, [])
 
   useEffect(() => {
     loadRequests()
     loadStats()
+    // La búsqueda de texto solo se aplica al presionar "Buscar" (handleSearch),
+    // no en cada tecleo; por eso 'search' queda fuera de este disparador.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, statusFilter, typeFilter, activeTab])
 
   const handleSearch = () => {
@@ -150,7 +153,7 @@ export default function AdminAssetRequestsPage() {
         Actualizar
       </Button>
     ),
-    [isLoading]
+    [isLoading, loadRequests, loadStats]
   )
 
   useSyncDashboardPageMeta({

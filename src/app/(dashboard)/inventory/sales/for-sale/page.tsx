@@ -552,7 +552,7 @@ export default function ForSalePage() {
     } finally {
       setLoading(false)
     }
-  }, [toast])
+  }, [])
 
   useEffect(() => {
     if (canAccess) loadEquipment()

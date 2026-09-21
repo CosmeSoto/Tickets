@@ -44,7 +44,7 @@ export function useBrandManagement({ familyId }: UseBrandManagementOptions = {})
     } finally {
       setLoading(false)
     }
-  }, [familyId, toast])
+  }, [familyId])
 
   const createBrand = useCallback(
     async (data: {
@@ -84,7 +84,7 @@ export function useBrandManagement({ familyId }: UseBrandManagementOptions = {})
         setSaving(false)
       }
     },
-    [familyId, toast]
+    [familyId]
   )
 
   const updateBrand = useCallback(
@@ -128,39 +128,36 @@ export function useBrandManagement({ familyId }: UseBrandManagementOptions = {})
         setSaving(false)
       }
     },
-    [toast]
+    []
   )
 
-  const deleteBrand = useCallback(
-    async (id: string): Promise<boolean> => {
-      setSaving(true)
-      try {
-        const response = await fetch(`/api/admin/inventory/brands/${id}`, {
-          method: 'DELETE',
-        })
+  const deleteBrand = useCallback(async (id: string): Promise<boolean> => {
+    setSaving(true)
+    try {
+      const response = await fetch(`/api/admin/inventory/brands/${id}`, {
+        method: 'DELETE',
+      })
 
-        if (!response.ok) {
-          const error = await response.json()
-          throw new Error(error.error || 'Error al eliminar marca')
-        }
-
-        setBrands(prev => prev.filter(b => b.id !== id))
-        toast({ title: 'Marca eliminada' })
-        return true
-      } catch (error: any) {
-        console.error('Error deleting brand:', error)
-        toast({
-          variant: 'destructive',
-          title: 'Error',
-          description: error.message || 'No se pudo eliminar la marca',
-        })
-        return false
-      } finally {
-        setSaving(false)
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Error al eliminar marca')
       }
-    },
-    [toast]
-  )
+
+      setBrands(prev => prev.filter(b => b.id !== id))
+      toast({ title: 'Marca eliminada' })
+      return true
+    } catch (error: any) {
+      console.error('Error deleting brand:', error)
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.message || 'No se pudo eliminar la marca',
+      })
+      return false
+    } finally {
+      setSaving(false)
+    }
+  }, [])
 
   const toggleActive = useCallback(
     async (id: string, isActive: boolean): Promise<boolean> => {
@@ -210,7 +207,7 @@ export function useBrandManagement({ familyId }: UseBrandManagementOptions = {})
         setSaving(false)
       }
     },
-    [brands, loadBrands, toast]
+    [brands, loadBrands]
   )
 
   const activeBrands = useMemo(() => brands.filter(b => b.isActive), [brands])
