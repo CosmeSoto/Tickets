@@ -14,6 +14,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { requireSuperAdmin } from '@/lib/auth/require-super-admin'
 import { getOAuthCredentials } from '@/lib/oauth-config'
+import { exchangeMicrosoftCodeForTokens } from '@/lib/oauth/microsoft-authorize'
 import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
@@ -23,6 +24,8 @@ const REDIRECT_URI = `${REDIRECT_URI_BASE}/api/admin/planner/cloud-auth/callback
 const SUCCESS_REDIRECT = `${REDIRECT_URI_BASE}/admin/planner/settings?cloud=authorized`
 const ERROR_REDIRECT = `${REDIRECT_URI_BASE}/admin/planner/settings?cloud=error`
 const REFRESH_TOKEN_KEY = 'plannerMicrosoftRefreshToken'
+const PLANNER_SCOPE =
+  'https://graph.microsoft.com/Tasks.ReadWrite https://graph.microsoft.com/Group.Read.All offline_access'
 
 export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions)
@@ -57,27 +60,12 @@ export async function GET(request: NextRequest) {
     const creds = await getOAuthCredentials('azure-ad-planner')
     if (!creds) throw new Error('Microsoft OAuth (Planner) no configurado')
 
-    const tenant = creds.tenantId ?? 'common'
-    const res = await fetch(`https://login.microsoftonline.com/${tenant}/oauth2/v2.0/token`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        code,
-        client_id: creds.clientId,
-        client_secret: creds.clientSecret,
-        redirect_uri: REDIRECT_URI,
-        grant_type: 'authorization_code',
-        scope:
-          'https://graph.microsoft.com/Tasks.ReadWrite https://graph.microsoft.com/Group.Read.All offline_access',
-      }),
+    const data = await exchangeMicrosoftCodeForTokens({
+      credentials: creds,
+      redirectUri: REDIRECT_URI,
+      code,
+      scope: PLANNER_SCOPE,
     })
-
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}))
-      throw new Error(`Microsoft token error: ${err.error_description ?? err.error ?? res.status}`)
-    }
-
-    const data = await res.json()
     if (!data.refresh_token) {
       throw new Error('Microsoft no devolvió refresh_token para Planner.')
     }

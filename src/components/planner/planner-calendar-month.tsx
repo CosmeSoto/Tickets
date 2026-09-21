@@ -3,7 +3,7 @@
 import { useMemo } from 'react'
 import { format, isSameDay, isSameMonth, isToday } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { ChevronsLeft, ChevronsRight } from 'lucide-react'
+import { ChevronsLeft, ChevronsRight, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { getMonthGridDays, shiftMonthKeepingDay } from '@/lib/calendar/month-grid'
@@ -28,6 +28,9 @@ interface PlannerCalendarMonthProps {
   selectedDay: Date
   onSelectDay: (day: Date) => void
   tasks: PlannerTask[]
+  /** Botón "+" al pasar el mouse sobre un día — crea una tarea independiente
+   *  con esa fecha pre-llenada. Sin esto, el botón no se muestra. */
+  onCreateTask?: (day: Date) => void
 }
 
 /** Calendario mensual de tareas — misma grilla/interacción que el de rondas
@@ -38,6 +41,7 @@ export function PlannerCalendarMonth({
   selectedDay,
   onSelectDay,
   tasks,
+  onCreateTask,
 }: PlannerCalendarMonthProps) {
   const days = useMemo(() => getMonthGridDays(month, 1), [month])
 
@@ -121,12 +125,16 @@ export function PlannerCalendarMonth({
           const today = isToday(day)
 
           return (
-            <button
+            <div
               key={key}
-              type='button'
+              role='button'
+              tabIndex={0}
               onClick={() => onSelectDay(day)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' || e.key === ' ') onSelectDay(day)
+              }}
               className={cn(
-                'min-h-[76px] border-b border-r p-1.5 text-left transition-colors sm:min-h-[92px] sm:p-2',
+                'group relative min-h-[76px] border-b border-r p-1.5 text-left transition-colors sm:min-h-[92px] sm:p-2',
                 'hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
                 !inMonth && 'bg-muted/20 text-muted-foreground',
                 selected && 'bg-primary/5 ring-2 ring-inset ring-primary/40',
@@ -160,7 +168,20 @@ export function PlannerCalendarMonth({
                   ))}
                 </div>
               )}
-            </button>
+              {onCreateTask && (
+                <button
+                  type='button'
+                  aria-label='Nueva tarea este día'
+                  onClick={e => {
+                    e.stopPropagation()
+                    onCreateTask(day)
+                  }}
+                  className='absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground opacity-0 shadow transition-opacity group-hover:opacity-100 focus-visible:opacity-100'
+                >
+                  <Plus className='h-3 w-3' />
+                </button>
+              )}
+            </div>
           )
         })}
       </div>

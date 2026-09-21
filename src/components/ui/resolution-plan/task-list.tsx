@@ -3,8 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../card'
 import { Button } from '../button'
 import { Badge } from '../badge'
 import { Input } from '../input'
-import { DateInput } from '@/components/ui/date-input'
-import { Textarea } from '../textarea'
+import { TaskDetailFields } from '@/components/ui/task-detail-fields'
 import {
   Plus,
   Circle,
@@ -37,9 +36,8 @@ import {
 import type { ResolutionPlan, TaskFormData, ResolutionTask } from '@/hooks/use-resolution-plan'
 import { getStatusIcon, getStatusBadge } from './plan-status-icons'
 import { formatDate, getPriorityColor, getPriorityLabel } from './plan-helpers'
-import { formatDuration, calculateDuration } from '@/lib/utils/time-utils'
+import { formatDuration } from '@/lib/utils/time-utils'
 import { toLocalDateAndTimeParts } from '@/lib/forms/form-date'
-import { TimePicker } from '@/components/ui/time-picker'
 
 interface TaskEditForm {
   title: string
@@ -74,70 +72,6 @@ interface TaskListProps {
   onUpdateTask: (taskId: string, updates: Partial<TaskEditForm>) => Promise<boolean>
   onUpdateTaskStatus: (taskId: string, status: ResolutionTask['status']) => void
   onDeleteTask: (taskId: string) => void
-}
-
-/** Bloque de campos opcionales (descripción, prioridad, fecha, horario) — se
- *  reutiliza tanto en el quick-add como en el formulario de edición. */
-function TaskDetailFields({
-  description,
-  priority,
-  dueDate,
-  startTime,
-  endTime,
-  onChange,
-}: {
-  description: string
-  priority: ResolutionTask['priority']
-  dueDate: string
-  startTime: string
-  endTime: string
-  onChange: (patch: Partial<TaskEditForm>) => void
-}) {
-  return (
-    <div className='space-y-3'>
-      <Textarea
-        placeholder='Descripción (opcional)'
-        value={description}
-        onChange={e => onChange({ description: e.target.value })}
-        rows={2}
-      />
-      <div className='grid grid-cols-1 md:grid-cols-2 gap-3'>
-        <select
-          value={priority}
-          onChange={e => onChange({ priority: e.target.value as ResolutionTask['priority'] })}
-          className='px-3 py-2 border border-border rounded-md text-sm bg-background'
-        >
-          <option value='low'>Prioridad Baja</option>
-          <option value='medium'>Prioridad Media</option>
-          <option value='high'>Prioridad Alta</option>
-        </select>
-        <DateInput
-          value={dueDate}
-          onChange={e => onChange({ dueDate: e.target.value })}
-          placeholder='Fecha programada'
-          clearable
-        />
-      </div>
-      <div>
-        <label className='text-sm font-medium'>Horario de la Tarea</label>
-        <div className='grid grid-cols-2 gap-2 mt-1'>
-          <div>
-            <label className='text-xs text-muted-foreground'>Hora inicio</label>
-            <TimePicker value={startTime} onChange={v => onChange({ startTime: v })} />
-          </div>
-          <div>
-            <label className='text-xs text-muted-foreground'>Hora fin</label>
-            <TimePicker value={endTime} onChange={v => onChange({ endTime: v })} />
-          </div>
-        </div>
-        {startTime && endTime && (
-          <p className='text-xs text-muted-foreground mt-1'>
-            Duración: {calculateDuration(startTime, endTime)}
-          </p>
-        )}
-      </div>
-    </div>
-  )
 }
 
 export function TaskList({

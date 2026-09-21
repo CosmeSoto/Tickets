@@ -235,12 +235,18 @@ model ticket_email_digest_items {
   @@index([createdAt])
 }
 
+/// accessToken/refreshToken se guardan cifrados (encrypt()/decrypt() de
+/// src/lib/crypto.ts, mismo patrón que oauth_configs.clientSecret). A
+/// diferencia de oauth_configs (una cuenta de servicio compartida), aquí cada
+/// fila es la cuenta Microsoft personal de un usuario (ej. provider
+/// 'microsoft-todo') — usado por la sincronización de tareas independientes.
 model oauth_accounts {
   id           String    @id
   provider     String
   providerId   String
   accessToken  String
   refreshToken String?
+  scope        String?
   expiresAt    DateTime?
   userId       String
   createdAt    DateTime  @default(now())
@@ -596,6 +602,7 @@ model users {
   ticket_email_digest_items                         ticket_email_digest_items[]
   oauth_accounts                                    oauth_accounts[]
   password_reset_tokens                             password_reset_tokens[]
+  personal_tasks                                    personal_tasks[]                 @relation("PersonalTaskOwner")
   resolution_plans_created                          resolution_plans[]               @relation("ResolutionPlanCreator")
   tasks_assigned                                    resolution_tasks[]               @relation("TaskAssignee")
   sessions                                          sessions[]
@@ -833,6 +840,60 @@ model planner_task_links {
   @@unique([plannerTaskId])
   @@index([syncStatus])
   @@map("planner_task_links")
+}
+
+/// Tarea personal independiente de tickets — creada directamente desde el
+/// módulo Tareas (calendario o tablero), sin pasar por resolution_plans. v1:
+/// estrictamente personal, sin asignación a otro usuario (creador = dueño).
+model personal_tasks {
+  id          String    @id @default(uuid())
+  userId      String    @map("user_id")
+  title       String
+  description String?
+  status      String    @default("pending")
+  priority    String    @default("medium")
+  startTime   String?   @map("start_time")
+  endTime     String?   @map("end_time")
+  dueDate     DateTime? @map("due_date")
+  completedAt DateTime? @map("completed_at")
+  notes       String?
+  familyId    String?   @map("family_id")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  user       users                        @relation("PersonalTaskOwner", fields: [userId], references: [id], onDelete: Cascade)
+  family     families?                    @relation(fields: [familyId], references: [id])
+  msTodoLink personal_task_ms_todo_links?
+
+  @@index([userId, dueDate])
+  @@index([userId, status])
+  @@index([familyId])
+  @@map("personal_tasks")
+}
+
+/// Vincula una personal_task con su tarea en la lista de Microsoft To Do del
+/// propio usuario (OAuth delegado por usuario, ver oauth_accounts). A
+/// diferencia de planner_task_links (cuenta de servicio compartida + un solo
+/// plan/bucket fijo), aquí cada usuario tiene su propia lista de To Do — por
+/// eso es una tabla propia con FK real, no polimórfica.
+model personal_task_ms_todo_links {
+  id             String    @id @default(uuid())
+  personalTaskId String    @unique @map("personal_task_id")
+  userId         String    @map("user_id")
+  msTaskListId   String    @map("ms_task_list_id")
+  msTaskId       String    @map("ms_task_id")
+  etag           String?
+  syncStatus     String    @default("synced") @map("sync_status")
+  syncError      String?   @map("sync_error")
+  lastSyncedAt   DateTime? @map("last_synced_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  personalTask personal_tasks @relation(fields: [personalTaskId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, msTaskId])
+  @@index([syncStatus])
+  @@map("personal_task_ms_todo_links")
 }
 
 model ticket_knowledge_articles {
@@ -2077,6 +2138,7 @@ model families {
   credentialShares      credential_shares[]
   processes             processes[]
   accessSubjects        access_subjects[]
+  personalTasks         personal_tasks[]
   accessPasses          access_passes[]
   accessScanEvents      access_scan_events[]
 

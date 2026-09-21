@@ -2,8 +2,15 @@
 
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
-import { CalendarClock, User } from 'lucide-react'
+import { CalendarClock, ListTodo, MoreVertical, Pencil, Trash2, User } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { Button } from '@/components/ui/button'
 import { getPriorityColor, getPriorityLabel } from '@/components/ui/resolution-plan/plan-helpers'
 import { ticketUrlForRole } from '@/lib/utils/ticket-role-url'
 import type { PlannerTask } from '@/hooks/use-planner-tasks'
@@ -28,15 +35,24 @@ interface PlannerTaskCardProps {
   task: PlannerTask
   dragHandleProps?: Record<string, unknown>
   isDragging?: boolean
+  onEdit?: (task: PlannerTask) => void
+  onDelete?: (task: PlannerTask) => void
 }
 
 /** Tarjeta estilo Trello: acento de color por familia + badge de prioridad,
  * reusando la misma paleta ya usada en la ficha del ticket (plan-helpers.ts)
  * en vez de inventar colores nuevos. */
-export function PlannerTaskCard({ task, dragHandleProps, isDragging }: PlannerTaskCardProps) {
+export function PlannerTaskCard({
+  task,
+  dragHandleProps,
+  isDragging,
+  onEdit,
+  onDelete,
+}: PlannerTaskCardProps) {
   const { data: session } = useSession()
   const dueLabel = formatDueDate(task.dueDate)
   const isOverdue = dueLabel?.includes('vencida')
+  const showMenu = (task.canEdit || task.canDelete) && (onEdit || onDelete)
 
   return (
     <div
@@ -48,18 +64,59 @@ export function PlannerTaskCard({ task, dragHandleProps, isDragging }: PlannerTa
     >
       <div className='flex items-start justify-between gap-2'>
         <p className='text-sm font-medium leading-snug'>{task.title}</p>
-        <Badge className={`shrink-0 text-[10px] ${getPriorityColor(task.priority)}`}>
-          {getPriorityLabel(task.priority)}
-        </Badge>
+        <div className='flex shrink-0 items-center gap-1'>
+          <Badge className={`shrink-0 text-[10px] ${getPriorityColor(task.priority)}`}>
+            {getPriorityLabel(task.priority)}
+          </Badge>
+          {showMenu && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type='button'
+                  variant='ghost'
+                  size='icon'
+                  className='h-5 w-5 opacity-0 group-hover:opacity-100'
+                  onClick={e => e.stopPropagation()}
+                >
+                  <MoreVertical className='h-3.5 w-3.5' />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align='end'>
+                {task.canEdit && onEdit && (
+                  <DropdownMenuItem onClick={() => onEdit(task)}>
+                    <Pencil className='mr-2 h-3.5 w-3.5' />
+                    Editar
+                  </DropdownMenuItem>
+                )}
+                {task.canDelete && onDelete && (
+                  <DropdownMenuItem
+                    className='text-destructive focus:text-destructive'
+                    onClick={() => onDelete(task)}
+                  >
+                    <Trash2 className='mr-2 h-3.5 w-3.5' />
+                    Eliminar
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
       </div>
 
-      <Link
-        href={ticketUrlForRole(session?.user?.role, task.ticketId)}
-        className='mt-1 block truncate text-xs text-muted-foreground hover:underline'
-        onClick={e => e.stopPropagation()}
-      >
-        {task.ticketTitle}
-      </Link>
+      {task.origin === 'ticket' && task.ticketId ? (
+        <Link
+          href={ticketUrlForRole(session?.user?.role, task.ticketId)}
+          className='mt-1 block truncate text-xs text-muted-foreground hover:underline'
+          onClick={e => e.stopPropagation()}
+        >
+          {task.ticketTitle}
+        </Link>
+      ) : (
+        <span className='mt-1 flex items-center gap-1 truncate text-xs text-muted-foreground'>
+          <ListTodo className='h-3 w-3 shrink-0' />
+          Tarea independiente
+        </span>
+      )}
 
       <div className='mt-2 flex items-center justify-between gap-2 text-xs text-muted-foreground'>
         <span className='flex items-center gap-1 truncate'>

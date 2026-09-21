@@ -48,6 +48,7 @@ export function OAuthSettingsTab() {
   const [googleEnabled, setGoogleEnabled] = useState(false)
   const [microsoftEnabled, setMicrosoftEnabled] = useState(false)
   const [plannerEnabled, setPlannerEnabled] = useState(false)
+  const [todoEnabled, setTodoEnabled] = useState(false)
   const [sharePointEnabled, setSharePointEnabled] = useState(false)
 
   return (
@@ -204,6 +205,42 @@ export function OAuthSettingsTab() {
             enabledLabel='Habilitar credenciales de Planner'
             enabledDescription='Debe estar activo para poder conectar la cuenta dedicada en Configuración de Tareas.'
             onStateChange={s => setPlannerEnabled(s.isEnabled)}
+          />
+        </CardContent>
+      </Card>
+
+      {/* Microsoft (To Do) */}
+      <Card>
+        <CardHeader>
+          <div className='flex items-center justify-between'>
+            <div className='flex items-center space-x-3'>
+              <div className='p-2 bg-muted rounded-lg'>
+                <MicrosoftIcon />
+              </div>
+              <div>
+                <CardTitle>Microsoft (To Do)</CardTitle>
+                <CardDescription>
+                  Registro de aplicación en Entra ID con permisos delegados de To Do
+                  (Tasks.ReadWrite). A diferencia de Planner (una sola cuenta de servicio
+                  compartida), acá cada usuario conecta SU PROPIA cuenta desde su perfil, para
+                  sincronizar sus tareas independientes con su lista personal de Microsoft To Do.
+                </CardDescription>
+              </div>
+            </div>
+            <ProviderStatusBadge isEnabled={todoEnabled} />
+          </div>
+        </CardHeader>
+        <CardContent className='space-y-4'>
+          <OAuthCredentialsFields
+            provider='azure-ad-todo'
+            clientIdPlaceholder='00000000-0000-0000-0000-000000000000'
+            showTenantId
+            tenantPlaceholder='common'
+            redirectUriPath='/api/planner/ms-todo/callback'
+            scopes='https://graph.microsoft.com/Tasks.ReadWrite offline_access'
+            enabledLabel='Habilitar credenciales de To Do'
+            enabledDescription='Debe estar activo para que los usuarios puedan vincular su cuenta de Microsoft To Do desde su perfil.'
+            onStateChange={s => setTodoEnabled(s.isEnabled)}
           />
         </CardContent>
       </Card>

@@ -25,24 +25,32 @@ const COLUMNS: { status: PlannerTaskStatus; label: string }[] = [
   { status: 'blocked', label: 'Bloqueada' },
 ]
 
-function DraggableCard({ task, canManage }: { task: PlannerTask; canManage: boolean }) {
+function DraggableCard({
+  task,
+  onEdit,
+  onDelete,
+}: {
+  task: PlannerTask
+  onEdit?: (task: PlannerTask) => void
+  onDelete?: (task: PlannerTask) => void
+}) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: task.id,
     data: { task },
-    // Sin permiso de gestión, la tarjeta se ve pero no se puede arrastrar —
-    // ver "Crear y gestionar tareas" en module-access-card.tsx: sin ese
-    // permiso el usuario solo puede consultar el tablero, igual que
-    // Procesos/Accesos con su propio canManage.
-    disabled: !canManage,
+    // El permiso de arrastrar ahora es por tarjeta (task.canEdit) — una tarea
+    // independiente la puede mover su propio dueño aunque no tenga
+    // canManagePlanner; una tarea de ticket sigue el mismo criterio global de
+    // antes (ver "Crear y gestionar tareas" en module-access-card.tsx).
+    disabled: !task.canEdit,
   })
   return (
     <div
       ref={setNodeRef}
-      {...(canManage ? attributes : {})}
-      {...(canManage ? listeners : {})}
-      className={canManage ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}
+      {...(task.canEdit ? attributes : {})}
+      {...(task.canEdit ? listeners : {})}
+      className={task.canEdit ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}
     >
-      <PlannerTaskCard task={task} isDragging={isDragging} />
+      <PlannerTaskCard task={task} isDragging={isDragging} onEdit={onEdit} onDelete={onDelete} />
     </div>
   )
 }
@@ -51,14 +59,16 @@ function DroppableColumn({
   status,
   label,
   tasks,
-  canManage,
+  onEdit,
+  onDelete,
 }: {
   status: PlannerTaskStatus
   label: string
   tasks: PlannerTask[]
-  canManage: boolean
+  onEdit?: (task: PlannerTask) => void
+  onDelete?: (task: PlannerTask) => void
 }) {
-  const { setNodeRef, isOver } = useDroppable({ id: status, disabled: !canManage })
+  const { setNodeRef, isOver } = useDroppable({ id: status })
   return (
     <div className='flex min-w-[260px] flex-1 flex-col rounded-lg border bg-muted/20'>
       <div
@@ -75,7 +85,7 @@ function DroppableColumn({
         style={{ minHeight: 200, maxHeight: 'calc(100vh - 320px)' }}
       >
         {tasks.map(task => (
-          <DraggableCard key={task.id} task={task} canManage={canManage} />
+          <DraggableCard key={task.id} task={task} onEdit={onEdit} onDelete={onDelete} />
         ))}
         {tasks.length === 0 && (
           <p className='py-6 text-center text-xs text-muted-foreground'>Sin tareas</p>
@@ -88,23 +98,25 @@ function DroppableColumn({
 interface PlannerBoardProps {
   tasks: PlannerTask[]
   onStatusChange: (task: PlannerTask, status: PlannerTaskStatus) => void
-  /** Sin esto, el tablero es de solo lectura (ver toggle "Crear y gestionar
-   *  tareas" del módulo Planner) — puede consultar pero no arrastrar tarjetas. */
-  canManage: boolean
+  onEditTask?: (task: PlannerTask) => void
+  onDeleteTask?: (task: PlannerTask) => void
 }
 
-export function PlannerBoard({ tasks, onStatusChange, canManage }: PlannerBoardProps) {
+export function PlannerBoard({
+  tasks,
+  onStatusChange,
+  onEditTask,
+  onDeleteTask,
+}: PlannerBoardProps) {
   const [activeTask, setActiveTask] = useState<PlannerTask | null>(null)
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))
 
   const handleDragStart = (event: DragStartEvent) => {
-    if (!canManage) return
     setActiveTask((event.active.data.current?.task as PlannerTask) ?? null)
   }
 
   const handleDragEnd = (event: DragEndEvent) => {
     setActiveTask(null)
-    if (!canManage) return
     const { active, over } = event
     if (!over) return
     const task = active.data.current?.task as PlannerTask | undefined
@@ -127,7 +139,8 @@ export function PlannerBoard({ tasks, onStatusChange, canManage }: PlannerBoardP
             status={col.status}
             label={col.label}
             tasks={tasks.filter(t => t.status === col.status)}
-            canManage={canManage}
+            onEdit={onEditTask}
+            onDelete={onDeleteTask}
           />
         ))}
       </div>

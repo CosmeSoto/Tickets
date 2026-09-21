@@ -29,6 +29,7 @@ export type OAuthCredentialsProvider =
   | 'azure-ad'
   | 'azure-ad-planner'
   | 'azure-ad-sharepoint'
+  | 'azure-ad-todo'
 
 interface OAuthConfigApiRow {
   provider: string

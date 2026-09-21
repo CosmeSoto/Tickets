@@ -37,6 +37,9 @@ interface PlannerCalendarWeekProps {
   onSelectDay: (day: Date) => void
   tasks: PlannerTask[]
   onTaskClick?: (task: PlannerTask) => void
+  /** Clic en una hora vacía de la grilla — crea una tarea independiente con
+   *  esa fecha/hora pre-llenada. Sin esto, las celdas vacías no reaccionan. */
+  onCreateTask?: (day: Date, hour: number) => void
   /** Un solo día visible (vista "Día") en vez de los 7 de la semana. */
   singleDay?: boolean
 }
@@ -52,6 +55,7 @@ export function PlannerCalendarWeek({
   onSelectDay,
   tasks,
   onTaskClick,
+  onCreateTask,
   singleDay,
 }: PlannerCalendarWeekProps) {
   const weekStart = useMemo(() => startOfWeek(weekAnchor, { weekStartsOn: 1 }), [weekAnchor])
@@ -266,7 +270,20 @@ export function PlannerCalendarWeek({
                   {hours.map(h => (
                     <div
                       key={h}
-                      className='absolute left-0 right-0 border-b border-border/60'
+                      role={onCreateTask ? 'button' : undefined}
+                      tabIndex={onCreateTask ? 0 : undefined}
+                      onClick={onCreateTask ? () => onCreateTask(day, h) : undefined}
+                      onKeyDown={
+                        onCreateTask
+                          ? e => {
+                              if (e.key === 'Enter' || e.key === ' ') onCreateTask(day, h)
+                            }
+                          : undefined
+                      }
+                      className={cn(
+                        'absolute left-0 right-0 border-b border-border/60',
+                        onCreateTask && 'cursor-pointer hover:bg-primary/5'
+                      )}
                       style={{ top: (h - hourStart) * 56, height: 56 }}
                     />
                   ))}

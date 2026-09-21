@@ -13,12 +13,15 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { requireSuperAdmin } from '@/lib/auth/require-super-admin'
 import { getOAuthCredentials } from '@/lib/oauth-config'
+import { buildMicrosoftAuthorizeUrl } from '@/lib/oauth/microsoft-authorize'
 import prisma from '@/lib/prisma'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 
 const REDIRECT_URI_BASE = process.env.NEXTAUTH_URL ?? 'http://localhost:3000'
 const REDIRECT_URI = `${REDIRECT_URI_BASE}/api/admin/planner/cloud-auth/callback`
 const REFRESH_TOKEN_KEY = 'plannerMicrosoftRefreshToken'
+const PLANNER_SCOPE =
+  'https://graph.microsoft.com/Tasks.ReadWrite https://graph.microsoft.com/Group.Read.All offline_access'
 
 export async function GET() {
   const session = await getServerSession(authOptions)
@@ -37,20 +40,15 @@ export async function GET() {
     return NextResponse.json({ authorized: false, oauthConfigured: false, authUrl: null })
   }
 
-  const tenant = creds.tenantId ?? 'common'
-  const params = new URLSearchParams({
-    client_id: creds.clientId,
-    redirect_uri: REDIRECT_URI,
-    response_type: 'code',
-    scope:
-      'https://graph.microsoft.com/Tasks.ReadWrite https://graph.microsoft.com/Group.Read.All offline_access',
-    state: `planner:${session!.user!.id}`,
-  })
-
   return NextResponse.json({
     authorized: false,
     oauthConfigured: true,
-    authUrl: `https://login.microsoftonline.com/${tenant}/oauth2/v2.0/authorize?${params}`,
+    authUrl: buildMicrosoftAuthorizeUrl({
+      credentials: creds,
+      redirectUri: REDIRECT_URI,
+      scope: PLANNER_SCOPE,
+      state: `planner:${session!.user!.id}`,
+    }),
   })
 }
 

@@ -57,6 +57,7 @@ import {
 } from 'lucide-react'
 import { UserModulesPanel } from '@/components/users/user-modules-panel'
 import { TelegramLinkCard } from '@/components/notifications/telegram-link-card'
+import { MsTodoLinkCard } from '@/components/planner/ms-todo-link-card'
 
 export default function ProfilePage() {
   const { data: session, status, update } = useAuthReady()
@@ -639,6 +640,9 @@ export default function ProfilePage() {
 
         {/* Telegram — vincular cuenta para recibir alertas operativas */}
         <TelegramLinkCard />
+
+        {/* Microsoft To Do — sincronizar tareas independientes del módulo Tareas */}
+        {(session.user as any).plannerEnabled && <MsTodoLinkCard />}
 
         {/* Seguridad */}
         <Card>

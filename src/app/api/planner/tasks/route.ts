@@ -1,10 +1,13 @@
 /**
  * GET /api/planner/tasks
- * Lista las tareas (resolution_tasks) visibles para el tablero/calendario del
- * módulo de Tareas — mismo dato que ya se ve dentro de cada ticket, agregado
- * en un solo lugar. No crea tareas nuevas (eso sigue viviendo en
- * /api/tickets/[id]/resolution-plan/tasks, dentro del ticket) — esta ruta es
- * de solo lectura para el tablero.
+ * Lista, en un solo array, las tareas de ticket (resolution_tasks) visibles
+ * para el tablero/calendario del módulo de Tareas junto con las tareas
+ * independientes (personal_tasks) del propio usuario, distinguidas por
+ * `origin`. La creación de tareas de ticket sigue viviendo en
+ * /api/tickets/[id]/resolution-plan/tasks; la de tareas independientes vive
+ * en /api/planner/personal-tasks — esta ruta sigue siendo de solo lectura,
+ * ahora agregando ambas fuentes para no duplicar la lógica de agrupar por
+ * día/columna en cada componente del calendario/tablero.
  */
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
@@ -85,22 +88,71 @@ export async function GET() {
     orderBy: [{ dueDate: 'asc' }, { createdAt: 'desc' }],
   })
 
+  // Las tareas independientes son siempre "las mías" — no tienen alcance por
+  // familia/rol como las de ticket (ver decisión de producto: v1 es
+  // estrictamente personal, sin asignación a otros usuarios).
+  const personalTasks = await prisma.personal_tasks.findMany({
+    where: { userId: session.user.id },
+    select: {
+      id: true,
+      title: true,
+      description: true,
+      status: true,
+      priority: true,
+      dueDate: true,
+      startTime: true,
+      endTime: true,
+      completedAt: true,
+      family: { select: { id: true, name: true, color: true } },
+      user: { select: { id: true, name: true, email: true } },
+    },
+    orderBy: [{ dueDate: 'asc' }, { createdAt: 'desc' }],
+  })
+
   return NextResponse.json({
-    tasks: tasks.map(t => ({
-      id: t.id,
-      title: t.title,
-      description: t.description,
-      status: t.status,
-      priority: t.priority,
-      dueDate: t.dueDate?.toISOString() ?? null,
-      startTime: t.startTime,
-      endTime: t.endTime,
-      completedAt: t.completedAt?.toISOString() ?? null,
-      assignee: t.assignee,
-      ticketId: t.plan.ticketId,
-      ticketTitle: t.plan.ticket.title,
-      planTitle: t.plan.title,
-      family: t.plan.ticket.family,
-    })),
+    tasks: [
+      ...tasks.map(t => ({
+        origin: 'ticket' as const,
+        id: t.id,
+        title: t.title,
+        description: t.description,
+        status: t.status,
+        priority: t.priority,
+        dueDate: t.dueDate?.toISOString() ?? null,
+        startTime: t.startTime,
+        endTime: t.endTime,
+        completedAt: t.completedAt?.toISOString() ?? null,
+        assignee: t.assignee,
+        ticketId: t.plan.ticketId,
+        ticketTitle: t.plan.ticket.title,
+        planTitle: t.plan.title,
+        family: t.plan.ticket.family,
+        // Mismo criterio global que ya gobernaba el arrastre en el tablero
+        // (access.canManage) — no se restringe más de lo que ya hace hoy la
+        // ruta de escritura (assertTicketAccess por ticket).
+        canEdit: access.canManage,
+        canDelete: access.canManage,
+      })),
+      ...personalTasks.map(t => ({
+        origin: 'personal' as const,
+        id: t.id,
+        title: t.title,
+        description: t.description,
+        status: t.status,
+        priority: t.priority,
+        dueDate: t.dueDate?.toISOString() ?? null,
+        startTime: t.startTime,
+        endTime: t.endTime,
+        completedAt: t.completedAt?.toISOString() ?? null,
+        assignee: t.user,
+        ticketId: null,
+        ticketTitle: null,
+        planTitle: null,
+        family: t.family,
+        // Siempre dueño único — sin asignación a otros en v1.
+        canEdit: true,
+        canDelete: true,
+      })),
+    ],
   })
 }
