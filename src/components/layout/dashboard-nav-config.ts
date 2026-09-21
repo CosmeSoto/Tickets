@@ -51,6 +51,15 @@ export const navigationByRole: Record<string, DashboardNavItem[]> = {
       ],
     },
     {
+      name: 'Tareas',
+      href: '/planner',
+      icon: ListTodo,
+      children: [
+        { name: 'Tablero', href: '/planner', icon: ListTodo },
+        { name: 'Configuración', href: '/admin/planner/settings', icon: Settings },
+      ],
+    },
+    {
       name: 'Inventario',
       href: '/inventory',
       icon: Package,
@@ -103,15 +112,6 @@ export const navigationByRole: Record<string, DashboardNavItem[]> = {
       children: [
         { name: 'Catálogo', href: '/admin/processes', icon: Workflow },
         { name: 'Configuración', href: '/admin/processes/settings', icon: Settings },
-      ],
-    },
-    {
-      name: 'Tareas',
-      href: '/planner',
-      icon: ListTodo,
-      children: [
-        { name: 'Tablero', href: '/planner', icon: ListTodo },
-        { name: 'Configuración', href: '/admin/planner/settings', icon: Settings },
       ],
     },
     { name: 'Familias', href: '/admin/families', icon: Layers },
