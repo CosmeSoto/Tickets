@@ -17,9 +17,19 @@ import { getOAuthCredentials } from '@/lib/oauth-config'
 import { refreshMicrosoftAccessToken } from '@/lib/oauth/microsoft-authorize'
 
 const GRAPH_BASE = 'https://graph.microsoft.com/v1.0'
-export const MS_TODO_SCOPE = 'https://graph.microsoft.com/Tasks.ReadWrite offline_access'
+// User.Read (no solo Tasks.ReadWrite) para poder mostrar en /profile qué
+// cuenta de Microsoft quedó conectada (getConnectedAccountEmail) — sin este
+// alcance, GET /me devuelve 403 y la tarjeta nunca sabe qué correo mostrar.
+export const MS_TODO_SCOPE =
+  'https://graph.microsoft.com/Tasks.ReadWrite https://graph.microsoft.com/User.Read offline_access'
 export const MS_TODO_PROVIDER = 'microsoft-todo'
 export const MS_TODO_LIST_NAME = 'Tareas (Gestión Operaciones)'
+/** Cookie httpOnly de vida corta que guarda el nonce anti-CSRF del flujo de
+ *  conexión (ver /api/planner/ms-todo/connect y callback/route.ts) — sin
+ *  esto, `state` solo llevaría el userId (adivinable/conocido), y alguien
+ *  podría enlazar su propia cuenta de Microsoft a la sesión de otra persona
+ *  con solo lograr que esa persona abra un callback armado a mano. */
+export const MS_TODO_OAUTH_NONCE_COOKIE = 'ms_todo_oauth_nonce'
 
 export class MsTodoNotConnectedError extends Error {
   constructor() {
@@ -72,6 +82,14 @@ export function fromGraphStatus(graphStatus: string): string {
   }
 }
 
+/** El recurso dateTimeTimeZone de Graph espera `dateTime` SIN sufijo de zona
+ *  (naive) cuando `timeZone` ya lo declara aparte — enviar un ISO con "Z" Y
+ *  timeZone:'UTC' a la vez es ambiguo. Acá siempre se declara 'UTC', así que
+ *  se quita el sufijo si vino de un `Date.toISOString()`. */
+function toGraphNaiveUtc(isoString: string): string {
+  return isoString.endsWith('Z') ? isoString.slice(0, -1) : isoString
+}
+
 export class MsTodoGraphService {
   /** Igual que PlannerGraphService.getAccessToken, pero por usuario — lee y
    *  rota el refresh token cifrado de oauth_accounts en vez de una sola fila
@@ -85,7 +103,19 @@ export class MsTodoGraphService {
     })
     if (!account?.refreshToken) throw new MsTodoNotConnectedError()
 
-    const creds = await getOAuthCredentials('azure-ad-todo')
+    // Reusa el access token vigente si todavía le quedan más de 2 minutos —
+    // a diferencia de Planner (una sola cuenta, poco tráfico), acá cada
+    // status/push/pull de cada usuario pediría un refresh nuevo en cada
+    // llamada si no se cachea, multiplicando el tráfico contra Microsoft y
+    // arriesgando refrescos concurrentes que se pisan entre sí (Microsoft
+    // rota el refresh token en cada uso).
+    if (account.expiresAt && account.expiresAt.getTime() - Date.now() > 2 * 60 * 1000) {
+      return decrypt(account.accessToken)
+    }
+
+    // Mismo App Registration que Planner ('azure-ad-planner') — ver el
+    // comentario de OAuthProviderKey en oauth-config.ts.
+    const creds = await getOAuthCredentials('azure-ad-planner')
     if (!creds) {
       throw new Error(
         'La integración con Microsoft To Do no está configurada por el administrador.'
@@ -160,7 +190,7 @@ export class MsTodoGraphService {
     const body: Record<string, unknown> = { title: input.title }
     if (input.status) body.status = toGraphStatus(input.status)
     if (input.dueDateTime) {
-      body.dueDateTime = { dateTime: input.dueDateTime, timeZone: 'UTC' }
+      body.dueDateTime = { dateTime: toGraphNaiveUtc(input.dueDateTime), timeZone: 'UTC' }
     }
 
     const res = await this.graphFetch(`/me/todo/lists/${listId}/tasks`, accessToken, {
@@ -185,7 +215,9 @@ export class MsTodoGraphService {
     if (patch.title !== undefined) body.title = patch.title
     if (patch.status !== undefined) body.status = toGraphStatus(patch.status)
     if (patch.dueDateTime !== undefined) {
-      body.dueDateTime = patch.dueDateTime ? { dateTime: patch.dueDateTime, timeZone: 'UTC' } : null
+      body.dueDateTime = patch.dueDateTime
+        ? { dateTime: toGraphNaiveUtc(patch.dueDateTime), timeZone: 'UTC' }
+        : null
     }
 
     const res = await this.graphFetch(`/me/todo/lists/${listId}/tasks/${taskId}`, accessToken, {
@@ -211,20 +243,35 @@ export class MsTodoGraphService {
     }
   }
 
+  /** Sigue @odata.nextLink hasta agotar las páginas — una lista personal
+   *  rara vez supera una página, pero sin esto, superarla hace que las
+   *  tareas de páginas siguientes se reporten como "eliminadas en Microsoft
+   *  To Do" en cada sondeo (ver pullChangesForUser). */
   static async listTasks(accessToken: string, listId: string): Promise<MsTodoTaskSummary[]> {
-    const res = await this.graphFetch(
-      `/me/todo/lists/${listId}/tasks?$select=id,title,status,dueDateTime`,
-      accessToken
-    )
-    if (!res.ok) throw new Error(`No se pudieron listar las tareas de To Do: ${res.status}`)
-    const data = await res.json()
-    return (data.value ?? []).map((t: any) => ({
-      id: t.id,
-      etag: t['@odata.etag'] ?? '',
-      title: t.title,
-      status: fromGraphStatus(t.status),
-      dueDateTime: t.dueDateTime?.dateTime ? `${t.dueDateTime.dateTime}Z` : null,
-    }))
+    const results: MsTodoTaskSummary[] = []
+    let url: string | null = `/me/todo/lists/${listId}/tasks?$select=id,title,status,dueDateTime`
+    let absolute = false
+
+    while (url) {
+      const res: Response = absolute
+        ? await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } })
+        : await this.graphFetch(url, accessToken)
+      if (!res.ok) throw new Error(`No se pudieron listar las tareas de To Do: ${res.status}`)
+      const data = await res.json()
+      for (const t of data.value ?? []) {
+        results.push({
+          id: t.id,
+          etag: t['@odata.etag'] ?? '',
+          title: t.title,
+          status: fromGraphStatus(t.status),
+          dueDateTime: t.dueDateTime?.dateTime ? `${t.dueDateTime.dateTime}Z` : null,
+        })
+      }
+      url = data['@odata.nextLink'] ?? null
+      absolute = true
+    }
+
+    return results
   }
 
   /** Guarda por primera vez el token de una cuenta recién conectada. */

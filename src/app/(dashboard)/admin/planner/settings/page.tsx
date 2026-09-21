@@ -107,10 +107,13 @@ export default function PlannerSettingsPage() {
       })
       void load()
     } else if (cloud === 'error') {
+      // searchParams.get ya decodifica el percent-encoding una vez — un
+      // decodeURIComponent extra sobre eso lanza URIError si el mensaje de
+      // Microsoft trae un "%" literal.
       const reason = searchParams.get('reason')
       toast({
         title: 'No se pudo conectar',
-        description: reason ? decodeURIComponent(reason) : 'Error desconocido',
+        description: reason || 'Error desconocido',
         variant: 'destructive',
       })
     }
@@ -244,7 +247,9 @@ export default function PlannerSettingsPage() {
             <CardTitle>Credenciales de la aplicación (Azure AD)</CardTitle>
             <CardDescription>
               Se configuran una sola vez para todo el sistema en Ajustes → OAuth, junto con las
-              demás credenciales de Microsoft (login, SharePoint).
+              demás credenciales de Microsoft (login, SharePoint). Esta misma credencial también
+              habilita que cada usuario conecte su propia cuenta de Microsoft To Do desde su perfil
+              (Mi Perfil → Microsoft To Do) — no requiere configurarse aparte.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -303,8 +308,12 @@ export default function PlannerSettingsPage() {
               </div>
             </div>
             {!connected && (
-              <div className='mt-3'>
+              <div className='mt-3 space-y-1.5'>
                 <RedirectUriNote path='/api/admin/planner/cloud-auth/callback' />
+                <RedirectUriNote
+                  path='/api/planner/ms-todo/callback'
+                  label='Además registra este segundo Redirect URI (lo usa Microsoft To Do por usuario, misma app):'
+                />
               </div>
             )}
           </CardContent>

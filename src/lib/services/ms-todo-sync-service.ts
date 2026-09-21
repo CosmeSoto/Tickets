@@ -11,7 +11,11 @@
  */
 import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
-import { MsTodoGraphService, MsTodoNotConnectedError } from './ms-todo-graph-service'
+import {
+  MsTodoGraphService,
+  MsTodoNotConnectedError,
+  MS_TODO_PROVIDER,
+} from './ms-todo-graph-service'
 
 interface PersonalTaskForSync {
   id: string
@@ -22,17 +26,36 @@ interface PersonalTaskForSync {
 
 async function hasConnectedAccount(userId: string): Promise<boolean> {
   const account = await prisma.oauth_accounts.findUnique({
-    where: { provider_providerId: { provider: 'microsoft-todo', providerId: userId } },
+    where: { provider_providerId: { provider: MS_TODO_PROVIDER, providerId: userId } },
     select: { id: true },
   })
   return !!account
 }
 
+/**
+ * Registra un fallo de sync. Usa upsert (no updateMany) para que también
+ * funcione cuando el link todavía no existe — el caso más importante: la
+ * PRIMERA sincronización de una tarea nueva, si falla antes de crear el
+ * link, antes quedaba muda (updateMany sobre 0 filas) y el usuario nunca se
+ * enteraba de que nada se sincronizó. `msTaskId` usa un placeholder único
+ * por tarea (`error:<personalTaskId>`) — un '' compartido violaría el
+ * índice único [userId, msTaskId] en cuanto un mismo usuario tuviera dos
+ * tareas fallidas a la vez.
+ */
 async function markLinkError(personalTaskId: string, userId: string, message: string) {
   await prisma.personal_task_ms_todo_links
-    .updateMany({
+    .upsert({
       where: { personalTaskId },
-      data: { syncStatus: 'error', syncError: message.slice(0, 500) },
+      update: { syncStatus: 'error', syncError: message.slice(0, 500) },
+      create: {
+        id: randomUUID(),
+        personalTaskId,
+        userId,
+        msTaskListId: '',
+        msTaskId: `error:${personalTaskId}`,
+        syncStatus: 'error',
+        syncError: message.slice(0, 500),
+      },
     })
     .catch(() => {})
   console.error('[MS TODO SYNC] Error sincronizando tarea', personalTaskId, 'de', userId, message)
@@ -49,7 +72,11 @@ export class MsTodoSyncService {
         where: { personalTaskId: task.id },
       })
 
-      if (link) {
+      // Solo un link con syncStatus 'synced' tiene un msTaskId real en
+      // Microsoft — un link en 'error' (o inexistente) significa que la
+      // tarea todavía no existe allá, así que hay que CREARLA (no
+      // actualizarla), incluso si ya hubo un intento previo fallido.
+      if (link?.syncStatus === 'synced') {
         const result = await MsTodoGraphService.updateTask(
           accessToken,
           link.msTaskListId,
@@ -72,15 +99,44 @@ export class MsTodoSyncService {
         return
       }
 
-      const listId = await MsTodoGraphService.getOrCreateDefaultList(accessToken)
+      // Reutiliza la lista de cualquier otra tarea ya sincronizada de este
+      // mismo usuario en vez de volver a resolverla por nombre cada vez —
+      // evita crear listas duplicadas si dos "primeras tareas" se disparan
+      // casi al mismo tiempo, y ahorra una llamada a Graph en el caso común.
+      const existingListId =
+        link?.msTaskListId ||
+        (
+          await prisma.personal_task_ms_todo_links.findFirst({
+            where: { userId, syncStatus: 'synced' },
+            select: { msTaskListId: true },
+          })
+        )?.msTaskListId
+      const listId =
+        existingListId || (await MsTodoGraphService.getOrCreateDefaultList(accessToken))
+
       const created = await MsTodoGraphService.createTask(accessToken, listId, {
         title: task.title,
         status: task.status as 'pending' | 'in_progress' | 'completed' | 'blocked',
         dueDateTime: task.dueDate ? task.dueDate.toISOString() : null,
       })
 
-      await prisma.personal_task_ms_todo_links.create({
-        data: {
+      // upsert (no create): si dos llamadas concurrentes llegan hasta acá
+      // para la misma tarea (crear seguido de inmediato de un editar, por
+      // ejemplo), la segunda no explota con una violación de índice único —
+      // gana la última en escribir, y como mucho queda una tarea huérfana
+      // en Microsoft To Do (que el usuario puede borrar allá), nunca un 500.
+      await prisma.personal_task_ms_todo_links.upsert({
+        where: { personalTaskId: task.id },
+        update: {
+          userId,
+          msTaskListId: listId,
+          msTaskId: created.id,
+          etag: created.etag,
+          syncStatus: 'synced',
+          syncError: null,
+          lastSyncedAt: new Date(),
+        },
+        create: {
           id: randomUUID(),
           personalTaskId: task.id,
           userId,
@@ -106,7 +162,7 @@ export class MsTodoSyncService {
       const link = await prisma.personal_task_ms_todo_links.findUnique({
         where: { personalTaskId },
       })
-      if (!link) return
+      if (!link || link.syncStatus !== 'synced') return // nunca llegó a crearse allá — nada que borrar
 
       const accessToken = await MsTodoGraphService.getAccessToken(userId)
       await MsTodoGraphService.deleteTask(accessToken, link.msTaskListId, link.msTaskId)
@@ -132,28 +188,35 @@ export class MsTodoSyncService {
     const result = { applied: 0, skipped: 0, errors: 0 }
 
     const accessToken = await MsTodoGraphService.getAccessToken(userId)
-    const links = await prisma.personal_task_ms_todo_links.findMany({ where: { userId } })
+    const links = await prisma.personal_task_ms_todo_links.findMany({
+      where: { userId, syncStatus: 'synced' },
+    })
     if (links.length === 0) return result
 
-    // Una sola lectura de la lista por usuario (igual de barato que el
-    // criterio ya usado para Planner) — todas las tareas vinculadas de este
-    // usuario viven en la misma lista (getOrCreateDefaultList).
-    const listId = links[0].msTaskListId
-    const graphTasks = await MsTodoGraphService.listTasks(accessToken, listId)
-    const graphTaskById = new Map(graphTasks.map(t => [t.id, t]))
+    // Normalmente todas las tareas de un usuario viven en la misma lista,
+    // pero si el nombre de la lista cambió/desapareció en algún momento
+    // (getOrCreateDefaultList crea una nueva), podrían quedar repartidas en
+    // más de una — se agrupa por lista real en vez de asumir links[0].
+    const listIds = [...new Set(links.map(l => l.msTaskListId))]
+    const graphTaskById = new Map<
+      string,
+      Awaited<ReturnType<typeof MsTodoGraphService.listTasks>>[number]
+    >()
+    for (const listId of listIds) {
+      const tasks = await MsTodoGraphService.listTasks(accessToken, listId)
+      for (const t of tasks) graphTaskById.set(t.id, t)
+    }
 
     for (const link of links) {
       const graphTask = graphTaskById.get(link.msTaskId)
 
       if (!graphTask) {
-        if (link.syncStatus !== 'error') {
-          await prisma.personal_task_ms_todo_links
-            .update({
-              where: { id: link.id },
-              data: { syncStatus: 'error', syncError: 'Eliminada en Microsoft To Do' },
-            })
-            .catch(() => {})
-        }
+        await prisma.personal_task_ms_todo_links
+          .update({
+            where: { id: link.id },
+            data: { syncStatus: 'error', syncError: 'Eliminada en Microsoft To Do' },
+          })
+          .catch(() => {})
         continue
       }
 
@@ -177,10 +240,15 @@ export class MsTodoSyncService {
 
         const updateData: Record<string, unknown> = { updatedAt: new Date() }
         let changed = false
-        if (graphTask.title && graphTask.title !== task.title) {
+
+        // Sin el guard "&&" de antes: un título no puede quedar vacío en To
+        // Do (campo requerido), así que comparar directo es seguro y permite
+        // detectar cualquier cambio real, no solo "de algo a algo".
+        if (graphTask.title !== task.title) {
           updateData.title = graphTask.title
           changed = true
         }
+
         if (newStatus !== task.status) {
           updateData.status = newStatus
           updateData.completedAt =
@@ -191,12 +259,15 @@ export class MsTodoSyncService {
                 : task.completedAt
           changed = true
         }
-        if (graphTask.dueDateTime) {
-          const newDue = new Date(graphTask.dueDateTime)
-          if (!task.dueDate || newDue.getTime() !== task.dueDate.getTime()) {
-            updateData.dueDate = newDue
-            changed = true
-          }
+
+        // Comparación simétrica: antes, un dueDate borrado en Microsoft
+        // (graphTask.dueDateTime === null) nunca se aplicaba localmente
+        // porque el `if` exigía que el valor entrante fuera verdadero.
+        const newDue = graphTask.dueDateTime ? new Date(graphTask.dueDateTime) : null
+        const dueDiffers = (newDue?.getTime() ?? null) !== (task.dueDate?.getTime() ?? null)
+        if (dueDiffers) {
+          updateData.dueDate = newDue
+          changed = true
         }
 
         if (changed) {
@@ -223,5 +294,29 @@ export class MsTodoSyncService {
     }
 
     return result
+  }
+
+  /**
+   * Reintenta el push de tareas cuyo link quedó en 'error' (ej. el token
+   * estaba vencido, Microsoft respondió 5xx) — sin esto, una tarea que
+   * falló una vez queda desincronizada para siempre, porque solo
+   * POST/PATCH disparan un push nuevo y nada obliga al usuario a volver a
+   * tocar esa tarea puntual. Se llama junto a pullChangesForUser desde el
+   * cron, después del sondeo de cambios entrantes.
+   */
+  static async retryErroredLinks(userId: string): Promise<{ retried: number }> {
+    const erroredLinks = await prisma.personal_task_ms_todo_links.findMany({
+      where: { userId, syncStatus: 'error' },
+      select: { personalTaskId: true },
+    })
+    if (erroredLinks.length === 0) return { retried: 0 }
+
+    const tasks = await prisma.personal_tasks.findMany({
+      where: { id: { in: erroredLinks.map(l => l.personalTaskId) }, userId },
+    })
+    for (const task of tasks) {
+      await this.pushTask(task, userId)
+    }
+    return { retried: tasks.length }
   }
 }

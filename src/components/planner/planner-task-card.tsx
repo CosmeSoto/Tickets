@@ -52,7 +52,12 @@ export function PlannerTaskCard({
   const { data: session } = useSession()
   const dueLabel = formatDueDate(task.dueDate)
   const isOverdue = dueLabel?.includes('vencida')
-  const showMenu = (task.canEdit || task.canDelete) && (onEdit || onDelete)
+  // Editar/eliminar solo existen para tareas independientes: canEdit/canDelete
+  // en una tarea de ticket significa "puedo arrastrarla en el tablero
+  // compartido" (ver GET /api/planner/tasks), no "puedo abrir un editor" —
+  // esa edición sigue viviendo únicamente en la ficha del ticket.
+  const showMenu =
+    task.origin === 'personal' && (task.canEdit || task.canDelete) && (onEdit || onDelete)
 
   return (
     <div

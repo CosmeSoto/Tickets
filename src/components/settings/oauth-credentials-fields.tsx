@@ -29,7 +29,6 @@ export type OAuthCredentialsProvider =
   | 'azure-ad'
   | 'azure-ad-planner'
   | 'azure-ad-sharepoint'
-  | 'azure-ad-todo'
 
 interface OAuthConfigApiRow {
   provider: string
@@ -49,8 +48,12 @@ interface OAuthCredentialsFieldsProps {
   tenantPlaceholder?: string
   tenantHint?: React.ReactNode
   tenantRequired?: boolean
-  /** Ruta del callback a registrar en el portal (ej. '/api/auth/callback/google'). Omitir para providers de aplicación (SharePoint) que no tienen redirect. */
-  redirectUriPath?: string
+  /** Ruta(s) del callback a registrar en el portal (ej. '/api/auth/callback/google').
+   *  Un array cuando esta misma credencial habilita más de un flujo delegado
+   *  (ej. Planner + Microsoft To Do comparten un solo App Registration, cada
+   *  uno con su propio redirect_uri) — todas deben registrarse en el portal.
+   *  Omitir para providers de aplicación (SharePoint) que no tienen redirect. */
+  redirectUriPath?: string | string[]
   scopes?: string
   enabledLabel: string
   enabledDescription: string
@@ -91,7 +94,7 @@ export function OAuthCredentialsFields({
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
-  const [copied, setCopied] = useState(false)
+  const [copied, setCopied] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -124,7 +127,17 @@ export function OAuthCredentialsFields({
   }, [load])
 
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : ''
-  const redirectUri = redirectUriPath ? `${baseUrl}${redirectUriPath}` : null
+  const redirectUriPaths = redirectUriPath
+    ? Array.isArray(redirectUriPath)
+      ? redirectUriPath
+      : [redirectUriPath]
+    : []
+  const redirectUris = redirectUriPaths.map(p => `${baseUrl}${p}`)
+  // Se guarda como metadato informativo (no se usa para construir la URL de
+  // autorización real, cada ruta ya trae su propio redirect_uri) — con más de
+  // uno, se listan todos separados por coma para que quede constancia de
+  // ambos en la config guardada.
+  const redirectUri = redirectUris.length > 0 ? redirectUris.join(', ') : null
 
   const setEnabled = (checked: boolean) => {
     setConfig(current => ({ ...current, isEnabled: checked }))
@@ -226,15 +239,14 @@ export function OAuthCredentialsFields({
     document.body.removeChild(el)
   }
 
-  const copyRedirectUri = () => {
-    if (!redirectUri) return
+  const copyRedirectUri = (uri: string) => {
     if (navigator?.clipboard?.writeText) {
-      navigator.clipboard.writeText(redirectUri).catch(() => fallbackCopy(redirectUri))
+      navigator.clipboard.writeText(uri).catch(() => fallbackCopy(uri))
     } else {
-      fallbackCopy(redirectUri)
+      fallbackCopy(uri)
     }
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    setCopied(uri)
+    setTimeout(() => setCopied(null), 2000)
   }
 
   if (loading) {
@@ -247,18 +259,29 @@ export function OAuthCredentialsFields({
 
   return (
     <>
-      {redirectUri && (
+      {redirectUris.length > 0 && (
         <div className='space-y-2'>
           <Label className='flex items-center space-x-2'>
             <Globe className='h-4 w-4' />
-            <span>Redirect URI (copiar al portal)</span>
+            <span>
+              {redirectUris.length > 1
+                ? 'Redirect URIs (copiar ambas al portal)'
+                : 'Redirect URI (copiar al portal)'}
+            </span>
           </Label>
-          <div className='flex space-x-2'>
-            <Input value={redirectUri} readOnly className='font-mono text-sm' />
-            <Button type='button' variant='outline' size='sm' onClick={copyRedirectUri}>
-              {copied ? <Check className='h-4 w-4' /> : <Copy className='h-4 w-4' />}
-            </Button>
-          </div>
+          {redirectUris.map(uri => (
+            <div key={uri} className='flex space-x-2'>
+              <Input value={uri} readOnly className='font-mono text-sm' />
+              <Button
+                type='button'
+                variant='outline'
+                size='sm'
+                onClick={() => copyRedirectUri(uri)}
+              >
+                {copied === uri ? <Check className='h-4 w-4' /> : <Copy className='h-4 w-4' />}
+              </Button>
+            </div>
+          ))}
         </div>
       )}
 

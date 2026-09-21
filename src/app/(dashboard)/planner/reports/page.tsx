@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek } from 'date-fns'
 import { ArrowLeft, Download, FileText, RefreshCw } from 'lucide-react'
@@ -158,10 +158,19 @@ export default function PlannerReportsPage() {
     [from, to, origin, status, familyId, userId, page]
   )
 
+  // Si cambió algún filtro (no solo la página), se vuelve a la página 1 —
+  // de lo contrario, filtrar estando en la página 3 muestra una tabla vacía
+  // sobre un total distinto de cero hasta que el usuario navega a mano.
+  const filtersKey = JSON.stringify({ from, to, origin, status, familyId, userId })
+  const prevFiltersKey = useRef(filtersKey)
   useEffect(() => {
-    void runReport('json', page)
+    const filtersChanged = prevFiltersKey.current !== filtersKey
+    prevFiltersKey.current = filtersKey
+    const targetPage = filtersChanged ? 1 : page
+    if (filtersChanged && page !== 1) setPage(1)
+    void runReport('json', targetPage)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [from, to, origin, status, familyId, userId, page])
+  }, [filtersKey, page])
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 

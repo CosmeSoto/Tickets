@@ -32,11 +32,14 @@ export interface PlannerTask {
 
 export interface PersonalTaskInput {
   title: string
-  description?: string
+  /** null explícito = vaciar el campo; undefined = no tocarlo (solo relevante
+   *  al editar — el diálogo siempre manda null en vez de omitir, para poder
+   *  limpiar un campo ya cargado). */
+  description?: string | null
   priority?: 'low' | 'medium' | 'high'
-  dueDate?: string
-  startTime?: string
-  endTime?: string
+  dueDate?: string | null
+  startTime?: string | null
+  endTime?: string | null
   familyId?: string | null
 }
 

@@ -642,7 +642,9 @@ export default function ProfilePage() {
         <TelegramLinkCard />
 
         {/* Microsoft To Do — sincronizar tareas independientes del módulo Tareas */}
-        {(session.user as any).plannerEnabled && <MsTodoLinkCard />}
+        {((session.user as any).plannerEnabled || (session.user as any).canManagePlanner) && (
+          <MsTodoLinkCard />
+        )}
 
         {/* Seguridad */}
         <Card>

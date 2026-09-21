@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
       select: { providerId: true },
     })
 
-    const totals = { applied: 0, skipped: 0, errors: 0 }
+    const totals = { applied: 0, skipped: 0, errors: 0, retried: 0 }
     const errorsByUser: Record<string, string> = {}
 
     for (const account of accounts) {
@@ -39,6 +39,12 @@ export async function GET(request: NextRequest) {
         totals.applied += result.applied
         totals.skipped += result.skipped
         totals.errors += result.errors
+
+        // Reintenta tareas cuyo push nunca llegó a Microsoft (token vencido,
+        // 5xx transitorio) — sin esto quedarían desincronizadas para
+        // siempre, ya que solo un nuevo POST/PATCH del usuario dispara push.
+        const retry = await MsTodoSyncService.retryErroredLinks(userId)
+        totals.retried += retry.retried
       } catch (err) {
         totals.errors++
         const message = err instanceof Error ? err.message : 'Error desconocido'

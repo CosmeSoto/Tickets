@@ -92,13 +92,17 @@ export function PersonalTaskDialog({
   const handleSave = async () => {
     if (!form.title.trim()) return
     setSaving(true)
+    // null explícito (no undefined) en los campos vacíos: al editar, un campo
+    // omitido del body se interpreta como "no tocar" (ver PATCH .../[id]) —
+    // enviar undefined aquí haría imposible vaciar una fecha/hora/descripción
+    // ya cargada.
     const input: PersonalTaskInput = {
       title: form.title.trim(),
-      description: form.description || undefined,
+      description: form.description || null,
       priority: form.priority,
-      dueDate: form.dueDate || undefined,
-      startTime: form.startTime || undefined,
-      endTime: form.endTime || undefined,
+      dueDate: form.dueDate || null,
+      startTime: form.startTime || null,
+      endTime: form.endTime || null,
       familyId: form.familyId || null,
     }
     const ok = isEditing ? await onUpdate(task!.id, input) : await onCreate(input)

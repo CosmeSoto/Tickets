@@ -79,16 +79,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (
-      !['google', 'azure-ad', 'azure-ad-planner', 'azure-ad-sharepoint', 'azure-ad-todo'].includes(
-        provider
-      )
-    ) {
+    if (!['google', 'azure-ad', 'azure-ad-planner', 'azure-ad-sharepoint'].includes(provider)) {
       return NextResponse.json(
         {
           success: false,
           error:
-            'Provider inválido. Debe ser "google", "azure-ad", "azure-ad-planner", "azure-ad-sharepoint" o "azure-ad-todo"',
+            'Provider inválido. Debe ser "google", "azure-ad", "azure-ad-planner" o "azure-ad-sharepoint"',
         },
         { status: 400 }
       )

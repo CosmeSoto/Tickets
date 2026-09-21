@@ -61,10 +61,13 @@ export function MsTodoLinkCard() {
       })
       void load()
     } else if (msTodo === 'error') {
+      // searchParams.get ya decodifica el percent-encoding una vez — volver a
+      // llamar decodeURIComponent sobre eso es un doble-decode que lanza
+      // URIError si el mensaje de error de Microsoft contiene un "%" literal.
       const reason = searchParams.get('reason')
       toast({
         title: 'No se pudo conectar',
-        description: reason ? decodeURIComponent(reason) : 'Error desconocido',
+        description: reason || 'Error desconocido',
         variant: 'destructive',
       })
     }

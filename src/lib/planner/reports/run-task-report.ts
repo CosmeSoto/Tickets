@@ -135,8 +135,12 @@ export async function runTaskReport(
     }
   }
 
-  if (filters.origin !== 'ticket') {
-    // Siempre "las mías" — ver nota de privacidad en el encabezado del archivo.
+  // Si se filtró "por técnico" a otra persona, las tareas independientes no
+  // deben aparecer en absoluto — son siempre "las mías" (ver nota de
+  // privacidad arriba), nunca las de un tercero, ni siquiera las propias del
+  // que consulta mezcladas bajo el nombre de otro técnico en el reporte.
+  const personalTasksApply = filters.origin !== 'ticket' && !effectiveTechnicianId
+  if (personalTasksApply) {
     const personalTasks = await prisma.personal_tasks.findMany({
       where: {
         userId,

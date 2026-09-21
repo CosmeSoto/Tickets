@@ -8,9 +8,8 @@ import { decrypt } from '@/lib/crypto'
 const PROVIDER_LABELS: Record<string, string> = {
   google: 'Google',
   'azure-ad': 'Microsoft',
-  'azure-ad-planner': 'Microsoft (Planner)',
+  'azure-ad-planner': 'Microsoft (Planner + To Do)',
   'azure-ad-sharepoint': 'Microsoft (SharePoint)',
-  'azure-ad-todo': 'Microsoft (To Do)',
 }
 
 // Verifica que el tenant de Azure AD existe y es accesible
@@ -160,9 +159,7 @@ export async function POST(request: NextRequest) {
 
     if (
       !provider ||
-      !['google', 'azure-ad', 'azure-ad-planner', 'azure-ad-sharepoint', 'azure-ad-todo'].includes(
-        provider
-      )
+      !['google', 'azure-ad', 'azure-ad-planner', 'azure-ad-sharepoint'].includes(provider)
     ) {
       return NextResponse.json({ success: false, error: 'Proveedor inválido.' }, { status: 400 })
     }
@@ -216,8 +213,7 @@ export async function POST(request: NextRequest) {
     if (
       provider === 'azure-ad' ||
       provider === 'azure-ad-planner' ||
-      provider === 'azure-ad-sharepoint' ||
-      provider === 'azure-ad-todo'
+      provider === 'azure-ad-sharepoint'
     ) {
       const tenant = config.tenantId || 'common'
 
@@ -302,10 +298,8 @@ export async function POST(request: NextRequest) {
       request.headers.get('origin') || request.headers.get('referer')?.split('/admin')[0] || ''
     const defaultRedirectUri =
       provider === 'azure-ad-planner'
-        ? `${baseUrl}/api/admin/planner/cloud-auth/callback`
-        : provider === 'azure-ad-todo'
-          ? `${baseUrl}/api/planner/ms-todo/callback`
-          : `${baseUrl}/api/auth/callback/${provider}`
+        ? `${baseUrl}/api/admin/planner/cloud-auth/callback, ${baseUrl}/api/planner/ms-todo/callback`
+        : `${baseUrl}/api/auth/callback/${provider}`
     const redirectUri = config.redirectUri || defaultRedirectUri
 
     return NextResponse.json({
