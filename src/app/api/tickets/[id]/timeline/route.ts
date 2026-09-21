@@ -8,8 +8,6 @@ import {
   translateField,
   translateFieldNames,
   translateFieldValue,
-  TICKET_FIELD_LABELS,
-  TICKET_ACTION_LABELS,
 } from '@/lib/constants/ticket-labels'
 import {
   assertTicketAccess,

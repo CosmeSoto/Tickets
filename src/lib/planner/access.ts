@@ -13,7 +13,7 @@ export type PlannerAccess = {
  * Mismo criterio que getProcessAccess (src/lib/processes/access.ts): el
  * alcance se resuelve desde user_family_access, no se fija en código.
  */
-export async function getPlannerAccess(userId: string, role: string): Promise<PlannerAccess> {
+export async function getPlannerAccess(userId: string, _role: string): Promise<PlannerAccess> {
   const user = await prisma.users.findUnique({
     where: { id: userId },
     select: {

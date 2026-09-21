@@ -3,7 +3,6 @@
 import React, { useEffect, useState, Suspense } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import Link from 'next/link'
 import { Loader2 } from 'lucide-react'
 import * as Icons from 'lucide-react'
 import { SystemLogo } from '@/components/common/system-logo'

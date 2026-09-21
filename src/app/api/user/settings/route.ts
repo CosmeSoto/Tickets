@@ -57,7 +57,7 @@ const userSettingsSchema = z.object({
  * GET /api/user/settings
  * Obtiene la configuración completa del usuario actual
  */
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {

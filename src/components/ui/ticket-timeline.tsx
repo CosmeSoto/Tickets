@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import React from 'react'
 import { useSession } from 'next-auth/react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './card'
+import { Card, CardContent, CardHeader } from './card'
 import { Badge } from './badge'
 import { Button } from './button'
 import { Textarea } from './textarea'
@@ -24,8 +24,6 @@ import {
   Target,
   Eye,
   Download,
-  Image as ImageIcon,
-  File as FileIcon,
   Lock,
   Globe,
   PlayCircle,

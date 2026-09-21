@@ -2,7 +2,7 @@
 
 import { useState, useEffect, use, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, RefreshCw, Settings } from 'lucide-react'
+import { ArrowLeft, RefreshCw } from 'lucide-react'
 import { FamilyIcon } from '@/components/inventory/family-badge'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'

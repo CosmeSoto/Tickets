@@ -1,6 +1,6 @@
 import { exec } from 'child_process'
 import { promisify } from 'util'
-import { stat, unlink, createReadStream } from 'fs'
+import { stat, unlink } from 'fs'
 import { createHash, randomBytes } from 'crypto'
 import { join } from 'path'
 import prisma from '@/lib/prisma'
@@ -153,9 +153,7 @@ export async function sendBackupNotification(
       return
     }
 
-    const { queueNotificationEmail } = await import(
-      '@/lib/notifications/queue-notification-email'
-    )
+    const { queueNotificationEmail } = await import('@/lib/notifications/queue-notification-email')
     const { getSystemBranding } = await import('@/lib/branding')
     const { systemName } = await getSystemBranding()
 

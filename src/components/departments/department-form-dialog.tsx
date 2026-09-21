@@ -48,7 +48,7 @@ export function DepartmentFormDialog({
   setFormData,
   onSubmit,
   submitting,
-  departments,
+  departments: _departments,
 }: DepartmentFormDialogProps) {
   const handleClose = () => {
     onOpenChange(false)

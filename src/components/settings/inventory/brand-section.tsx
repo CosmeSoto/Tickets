@@ -58,9 +58,9 @@ export function BrandSection({
   loading,
   saving,
   familyId,
-  familyColor,
+  familyColor: _familyColor,
   onCreateBrand,
-  onEditBrand,
+  onEditBrand: _onEditBrand,
   onDeleteBrand,
   onToggleActive,
   onReorder,
@@ -103,7 +103,7 @@ export function BrandSection({
     setBrandFormOpen(true)
   }
 
-  const handleBrandFormSuccess = (item: any) => {
+  const handleBrandFormSuccess = (_item: any) => {
     setBrandFormOpen(false)
     if (brandFormMode === 'create') {
       onCreateBrand()

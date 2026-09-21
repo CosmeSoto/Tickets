@@ -188,7 +188,7 @@ const sharedAuthOptions: Omit<NextAuthOptions, 'providers'> = {
     maxAge: 24 * 60 * 60, // 24 horas (máximo permitido, se validará en middleware)
   },
   callbacks: {
-    async signIn({ user, account, profile }) {
+    async signIn({ user, account, profile: _profile }) {
       try {
         // Si es login con OAuth (Google o Microsoft)
         if (account?.provider === 'google' || account?.provider === 'azure-ad') {

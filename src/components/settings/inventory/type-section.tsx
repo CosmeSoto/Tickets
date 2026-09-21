@@ -77,7 +77,7 @@ export function TypeSection<T extends AnyType>({
   types,
   loading,
   saving,
-  familyColor,
+  familyColor: _familyColor,
   currentFamilyId = null,
   onCreateType,
   onEditType,

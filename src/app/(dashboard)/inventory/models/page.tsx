@@ -10,13 +10,6 @@ import Link from 'next/link'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ModelCards } from '@/components/inventory/dashboard/ModelCards'
 import { InventoryFiltersClient } from '@/components/inventory/filters/InventoryFiltersClient'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { ModelSortClient } from '@/components/inventory/model/ModelSortClient'
 import {
   getHomePathForRole,
@@ -38,7 +31,10 @@ async function getModelsData(filters: SearchParams) {
       typeId: filters.typeId,
       departmentId: filters.departmentId,
     }),
-    prisma.equipment_types.findMany({ where: { isActive: true }, orderBy: [{ order: 'asc' }, { name: 'asc' }] }),
+    prisma.equipment_types.findMany({
+      where: { isActive: true },
+      orderBy: [{ order: 'asc' }, { name: 'asc' }],
+    }),
     prisma.departments.findMany({ where: { isActive: true }, orderBy: { name: 'asc' } }),
   ])
 

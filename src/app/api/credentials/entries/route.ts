@@ -12,7 +12,6 @@ import {
   assertLicenseLinkAllowed,
   buildCredentialEntriesVisibilityWhere,
   credentialEntryMetadataSelect,
-  getCredentialsFamilyScopeIds,
   userCanAccessVault,
   userCanEditEntry,
   userCanMutateEntry,

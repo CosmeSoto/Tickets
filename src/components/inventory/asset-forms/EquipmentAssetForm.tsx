@@ -8,7 +8,7 @@ import { SerialNumberInput } from '@/components/ui/serial-number-input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { SearchableSelect, type SearchableSelectOption } from '@/components/ui/searchable-select'
+import { type SearchableSelectOption } from '@/components/ui/searchable-select'
 import { InlineCreateSelect } from '@/components/ui/inline-create-select'
 import { SimpleSelect } from '@/components/ui/simple-select'
 import { ContractPicker } from '@/components/contracts/contract-picker'
@@ -35,7 +35,6 @@ import { toast } from 'sonner'
 import { inlineSelectFeedback } from '@/lib/utils/inline-select-feedback'
 import { isDirectFormSubmit } from '@/lib/utils/inline-form-guard'
 import {
-  showDepartmentSelector,
   showWarehouseSelector,
   showMaintenanceBlock,
   showAssignmentBlock,
@@ -54,7 +53,7 @@ import { useActiveDepartments } from '@/contexts/departments-context'
 import { FormDraftKeys, useFormDraft } from '@/hooks/common/use-form-draft'
 import { FormDraftBanner } from '@/components/common/form-draft-banner'
 import { toLocalDateInputValue } from '@/lib/forms/form-date'
-import { X, Plus, ChevronDown, ChevronUp, AlertCircle, Tag, KeyRound } from 'lucide-react'
+import { ChevronDown, ChevronUp, Tag, KeyRound } from 'lucide-react'
 
 interface EquipmentAssetFormProps {
   familyId: string

@@ -3,8 +3,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { Camera, CameraOff, Loader2, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-
 interface ScanResult {
   checkpointId: string
   token: string

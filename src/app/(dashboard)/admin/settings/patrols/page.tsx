@@ -1,7 +1,7 @@
 'use client'
 
 import { Suspense } from 'react'
-import { Save, RefreshCw, Shield } from 'lucide-react'
+import { Save, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { usePatrolSettings } from '@/hooks/use-patrol-settings'

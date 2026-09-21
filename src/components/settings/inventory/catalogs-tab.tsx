@@ -56,7 +56,7 @@ export function CatalogsTab({ familyId, familyColor }: CatalogsTabProps) {
     await equipmentBrands.loadBrands()
   }
 
-  const handleEditBrand = async (brand: any) => {
+  const handleEditBrand = async (_brand: any) => {
     await equipmentBrands.loadBrands()
   }
 

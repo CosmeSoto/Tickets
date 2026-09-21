@@ -2,12 +2,12 @@
  * Configuración de Fuse.js para búsqueda fuzzy de categorías
  */
 
-import Fuse, { type IFuseOptions } from 'fuse.js';
-import type { CategorySearchIndex } from '../types';
+import { type IFuseOptions } from 'fuse.js'
+import type { CategorySearchIndex } from '../types'
 
 /**
  * Opciones de configuración para Fuse.js
- * 
+ *
  * - threshold: 0.3 = permite coincidencias con hasta 30% de diferencia
  * - distance: 100 = máxima distancia entre caracteres coincidentes
  * - minMatchCharLength: 2 = mínimo 2 caracteres para considerar coincidencia
@@ -39,7 +39,7 @@ export const fuseOptions: IFuseOptions<CategorySearchIndex> = {
       weight: 0.1,
     },
   ],
-};
+}
 
 /**
  * Normaliza texto para búsqueda (sin acentos, minúsculas)
@@ -48,7 +48,7 @@ export function normalizeText(text: string): string {
   return text
     .toLowerCase()
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, ''); // Elimina acentos
+    .replace(/[\u0300-\u036f]/g, '') // Elimina acentos
 }
 
 /**
@@ -56,15 +56,48 @@ export function normalizeText(text: string): string {
  */
 export function extractKeywords(text: string): string[] {
   const stopWords = new Set([
-    'el', 'la', 'los', 'las', 'un', 'una', 'unos', 'unas',
-    'de', 'del', 'al', 'a', 'en', 'con', 'por', 'para',
-    'y', 'o', 'pero', 'si', 'no', 'que', 'como', 'cuando',
+    'el',
+    'la',
+    'los',
+    'las',
+    'un',
+    'una',
+    'unos',
+    'unas',
+    'de',
+    'del',
+    'al',
+    'a',
+    'en',
+    'con',
+    'por',
+    'para',
+    'y',
+    'o',
+    'pero',
+    'si',
+    'no',
+    'que',
+    'como',
+    'cuando',
     // Verbos / muletillas frecuentes en títulos de tickets (ruido en sugerencias)
-    'puedo', 'puede', 'pueden', 'puedes', 'queria', 'quiero', 'quiere',
-    'tengo', 'tiene', 'tienen', 'necesito', 'necesita', 'ayuda', 'favor',
-  ]);
+    'puedo',
+    'puede',
+    'pueden',
+    'puedes',
+    'queria',
+    'quiero',
+    'quiere',
+    'tengo',
+    'tiene',
+    'tienen',
+    'necesito',
+    'necesita',
+    'ayuda',
+    'favor',
+  ])
 
   return normalizeText(text)
     .split(/\s+/)
-    .filter(word => word.length > 2 && !stopWords.has(word));
+    .filter(word => word.length > 2 && !stopWords.has(word))
 }

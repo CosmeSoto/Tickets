@@ -58,7 +58,7 @@ describe('Cache Service Basic Tests', () => {
         misses: 0,
         sets: 0,
         deletes: 0,
-        errors: 0
+        errors: 0,
       }
 
       expect(stats).toHaveProperty('hits')
@@ -90,13 +90,13 @@ describe('Cache Service Basic Tests', () => {
         ttl: 3600,
         prefix: 'app',
         serialize: true,
-        compress: false
+        compress: false,
       }
 
       const customOptions = {
         ttl: 1800,
         prefix: 'custom',
-        tags: ['test']
+        tags: ['test'],
       }
 
       const mergedOptions = { ...defaultOptions, ...customOptions }
@@ -130,11 +130,9 @@ describe('Cache Service Basic Tests', () => {
     it('should handle cache invalidation by tags', () => {
       const tags = ['users', 'profile']
       const cacheKeys = ['app:user:1', 'app:user:2']
-      
+
       // Simulate tag-based invalidation
-      const keysToInvalidate = tags.flatMap(tag => 
-        cacheKeys.filter(key => key.includes('user'))
-      )
+      const keysToInvalidate = tags.flatMap(_tag => cacheKeys.filter(key => key.includes('user')))
 
       expect(keysToInvalidate.length).toBeGreaterThan(0)
     })
@@ -157,7 +155,7 @@ describe('Cache Service Basic Tests', () => {
           const value = { data: 'test' }
           memoryCache.set(memoryKey, {
             value,
-            expires: Date.now() + memoryTtl
+            expires: Date.now() + memoryTtl,
           })
           redisCache = value
         }
@@ -201,7 +199,7 @@ describe('Cache Service Basic Tests', () => {
     it('should handle large data sets efficiently', () => {
       const largeArray = Array.from({ length: 1000 }, (_, i) => ({
         id: i,
-        data: `item-${i}`
+        data: `item-${i}`,
       }))
 
       const serialized = JSON.stringify(largeArray)
@@ -215,13 +213,11 @@ describe('Cache Service Basic Tests', () => {
       // Reset the mock for this test
       mockRedis.get.mockReset()
       mockRedis.get.mockResolvedValue('test-value')
-      
-      const operations = Array.from({ length: 10 }, (_, i) => 
-        mockRedis.get(`key-${i}`)
-      )
+
+      const operations = Array.from({ length: 10 }, (_, i) => mockRedis.get(`key-${i}`))
 
       const results = await Promise.all(operations)
-      
+
       expect(results).toHaveLength(10)
       expect(mockRedis.get).toHaveBeenCalledTimes(10)
     })

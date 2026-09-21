@@ -9,7 +9,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
   Select,
@@ -20,7 +19,6 @@ import {
 } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { ArrowUpDown, Search, Download } from 'lucide-react'
-import Link from 'next/link'
 import { BatchBadge } from '@/components/inventory/dashboard/BatchBadge'
 import {
   EquipmentStatusBadge,

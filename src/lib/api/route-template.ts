@@ -97,32 +97,22 @@ export function createApiRoute(
 
           // Verificar roles si están especificados
           if (config.auth.roles && !config.auth.roles.includes(session.user.role)) {
-            ApplicationLogger.authorizationCheck(
-              session.user.id,
-              path,
-              method,
-              false,
-              { requestId }
-            )
+            ApplicationLogger.authorizationCheck(session.user.id, path, method, false, {
+              requestId,
+            })
             return ApiResponseBuilder.forbidden(
               'No tienes permisos para acceder a este recurso',
               requestId
             )
           }
 
-          ApplicationLogger.authenticationAttempt(session.user.email, true, { 
+          ApplicationLogger.authenticationAttempt(session.user.email, true, {
             requestId,
-            userId: session.user.id 
+            userId: session.user.id,
           })
-          
+
           if (config.auth.roles) {
-            ApplicationLogger.authorizationCheck(
-              session.user.id,
-              path,
-              method,
-              true,
-              { requestId }
-            )
+            ApplicationLogger.authorizationCheck(session.user.id, path, method, true, { requestId })
           }
 
           context.user = session.user
@@ -219,25 +209,24 @@ export function createApiRoute(
 
         // 6. Ejecutar el handler
         const response = await handler(request, context)
-        
+
         // Log successful completion
         const duration = performance.now() - startTime
-        ApplicationLogger.apiRequestComplete(method, path, response.status, duration, { 
+        ApplicationLogger.apiRequestComplete(method, path, response.status, duration, {
           requestId,
-          userId: context.user?.id 
+          userId: context.user?.id,
         })
 
         return response
-
       } catch (error) {
         const duration = performance.now() - startTime
         const err = error instanceof Error ? error : new Error(String(error))
-        
-        ApplicationLogger.apiRequestError(method, path, err, { 
+
+        ApplicationLogger.apiRequestError(method, path, err, {
           requestId,
-          userId: context.user?.id 
+          userId: context.user?.id,
         })
-        
+
         // Re-throw to maintain existing error handling
         throw error
       }
@@ -417,7 +406,7 @@ export class RouteHelpers {
   /**
    * Respuesta de operación exitosa sin datos
    */
-  static noContent(context: RouteContext): NextResponse {
+  static noContent(_context: RouteContext): NextResponse {
     return new NextResponse(null, { status: 204 })
   }
 }

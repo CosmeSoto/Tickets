@@ -7,7 +7,6 @@ import {
   assertInventoryResourceManage,
   assertInventoryResourceRead,
   InventoryAccessError,
-  toInventoryAccessUser,
   inventoryAccessToResponse,
 } from '@/lib/inventory/inventory-resource-access'
 import {

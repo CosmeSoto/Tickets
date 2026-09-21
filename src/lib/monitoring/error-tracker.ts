@@ -1,6 +1,6 @@
 /**
  * Error Tracking and Alerting System
- * 
+ *
  * Comprehensive error tracking with categorization, alerting, and reporting
  */
 
@@ -46,14 +46,14 @@ export enum ErrorType {
   NETWORK = 'network',
   SYSTEM = 'system',
   BUSINESS_LOGIC = 'business_logic',
-  EXTERNAL_SERVICE = 'external_service'
+  EXTERNAL_SERVICE = 'external_service',
 }
 
 export enum ErrorSeverity {
   LOW = 'low',
   MEDIUM = 'medium',
   HIGH = 'high',
-  CRITICAL = 'critical'
+  CRITICAL = 'critical',
 }
 
 export interface ErrorTrackingConfig {
@@ -91,7 +91,7 @@ const DEFAULT_CONFIG: ErrorTrackingConfig = {
     webhookUrl: process.env.ERROR_WEBHOOK_URL,
     emailRecipients: process.env.ERROR_EMAIL_RECIPIENTS?.split(','),
     slackWebhook: process.env.SLACK_WEBHOOK_URL,
-    teamsWebhook: process.env.TEAMS_WEBHOOK_URL
+    teamsWebhook: process.env.TEAMS_WEBHOOK_URL,
   },
   filtering: {
     ignoreErrors: [
@@ -99,20 +99,11 @@ const DEFAULT_CONFIG: ErrorTrackingConfig = {
       'ChunkLoadError',
       'Loading chunk',
       'Script error',
-      'ResizeObserver loop limit exceeded'
+      'ResizeObserver loop limit exceeded',
     ],
-    ignorePaths: [
-      '/favicon.ico',
-      '/robots.txt',
-      '/_next/static'
-    ],
-    ignoreUserAgents: [
-      'bot',
-      'crawler',
-      'spider',
-      'scraper'
-    ]
-  }
+    ignorePaths: ['/favicon.ico', '/robots.txt', '/_next/static'],
+    ignoreUserAgents: ['bot', 'crawler', 'spider', 'scraper'],
+  },
 }
 
 export class ErrorTracker {
@@ -125,15 +116,15 @@ export class ErrorTracker {
    */
   static initialize(config?: Partial<ErrorTrackingConfig>): void {
     this.config = { ...DEFAULT_CONFIG, ...config }
-    
+
     if (this.config.enabled) {
       this.setupGlobalErrorHandlers()
       ApplicationLogger.businessOperation('initialize_error_tracking', 'error-tracker', 'system', {
-        metadata: { 
+        metadata: {
           environment: this.config.environment,
           version: this.config.version,
-          alertingEnabled: this.config.alerting.enabled
-        }
+          alertingEnabled: this.config.alerting.enabled,
+        },
       })
     }
   }
@@ -153,13 +144,13 @@ export class ErrorTracker {
 
     const timer = ApplicationLogger.timer('track_error', {
       component: 'error-tracker',
-      metadata: { type, severity }
+      metadata: { type, severity },
     })
 
     try {
       // Normalize error
       const normalizedError = this.normalizeError(error)
-      
+
       // Check if error should be ignored
       if (this.shouldIgnoreError(normalizedError, context)) {
         timer.end('Error ignored by filters')
@@ -168,7 +159,7 @@ export class ErrorTracker {
 
       // Generate error fingerprint
       const fingerprint = this.generateFingerprint(normalizedError, type, context)
-      
+
       // Create or update error report
       const errorReport = this.createOrUpdateErrorReport(
         normalizedError,
@@ -185,7 +176,7 @@ export class ErrorTracker {
         severity,
         message: normalizedError.message,
         fingerprint,
-        count: errorReport.count
+        count: errorReport.count,
       })
 
       // Send alerts if needed
@@ -193,12 +184,11 @@ export class ErrorTracker {
 
       timer.end('Error tracked successfully')
       return errorReport.id
-
     } catch (trackingError) {
       const err = trackingError instanceof Error ? trackingError : new Error(String(trackingError))
       ApplicationLogger.systemHealth('error-tracker', 'unhealthy', {
         error: err.message,
-        originalError: error instanceof Error ? error.message : String(error)
+        originalError: error instanceof Error ? error.message : String(error),
       })
       timer.end('Error tracking failed')
       return ''
@@ -231,8 +221,8 @@ export class ErrorTracker {
       metadata: {
         requestBody: request.body,
         responseStatus: response?.status,
-        responseStatusText: response?.statusText
-      }
+        responseStatusText: response?.statusText,
+      },
     }
 
     const severity = this.determineSeverityFromStatus(response?.status)
@@ -253,8 +243,8 @@ export class ErrorTracker {
       operation,
       metadata: {
         query: query?.substring(0, 500), // Limit query length
-        paramCount: params?.length
-      }
+        paramCount: params?.length,
+      },
     }
 
     return this.trackError(error, context, ErrorType.DATABASE, ErrorSeverity.HIGH)
@@ -263,18 +253,14 @@ export class ErrorTracker {
   /**
    * Track authentication error
    */
-  static async trackAuthError(
-    error: Error,
-    userId?: string,
-    operation?: string
-  ): Promise<string> {
+  static async trackAuthError(error: Error, userId?: string, operation?: string): Promise<string> {
     const context: ErrorContext = {
       userId,
       component: 'authentication',
       operation,
       metadata: {
-        hasUserId: !!userId
-      }
+        hasUserId: !!userId,
+      },
     }
 
     return this.trackError(error, context, ErrorType.AUTHENTICATION, ErrorSeverity.HIGH)
@@ -291,14 +277,14 @@ export class ErrorTracker {
     topErrors: ErrorReport[]
   } {
     const errors = Array.from(this.errorStore.values())
-    
+
     const errorsByType = {} as Record<ErrorType, number>
     const errorsBySeverity = {} as Record<ErrorSeverity, number>
-    
+
     // Initialize counters
-    Object.values(ErrorType).forEach(type => errorsByType[type] = 0)
-    Object.values(ErrorSeverity).forEach(severity => errorsBySeverity[severity] = 0)
-    
+    Object.values(ErrorType).forEach(type => (errorsByType[type] = 0))
+    Object.values(ErrorSeverity).forEach(severity => (errorsBySeverity[severity] = 0))
+
     // Count errors
     errors.forEach(error => {
       errorsByType[error.type] += error.count
@@ -313,16 +299,14 @@ export class ErrorTracker {
       .slice(0, 10)
 
     // Get top errors by count
-    const topErrors = errors
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 10)
+    const topErrors = errors.sort((a, b) => b.count - a.count).slice(0, 10)
 
     return {
       totalErrors: errors.reduce((sum, error) => sum + error.count, 0),
       errorsByType,
       errorsBySeverity,
       recentErrors,
-      topErrors
+      topErrors,
     }
   }
 
@@ -337,9 +321,9 @@ export class ErrorTracker {
 
     error.resolved = true
     error.tags.push(`resolved-by:${resolvedBy || 'system'}`)
-    
+
     ApplicationLogger.businessOperation('resolve_error', 'error-tracker', 'error', {
-      metadata: { errorId, resolvedBy, fingerprint: error.fingerprint }
+      metadata: { errorId, resolvedBy, fingerprint: error.fingerprint },
     })
 
     return true
@@ -360,7 +344,7 @@ export class ErrorTracker {
     }
 
     ApplicationLogger.businessOperation('clear_old_errors', 'error-tracker', 'maintenance', {
-      metadata: { clearedCount, olderThanDays }
+      metadata: { clearedCount, olderThanDays },
     })
 
     return clearedCount
@@ -370,33 +354,48 @@ export class ErrorTracker {
   private static setupGlobalErrorHandlers(): void {
     // Handle unhandled promise rejections
     if (typeof process !== 'undefined') {
-      process.on('unhandledRejection', (reason, promise) => {
+      process.on('unhandledRejection', (reason, _promise) => {
         const error = reason instanceof Error ? reason : new Error(String(reason))
-        this.trackError(error, { component: 'unhandled-promise' }, ErrorType.SYSTEM, ErrorSeverity.HIGH)
+        this.trackError(
+          error,
+          { component: 'unhandled-promise' },
+          ErrorType.SYSTEM,
+          ErrorSeverity.HIGH
+        )
       })
 
-      process.on('uncaughtException', (error) => {
-        this.trackError(error, { component: 'uncaught-exception' }, ErrorType.SYSTEM, ErrorSeverity.CRITICAL)
+      process.on('uncaughtException', error => {
+        this.trackError(
+          error,
+          { component: 'uncaught-exception' },
+          ErrorType.SYSTEM,
+          ErrorSeverity.CRITICAL
+        )
       })
     }
 
     // Handle client-side errors
     if (typeof window !== 'undefined') {
-      window.addEventListener('error', (event) => {
+      window.addEventListener('error', event => {
         const error = event.error || new Error(event.message)
         this.trackError(error, {
           url: event.filename,
           component: 'window-error',
           metadata: {
             lineno: event.lineno,
-            colno: event.colno
-          }
+            colno: event.colno,
+          },
         })
       })
 
-      window.addEventListener('unhandledrejection', (event) => {
+      window.addEventListener('unhandledrejection', event => {
         const error = event.reason instanceof Error ? event.reason : new Error(String(event.reason))
-        this.trackError(error, { component: 'unhandled-promise-client' }, ErrorType.JAVASCRIPT, ErrorSeverity.HIGH)
+        this.trackError(
+          error,
+          { component: 'unhandled-promise-client' },
+          ErrorType.JAVASCRIPT,
+          ErrorSeverity.HIGH
+        )
       })
     }
   }
@@ -410,23 +409,25 @@ export class ErrorTracker {
 
   private static shouldIgnoreError(error: Error, context: ErrorContext): boolean {
     // Check ignored error messages
-    if (this.config.filtering.ignoreErrors.some(ignored => 
-      error.message.includes(ignored)
-    )) {
+    if (this.config.filtering.ignoreErrors.some(ignored => error.message.includes(ignored))) {
       return true
     }
 
     // Check ignored paths
-    if (context.url && this.config.filtering.ignorePaths.some(path => 
-      context.url!.includes(path)
-    )) {
+    if (
+      context.url &&
+      this.config.filtering.ignorePaths.some(path => context.url!.includes(path))
+    ) {
       return true
     }
 
     // Check ignored user agents
-    if (context.userAgent && this.config.filtering.ignoreUserAgents.some(agent => 
-      context.userAgent!.toLowerCase().includes(agent.toLowerCase())
-    )) {
+    if (
+      context.userAgent &&
+      this.config.filtering.ignoreUserAgents.some(agent =>
+        context.userAgent!.toLowerCase().includes(agent.toLowerCase())
+      )
+    ) {
       return true
     }
 
@@ -439,9 +440,9 @@ export class ErrorTracker {
       type,
       context.component || '',
       context.operation || '',
-      error.stack?.split('\n')[1] || '' // First line of stack trace
+      error.stack?.split('\n')[1] || '', // First line of stack trace
     ]
-    
+
     return Buffer.from(components.join('|')).toString('base64').substring(0, 16)
   }
 
@@ -474,14 +475,14 @@ export class ErrorTracker {
         ...context,
         timestamp: now,
         environment: this.config.environment,
-        version: this.config.version
+        version: this.config.version,
       },
       fingerprint,
       count: 1,
       firstSeen: now,
       lastSeen: now,
       resolved: false,
-      tags: []
+      tags: [],
     }
 
     this.errorStore.set(fingerprint, errorReport)
@@ -497,16 +498,17 @@ export class ErrorTracker {
     const cooldownKey = `${errorReport.fingerprint}-${errorReport.severity}`
     const lastAlert = this.alertCooldown.get(cooldownKey) || 0
     const cooldownPeriod = this.getCooldownPeriod(errorReport.severity)
-    
+
     if (Date.now() - lastAlert < cooldownPeriod) {
       return
     }
 
     // Send alerts based on severity
-    if (errorReport.severity === ErrorSeverity.CRITICAL || 
-        (errorReport.severity === ErrorSeverity.HIGH && errorReport.count >= 5) ||
-        (errorReport.severity === ErrorSeverity.MEDIUM && errorReport.count >= 10)) {
-      
+    if (
+      errorReport.severity === ErrorSeverity.CRITICAL ||
+      (errorReport.severity === ErrorSeverity.HIGH && errorReport.count >= 5) ||
+      (errorReport.severity === ErrorSeverity.MEDIUM && errorReport.count >= 10)
+    ) {
       await this.sendAlert(errorReport)
       this.alertCooldown.set(cooldownKey, Date.now())
     }
@@ -522,7 +524,7 @@ export class ErrorTracker {
       lastSeen: errorReport.lastSeen.toISOString(),
       component: errorReport.context.component,
       url: errorReport.context.url,
-      userId: errorReport.context.userId
+      userId: errorReport.context.userId,
     }
 
     try {
@@ -537,47 +539,48 @@ export class ErrorTracker {
       }
 
       ApplicationLogger.businessOperation('send_error_alert', 'error-tracker', 'alert', {
-        metadata: { 
+        metadata: {
           errorId: errorReport.id,
           severity: errorReport.severity,
           alertChannels: [
             this.config.alerting.teamsWebhook ? 'teams' : null,
-            this.config.alerting.slackWebhook ? 'slack' : null
-          ].filter(Boolean)
-        }
+            this.config.alerting.slackWebhook ? 'slack' : null,
+          ].filter(Boolean),
+        },
       })
-
     } catch (error) {
       ApplicationLogger.systemHealth('error-tracker', 'degraded', {
         error: error instanceof Error ? error.message : String(error),
-        operation: 'send_alert'
+        operation: 'send_alert',
       })
     }
   }
 
   private static async sendTeamsAlert(webhookUrl: string, alertData: any): Promise<void> {
     const payload = {
-      "@type": "MessageCard",
-      "@context": "http://schema.org/extensions",
-      "themeColor": this.getSeverityColor(alertData.count > 10 ? 'critical' : 'high'),
-      "summary": alertData.title,
-      "sections": [{
-        "activityTitle": alertData.title,
-        "activitySubtitle": `Environment: ${alertData.environment}`,
-        "facts": [
-          { "name": "Error", "value": alertData.message },
-          { "name": "Count", "value": alertData.count.toString() },
-          { "name": "Component", "value": alertData.component || 'Unknown' },
-          { "name": "First Seen", "value": alertData.firstSeen },
-          { "name": "Last Seen", "value": alertData.lastSeen }
-        ]
-      }]
+      '@type': 'MessageCard',
+      '@context': 'http://schema.org/extensions',
+      themeColor: this.getSeverityColor(alertData.count > 10 ? 'critical' : 'high'),
+      summary: alertData.title,
+      sections: [
+        {
+          activityTitle: alertData.title,
+          activitySubtitle: `Environment: ${alertData.environment}`,
+          facts: [
+            { name: 'Error', value: alertData.message },
+            { name: 'Count', value: alertData.count.toString() },
+            { name: 'Component', value: alertData.component || 'Unknown' },
+            { name: 'First Seen', value: alertData.firstSeen },
+            { name: 'Last Seen', value: alertData.lastSeen },
+          ],
+        },
+      ],
     }
 
     const response = await fetch(webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
     })
 
     if (!response.ok) {
@@ -588,22 +591,24 @@ export class ErrorTracker {
   private static async sendSlackAlert(webhookUrl: string, alertData: any): Promise<void> {
     const payload = {
       text: alertData.title,
-      attachments: [{
-        color: this.getSeverityColor(alertData.count > 10 ? 'critical' : 'high'),
-        fields: [
-          { title: "Error", value: alertData.message, short: false },
-          { title: "Count", value: alertData.count.toString(), short: true },
-          { title: "Environment", value: alertData.environment, short: true },
-          { title: "Component", value: alertData.component || 'Unknown', short: true },
-          { title: "First Seen", value: alertData.firstSeen, short: true }
-        ]
-      }]
+      attachments: [
+        {
+          color: this.getSeverityColor(alertData.count > 10 ? 'critical' : 'high'),
+          fields: [
+            { title: 'Error', value: alertData.message, short: false },
+            { title: 'Count', value: alertData.count.toString(), short: true },
+            { title: 'Environment', value: alertData.environment, short: true },
+            { title: 'Component', value: alertData.component || 'Unknown', short: true },
+            { title: 'First Seen', value: alertData.firstSeen, short: true },
+          ],
+        },
+      ],
     }
 
     const response = await fetch(webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
     })
 
     if (!response.ok) {
@@ -613,7 +618,7 @@ export class ErrorTracker {
 
   private static determineSeverityFromStatus(status?: number): ErrorSeverity {
     if (!status) return ErrorSeverity.MEDIUM
-    
+
     if (status >= 500) return ErrorSeverity.HIGH
     if (status >= 400) return ErrorSeverity.MEDIUM
     return ErrorSeverity.LOW
@@ -621,20 +626,29 @@ export class ErrorTracker {
 
   private static getCooldownPeriod(severity: ErrorSeverity): number {
     switch (severity) {
-      case ErrorSeverity.CRITICAL: return 5 * 60 * 1000 // 5 minutes
-      case ErrorSeverity.HIGH: return 15 * 60 * 1000 // 15 minutes
-      case ErrorSeverity.MEDIUM: return 60 * 60 * 1000 // 1 hour
-      case ErrorSeverity.LOW: return 4 * 60 * 60 * 1000 // 4 hours
+      case ErrorSeverity.CRITICAL:
+        return 5 * 60 * 1000 // 5 minutes
+      case ErrorSeverity.HIGH:
+        return 15 * 60 * 1000 // 15 minutes
+      case ErrorSeverity.MEDIUM:
+        return 60 * 60 * 1000 // 1 hour
+      case ErrorSeverity.LOW:
+        return 4 * 60 * 60 * 1000 // 4 hours
     }
   }
 
   private static getSeverityColor(severity: string): string {
     switch (severity) {
-      case 'critical': return '#FF0000'
-      case 'high': return '#FF6600'
-      case 'medium': return '#FFCC00'
-      case 'low': return '#00CC00'
-      default: return '#808080'
+      case 'critical':
+        return '#FF0000'
+      case 'high':
+        return '#FF6600'
+      case 'medium':
+        return '#FFCC00'
+      case 'low':
+        return '#00CC00'
+      default:
+        return '#808080'
     }
   }
 
@@ -654,9 +668,9 @@ export class ErrorTracker {
    */
   static updateConfig(newConfig: Partial<ErrorTrackingConfig>): void {
     this.config = { ...this.config, ...newConfig }
-    
+
     ApplicationLogger.businessOperation('config_updated', 'error-tracker', 'config', {
-      metadata: { updatedFields: Object.keys(newConfig) }
+      metadata: { updatedFields: Object.keys(newConfig) },
     })
   }
 }

@@ -8,7 +8,6 @@ import {
   ChevronUp,
   TrendingDown,
   ArrowLeft,
-  X,
   Tag,
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
@@ -37,7 +36,6 @@ import { DecommissionDialog } from './equipment/dialogs/decommission-dialog'
 import { ConvertToPurchaseDialog } from './equipment/dialogs/convert-to-purchase-dialog'
 import { SaleDialog } from './equipment/dialogs/sale-dialog'
 import { TransferFamilyDialog } from './transfer-family-dialog'
-import { Button } from '@/components/ui/button'
 import { useSession } from 'next-auth/react'
 import { LinkedCredentialsCard } from '@/components/credentials/linked-credentials-card'
 

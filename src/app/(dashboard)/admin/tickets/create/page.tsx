@@ -31,7 +31,6 @@ import {
   ArrowLeft,
   User,
   Tag,
-  Info,
   Upload,
   File,
   X,

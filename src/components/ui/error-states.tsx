@@ -6,7 +6,7 @@
 import * as React from 'react'
 import { cn } from '@/lib/utils'
 import { Button } from './button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './card'
+import { Card, CardContent, CardDescription, CardTitle } from './card'
 import { Alert, AlertDescription } from './alert'
 import {
   AlertTriangle,

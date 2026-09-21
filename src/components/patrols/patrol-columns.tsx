@@ -4,14 +4,10 @@ import {
   User,
   ClipboardList,
   AlertTriangle,
-  Clock,
-  MapPin,
   QrCode,
   Wifi,
   WifiOff,
   ShieldAlert,
-  Calendar,
-  BadgeCheck,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
@@ -54,14 +50,14 @@ interface CheckpointColumnsProps {
 }
 
 export function createCheckpointColumns({
-  onEdit,
-  onDownloadQR,
-  onDeactivate,
-  onReactivate,
-  onPermanentDelete,
-  onOpenDisplay,
-  downloadingQrId,
-  isSuperAdmin,
+  onEdit: _onEdit,
+  onDownloadQR: _onDownloadQR,
+  onDeactivate: _onDeactivate,
+  onReactivate: _onReactivate,
+  onPermanentDelete: _onPermanentDelete,
+  onOpenDisplay: _onOpenDisplay,
+  downloadingQrId: _downloadingQrId,
+  isSuperAdmin: _isSuperAdmin,
 }: CheckpointColumnsProps): Column<Checkpoint>[] {
   return [
     {
@@ -175,10 +171,10 @@ interface RouteColumnsProps {
 }
 
 export function createRouteColumns({
-  onEdit,
-  onDeactivate,
-  onPermanentDelete,
-  isSuperAdmin,
+  onEdit: _onEdit,
+  onDeactivate: _onDeactivate,
+  onPermanentDelete: _onPermanentDelete,
+  isSuperAdmin: _isSuperAdmin,
 }: RouteColumnsProps): Column<PatrolRoute>[] {
   return [
     {
@@ -253,11 +249,11 @@ interface ScheduleColumnsProps {
 const DAY_LABELS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
 
 export function createScheduleColumns({
-  onEdit,
-  onDeactivate,
-  onReactivate,
-  onPermanentDelete,
-  isSuperAdmin,
+  onEdit: _onEdit,
+  onDeactivate: _onDeactivate,
+  onReactivate: _onReactivate,
+  onPermanentDelete: _onPermanentDelete,
+  isSuperAdmin: _isSuperAdmin,
 }: ScheduleColumnsProps): Column<PatrolSchedule>[] {
   return [
     {

@@ -36,7 +36,7 @@ export function HeaderActions({
   ticket,
   isEditing,
   unassigning,
-  assignmentDialogOpen,
+  assignmentDialogOpen: _assignmentDialogOpen,
   sessionUser,
   onEdit,
   onCancelEdit,

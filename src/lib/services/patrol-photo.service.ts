@@ -9,7 +9,7 @@
 
 import { writeFile, unlink, mkdir } from 'fs/promises'
 import { existsSync } from 'fs'
-import { join, extname } from 'path'
+import { join } from 'path'
 import { randomUUID } from 'crypto'
 import prisma from '@/lib/prisma'
 import { getUploadDir } from '@/lib/upload-path'

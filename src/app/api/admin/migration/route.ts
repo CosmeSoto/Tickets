@@ -20,14 +20,16 @@ const CreateMigrationSchema = z.object({
     tickets: z.array(z.any()),
     categories: z.array(z.any()),
   }),
-  options: z.object({
-    dryRun: z.boolean().optional(),
-    batchSize: z.number().optional(),
-    skipValidation: z.boolean().optional(),
-    continueOnError: z.boolean().optional(),
-    backupBeforeMigration: z.boolean().optional(),
-    validateAfterMigration: z.boolean().optional(),
-  }).optional(),
+  options: z
+    .object({
+      dryRun: z.boolean().optional(),
+      batchSize: z.number().optional(),
+      skipValidation: z.boolean().optional(),
+      continueOnError: z.boolean().optional(),
+      backupBeforeMigration: z.boolean().optional(),
+      validateAfterMigration: z.boolean().optional(),
+    })
+    .optional(),
 })
 
 const ExecuteMigrationSchema = z.object({
@@ -47,12 +49,14 @@ const ValidateDataSchema = z.object({
     tickets: z.array(z.any()),
     categories: z.array(z.any()),
   }),
-  options: z.object({
-    includePerformanceChecks: z.boolean().optional(),
-    includeSecurityChecks: z.boolean().optional(),
-    includeBusinessRuleChecks: z.boolean().optional(),
-    deepValidation: z.boolean().optional(),
-  }).optional(),
+  options: z
+    .object({
+      includePerformanceChecks: z.boolean().optional(),
+      includeSecurityChecks: z.boolean().optional(),
+      includeBusinessRuleChecks: z.boolean().optional(),
+      deepValidation: z.boolean().optional(),
+    })
+    .optional(),
 })
 
 // Services
@@ -66,7 +70,7 @@ const integrityService = new IntegrityVerification()
  * Get migration status and list active migrations
  */
 export const GET = createApiRoute(
-  async (request: NextRequest, context: RouteContext) => {
+  async (request: NextRequest, _context: RouteContext) => {
     const url = new URL(request.url)
     const migrationId = url.searchParams.get('migrationId')
 
@@ -76,10 +80,7 @@ export const GET = createApiRoute(
       const rollbackProgress = rollbackService.getRollbackProgress(migrationId)
 
       if (!progress && !rollbackProgress) {
-        return NextResponse.json(
-          { error: 'Migration not found' },
-          { status: 404 }
-        )
+        return NextResponse.json({ error: 'Migration not found' }, { status: 404 })
       }
 
       return NextResponse.json({
@@ -108,7 +109,7 @@ export const GET = createApiRoute(
  * Create and manage migration operations
  */
 export const POST = createApiRoute(
-  async (request: NextRequest, context: RouteContext) => {
+  async (request: NextRequest, _context: RouteContext) => {
     const body = await request.json()
     const action = body.action
 
@@ -126,10 +127,7 @@ export const POST = createApiRoute(
       case 'generate_report':
         return await handleGenerateReport(body)
       default:
-        return NextResponse.json(
-          { error: 'Invalid action' },
-          { status: 400 }
-        )
+        return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
     }
   },
   {
@@ -151,14 +149,21 @@ async function handleCreateMigration(body: any) {
         id: 'validate_data',
         name: 'Validate Data',
         description: 'Validate source data integrity',
-        execute: async (context: any) => {
-          const userValidation = await validationService.validateUsers(validatedData.sourceData.users)
-          const ticketValidation = await validationService.validateTickets(validatedData.sourceData.tickets)
-          const categoryValidation = await validationService.validateCategories(validatedData.sourceData.categories)
+        execute: async (_context: any) => {
+          const userValidation = await validationService.validateUsers(
+            validatedData.sourceData.users
+          )
+          const ticketValidation = await validationService.validateTickets(
+            validatedData.sourceData.tickets
+          )
+          const categoryValidation = await validationService.validateCategories(
+            validatedData.sourceData.categories
+          )
 
-          const hasErrors = userValidation.errors.length > 0 || 
-                           ticketValidation.errors.length > 0 || 
-                           categoryValidation.errors.length > 0
+          const hasErrors =
+            userValidation.errors.length > 0 ||
+            ticketValidation.errors.length > 0 ||
+            categoryValidation.errors.length > 0
 
           const allErrors = [
             ...userValidation.errors,
@@ -174,15 +179,16 @@ async function handleCreateMigration(body: any) {
 
           return {
             success: !hasErrors,
-            processedRecords: validatedData.sourceData.users.length + 
-                            validatedData.sourceData.tickets.length + 
-                            validatedData.sourceData.categories.length,
+            processedRecords:
+              validatedData.sourceData.users.length +
+              validatedData.sourceData.tickets.length +
+              validatedData.sourceData.categories.length,
             errors: allErrors.map(err => ({
               step: 'validate_data',
               error: String(err),
               recoverable: true,
               severity: 'high' as const,
-              details: err
+              details: err,
             })),
             warnings: allWarnings.map(warn => String(warn)),
           }
@@ -193,7 +199,7 @@ async function handleCreateMigration(body: any) {
         name: 'Import Users',
         description: 'Import user data',
         dependencies: ['validate_data'],
-        execute: async (context: any) => {
+        execute: async (_context: any) => {
           const result = await migrationService.importData(
             validatedData.sourceData.users,
             'users',
@@ -208,7 +214,7 @@ async function handleCreateMigration(body: any) {
               error: String(err),
               recoverable: true,
               severity: 'high' as const,
-              details: err
+              details: err,
             })),
             warnings: result.warnings.map(warn => String(warn)),
           }
@@ -219,7 +225,7 @@ async function handleCreateMigration(body: any) {
         name: 'Import Categories',
         description: 'Import category data',
         dependencies: ['validate_data'],
-        execute: async (context: any) => {
+        execute: async (_context: any) => {
           const result = await migrationService.importData(
             validatedData.sourceData.categories,
             'categories',
@@ -234,7 +240,7 @@ async function handleCreateMigration(body: any) {
               error: String(err),
               recoverable: true,
               severity: 'high' as const,
-              details: err
+              details: err,
             })),
             warnings: result.warnings.map(warn => String(warn)),
           }
@@ -245,7 +251,7 @@ async function handleCreateMigration(body: any) {
         name: 'Import Tickets',
         description: 'Import ticket data',
         dependencies: ['import_users', 'import_categories'],
-        execute: async (context: any) => {
+        execute: async (_context: any) => {
           const result = await migrationService.importData(
             validatedData.sourceData.tickets,
             'tickets',
@@ -260,7 +266,7 @@ async function handleCreateMigration(body: any) {
               error: String(err),
               recoverable: true,
               severity: 'high' as const,
-              details: err
+              details: err,
             })),
             warnings: result.warnings.map(warn => String(warn)),
           }
@@ -281,12 +287,11 @@ async function handleCreateMigration(body: any) {
         dependencies: s.dependencies || [],
       })),
     })
-
   } catch (error) {
     return NextResponse.json(
-      { 
+      {
         error: 'Failed to create migration',
-        details: error instanceof Error ? error.message : String(error)
+        details: error instanceof Error ? error.message : String(error),
       },
       { status: 400 }
     )
@@ -301,10 +306,7 @@ async function handleExecuteMigration(body: any) {
     const validatedData = ExecuteMigrationSchema.parse(body)
 
     if (!validatedData.confirm) {
-      return NextResponse.json(
-        { error: 'Migration execution must be confirmed' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Migration execution must be confirmed' }, { status: 400 })
     }
 
     // Get migration steps (in real implementation, retrieve from storage)
@@ -320,12 +322,11 @@ async function handleExecuteMigration(body: any) {
       warnings: result.warnings,
       message: result.success ? 'Migration executed successfully' : 'Migration failed',
     })
-
   } catch (error) {
     return NextResponse.json(
-      { 
+      {
         error: 'Failed to execute migration',
-        details: error instanceof Error ? error.message : String(error)
+        details: error instanceof Error ? error.message : String(error),
       },
       { status: 500 }
     )
@@ -340,10 +341,7 @@ async function handleRollbackMigration(body: any) {
     const validatedData = RollbackMigrationSchema.parse(body)
 
     if (!validatedData.confirm) {
-      return NextResponse.json(
-        { error: 'Migration rollback must be confirmed' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Migration rollback must be confirmed' }, { status: 400 })
     }
 
     const result = await rollbackService.executeRollback(
@@ -359,12 +357,11 @@ async function handleRollbackMigration(body: any) {
       warnings: result.warnings,
       message: result.success ? 'Migration rolled back successfully' : 'Rollback failed',
     })
-
   } catch (error) {
     return NextResponse.json(
-      { 
+      {
         error: 'Failed to rollback migration',
-        details: error instanceof Error ? error.message : String(error)
+        details: error instanceof Error ? error.message : String(error),
       },
       { status: 500 }
     )
@@ -385,12 +382,11 @@ async function handleValidateData(body: any) {
       report,
       message: 'Data validation completed',
     })
-
   } catch (error) {
     return NextResponse.json(
-      { 
+      {
         error: 'Failed to validate data',
-        details: error instanceof Error ? error.message : String(error)
+        details: error instanceof Error ? error.message : String(error),
       },
       { status: 500 }
     )
@@ -414,12 +410,11 @@ async function handleVerifyIntegrity(body: any) {
       result,
       message: 'Integrity verification completed',
     })
-
   } catch (error) {
     return NextResponse.json(
-      { 
+      {
         error: 'Failed to verify integrity',
-        details: error instanceof Error ? error.message : String(error)
+        details: error instanceof Error ? error.message : String(error),
       },
       { status: 500 }
     )
@@ -434,10 +429,7 @@ async function handleGenerateReport(body: any) {
     const { migrationId, data } = body
 
     if (!data) {
-      return NextResponse.json(
-        { error: 'Data is required for report generation' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Data is required for report generation' }, { status: 400 })
     }
 
     const consistencyReport = await integrityService.generateConsistencyReport(migrationId, data)
@@ -451,12 +443,11 @@ async function handleGenerateReport(body: any) {
       },
       message: 'Reports generated successfully',
     })
-
   } catch (error) {
     return NextResponse.json(
-      { 
+      {
         error: 'Failed to generate report',
-        details: error instanceof Error ? error.message : String(error)
+        details: error instanceof Error ? error.message : String(error),
       },
       { status: 500 }
     )

@@ -6,10 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import {
-  getOrCreatePatrolFamilyConfig,
-  PATROL_FAMILY_DEFAULTS,
-} from '@/lib/patrol/patrol-family-config'
+import { getOrCreatePatrolFamilyConfig } from '@/lib/patrol/patrol-family-config'
 import { validatePatrolFamilyConfig } from '@/lib/patrol/patrol-config-validator'
 import {
   sanitizePatrolConfigBody,

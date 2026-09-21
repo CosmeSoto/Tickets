@@ -1,20 +1,10 @@
 'use client'
 
 import React from 'react'
-import {
-  CheckCircle2,
-  Edit,
-  Clock,
-  Users,
-  TrendingUp,
-  ChevronRight,
-  Building2,
-  FileText,
-} from 'lucide-react'
+import { CheckCircle2, Edit, ChevronRight } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Separator } from '@/components/ui/separator'
 import type { Category, CategoryMetadata } from '../types'
 
 export interface ConfirmationPanelProps {

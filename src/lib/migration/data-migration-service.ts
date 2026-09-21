@@ -148,15 +148,12 @@ export class DataMigrationService {
   /**
    * Create a new migration
    */
-  async createMigration(
-    steps: MigrationStep[],
-    options: MigrationOptions = {}
-  ): Promise<string> {
+  async createMigration(steps: MigrationStep[], options: MigrationOptions = {}): Promise<string> {
     const migrationId = `migration_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-    
+
     // Validate migration steps
     this.validateMigrationSteps(steps)
-    
+
     // Create migration context
     const context: MigrationContext = {
       migrationId,
@@ -213,11 +210,11 @@ export class DataMigrationService {
     try {
       // Sort steps by dependencies
       const sortedSteps = this.sortStepsByDependencies(steps)
-      
+
       // Execute steps
       for (const step of sortedSteps) {
         context.progress.currentStep = step.name
-        
+
         this.logger.info('Executing migration step', {
           migration: migrationId,
           stepId: step.id,
@@ -235,7 +232,7 @@ export class DataMigrationService {
               recoverable: false,
             }
             context.progress.errors.push(error)
-            
+
             if (!context.options.continueOnError) {
               throw new Error(`Migration step ${step.id} validation failed`)
             }
@@ -244,11 +241,11 @@ export class DataMigrationService {
 
         // Execute step
         const stepResult = await step.execute(context)
-        
+
         // Handle step result
         if (!stepResult.success) {
           context.progress.errors.push(...stepResult.errors)
-          
+
           if (!context.options.continueOnError) {
             throw new Error(`Migration step ${step.id} failed`)
           }
@@ -287,7 +284,6 @@ export class DataMigrationService {
         errors: context.progress.errors,
         warnings: context.progress.warnings,
       }
-
     } catch (error) {
       this.logger.error('Migration failed', {
         migration: migrationId,
@@ -314,10 +310,7 @@ export class DataMigrationService {
   /**
    * Rollback migration
    */
-  async rollbackMigration(
-    migrationId: string,
-    steps: MigrationStep[]
-  ): Promise<void> {
+  async rollbackMigration(migrationId: string, steps: MigrationStep[]): Promise<void> {
     const context = this.activeMigrations.get(migrationId)
     if (!context) {
       throw new Error(`Migration ${migrationId} not found`)
@@ -328,7 +321,7 @@ export class DataMigrationService {
     try {
       // Execute rollback steps in reverse order
       const reversedSteps = steps.reverse()
-      
+
       for (const step of reversedSteps) {
         if (step.rollback) {
           this.logger.info('Rolling back migration step', {
@@ -342,7 +335,6 @@ export class DataMigrationService {
       }
 
       this.logger.info('Migration rollback completed', { migration: migrationId } as any)
-
     } catch (error) {
       this.logger.error('Migration rollback failed', {
         migration: migrationId,
@@ -382,10 +374,10 @@ export class DataMigrationService {
     const warnings: string[] = []
 
     const batchSize = options.batchSize || 1000
-    
+
     for (let i = 0; i < data.length; i += batchSize) {
       const batch = data.slice(i, i + batchSize)
-      
+
       for (const record of batch) {
         try {
           // Validate if requested
@@ -410,7 +402,6 @@ export class DataMigrationService {
           }
 
           imported.push(processedRecord)
-
         } catch (error) {
           errors.push({
             step: 'import',
@@ -462,7 +453,7 @@ export class DataMigrationService {
    */
   private validateMigrationSteps(steps: MigrationStep[]): void {
     const stepIds = new Set<string>()
-    
+
     for (const step of steps) {
       // Check for duplicate step IDs
       if (stepIds.has(step.id)) {
@@ -499,14 +490,14 @@ export class DataMigrationService {
       if (visiting.has(stepId)) {
         throw new Error(`Circular dependency detected: ${path.join(' -> ')} -> ${stepId}`)
       }
-      
+
       if (visited.has(stepId)) {
         return
       }
 
       visiting.add(stepId)
       const step = steps.find(s => s.id === stepId)
-      
+
       if (step?.dependencies) {
         for (const dep of step.dependencies) {
           visit(dep, [...path, stepId])
@@ -536,7 +527,7 @@ export class DataMigrationService {
       if (visiting.has(step.id)) {
         throw new Error(`Circular dependency detected involving step: ${step.id}`)
       }
-      
+
       if (visited.has(step.id)) {
         return
       }
@@ -638,11 +629,13 @@ export class DataMigrationService {
   private exportToJSON(data: any[], options: any): string {
     const exportData = {
       data,
-      metadata: options.includeMetadata ? {
-        exportedAt: new Date().toISOString(),
-        recordCount: data.length,
-        version: '1.0',
-      } : undefined,
+      metadata: options.includeMetadata
+        ? {
+            exportedAt: new Date().toISOString(),
+            recordCount: data.length,
+            version: '1.0',
+          }
+        : undefined,
     }
 
     return JSON.stringify(exportData, null, 2)
@@ -651,7 +644,7 @@ export class DataMigrationService {
   /**
    * Export to CSV
    */
-  private exportToCSV(data: any[], options: any): string {
+  private exportToCSV(data: any[], _options: any): string {
     if (data.length === 0) return ''
 
     const headers = Object.keys(data[0])
@@ -660,7 +653,10 @@ export class DataMigrationService {
     for (const record of data) {
       const values = headers.map(header => {
         const value = record[header]
-        if (typeof value === 'string' && (value.includes(',') || value.includes('"') || value.includes('\n'))) {
+        if (
+          typeof value === 'string' &&
+          (value.includes(',') || value.includes('"') || value.includes('\n'))
+        ) {
           return `"${value.replace(/"/g, '""')}"`
         }
         return value
@@ -674,7 +670,7 @@ export class DataMigrationService {
   /**
    * Export to XML
    */
-  private exportToXML(data: any[], options: any): string {
+  private exportToXML(data: any[], _options: any): string {
     let xml = '<?xml version="1.0" encoding="UTF-8"?>\n<data>\n'
 
     for (const record of data) {

@@ -6,7 +6,7 @@ import { useAuthReady } from '@/hooks/auth/use-auth-ready'
 import Link from 'next/link'
 import { AssetRequestCreateForm } from '@/components/inventory/asset-requests/asset-request-create-form'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
-import { ArrowLeft, Plus } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import { useUserModules } from '@/hooks/use-user-modules'
 
 export default function CreateAssetRequestPage() {

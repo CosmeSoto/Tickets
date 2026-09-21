@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { useDebounce } from './use-debounce'
 
 export interface KnowledgeFilters {
@@ -17,20 +17,20 @@ const DEFAULT_FILTERS: KnowledgeFilters = {
 
 export function useKnowledgeFilters() {
   const [filters, setFilters] = useState<KnowledgeFilters>(DEFAULT_FILTERS)
-  
+
   // Debounce solo para búsqueda
   const debouncedSearch = useDebounce(filters.search, 300)
-  
-  // Filtros con búsqueda debounced
-  const debouncedFilters = useMemo(() => ({
-    ...filters,
-    search: debouncedSearch,
-  }), [filters, debouncedSearch])
 
-  const setFilter = <K extends keyof KnowledgeFilters>(
-    key: K,
-    value: KnowledgeFilters[K]
-  ) => {
+  // Filtros con búsqueda debounced
+  const debouncedFilters = useMemo(
+    () => ({
+      ...filters,
+      search: debouncedSearch,
+    }),
+    [filters, debouncedSearch]
+  )
+
+  const setFilter = <K extends keyof KnowledgeFilters>(key: K, value: KnowledgeFilters[K]) => {
     setFilters(prev => ({ ...prev, [key]: value }))
   }
 

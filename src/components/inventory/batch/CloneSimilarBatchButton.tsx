@@ -13,7 +13,7 @@ interface CloneSimilarBatchButtonProps {
 
 export function CloneSimilarBatchButton({
   batchId,
-  batchCode,
+  batchCode: _batchCode,
   highlight = false,
 }: CloneSimilarBatchButtonProps) {
   return (

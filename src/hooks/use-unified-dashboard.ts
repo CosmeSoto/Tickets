@@ -7,7 +7,7 @@ import {
   useTechnicianProtection,
   useClientProtection,
 } from './use-role-protection'
-import { dashboardCache, CACHE_KEYS, CACHE_TTL } from '@/lib/cache/dashboard-cache'
+import { dashboardCache, CACHE_KEYS } from '@/lib/cache/dashboard-cache'
 
 type Role = 'ADMIN' | 'TECHNICIAN' | 'CLIENT'
 

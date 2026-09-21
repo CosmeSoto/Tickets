@@ -21,7 +21,7 @@ import { AssetRequestStatus, AssetType, UserRole } from '@prisma/client'
 import { FolioService } from './folio.service'
 import { AuditServiceComplete } from './audit-service-complete'
 import { NotificationService } from './notification-service'
-import { getFamilyScopedAdmins, getNativeFamilyAdmins } from '@/lib/notifications/family-recipients'
+import { getNativeFamilyAdmins } from '@/lib/notifications/family-recipients'
 import { EmailService } from '@/lib/services/email/email-service'
 import { createModuleCache, getSetting } from '@/lib/api-cache'
 import {

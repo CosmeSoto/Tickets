@@ -7,10 +7,9 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { UserPlus, UserMinus, Users, RefreshCw, Search } from 'lucide-react'
+import { UserPlus, UserMinus, RefreshCw, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { useToast } from '@/hooks/use-toast'
 

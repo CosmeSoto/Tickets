@@ -14,7 +14,7 @@ export type ProcessAccess = {
  * departamento nativo y las asignaciones `user_family_access` de `processes`.
  * ADMIN normal también queda restringido a su scope de familias.
  */
-export async function getProcessAccess(userId: string, role: string): Promise<ProcessAccess> {
+export async function getProcessAccess(userId: string, _role: string): Promise<ProcessAccess> {
   const user = await prisma.users.findUnique({
     where: { id: userId },
     select: {

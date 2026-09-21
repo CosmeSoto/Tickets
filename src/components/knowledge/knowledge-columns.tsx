@@ -2,7 +2,7 @@
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Eye, ThumbsUp, Calendar, BookOpen, Tag, Trash2, Users } from 'lucide-react'
+import { Eye, ThumbsUp, Calendar, BookOpen, Tag, Trash2 } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
 import type { Column } from '@/components/ui/data-table'

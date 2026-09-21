@@ -6,7 +6,6 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { headers } from 'next/headers'
 import { ValidationService } from './validation'
 
 // Configuración de rate limiting (en memoria para desarrollo)
@@ -251,10 +250,10 @@ export function createSecureApiRoute(
           return SecurityMiddleware.applySecurityHeaders(response)
         } else {
           // Si es Response, crear un NextResponse equivalente
-          const nextResponse = NextResponse.json(
-            response.body ? await response.json() : null,
-            { status: response.status, statusText: response.statusText }
-          )
+          const nextResponse = NextResponse.json(response.body ? await response.json() : null, {
+            status: response.status,
+            statusText: response.statusText,
+          })
           return SecurityMiddleware.applySecurityHeaders(nextResponse)
         }
       }

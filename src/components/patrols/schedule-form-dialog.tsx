@@ -4,7 +4,6 @@ import { DEFAULT_TIMEZONE } from '@/lib/constants'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Loader2, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { DateTimePicker } from '@/components/ui/date-time-picker'
 import { TimePicker } from '@/components/ui/time-picker'
@@ -24,10 +23,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { useToast } from '@/hooks/use-toast'
-import { PATROL_RECURRENCE_LABELS_ES } from '@/lib/utils/patrol-utils'
 import { formatDurationMinutes } from '@/lib/utils/patrol-utils'
 import { FormData, EMPTY_FORM, Family, PatrolRoute, Agent, DAY_LABELS } from './types'
-import { localDayToUTCDay, utcDayToLocalDay, formatDateTimeLocal } from './utils'
+import { localDayToUTCDay, utcDayToLocalDay } from './utils'
 
 interface ScheduleFormDialogProps {
   open: boolean

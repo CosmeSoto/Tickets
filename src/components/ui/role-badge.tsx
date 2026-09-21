@@ -10,7 +10,6 @@
  */
 
 import { Badge } from '@/components/ui/badge'
-import { Shield, Wrench, UserCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { UserRole } from '@/lib/constants/user-constants'
 import { USER_ROLE_COLORS, USER_ROLE_LABELS, USER_ROLE_ICONS } from '@/lib/constants/user-constants'
@@ -19,12 +18,12 @@ import { USER_ROLE_COLORS, USER_ROLE_LABELS, USER_ROLE_ICONS } from '@/lib/const
 function CrownIcon({ className }: { className?: string }) {
   return (
     <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="currentColor"
+      xmlns='http://www.w3.org/2000/svg'
+      viewBox='0 0 24 24'
+      fill='currentColor'
       className={className}
     >
-      <path d="M5 16L3 5l5.5 5L12 4l3.5 6L21 5l-2 11H5zm2.7 2a1 1 0 0 0 0 2h8.6a1 1 0 0 0 0-2H7.7z" />
+      <path d='M5 16L3 5l5.5 5L12 4l3.5 6L21 5l-2 11H5zm2.7 2a1 1 0 0 0 0 2h8.6a1 1 0 0 0 0-2H7.7z' />
     </svg>
   )
 }
@@ -84,7 +83,13 @@ export function RoleBadge({ role, isSuperAdmin, className, iconSize = 'md' }: Ro
   }
 
   return (
-    <Badge className={cn('flex items-center gap-1 w-fit text-xs', USER_ROLE_COLORS[role as UserRole], className)}>
+    <Badge
+      className={cn(
+        'flex items-center gap-1 w-fit text-xs',
+        USER_ROLE_COLORS[role as UserRole],
+        className
+      )}
+    >
       <RoleIcon className={iconClass} />
       {USER_ROLE_LABELS[role as UserRole]}
     </Badge>

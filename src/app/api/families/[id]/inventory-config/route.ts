@@ -3,7 +3,7 @@
  * Preferir: /api/inventory/family-config/[familyId]
  */
 
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import {
   GET as canonicalGet,
   PUT as canonicalPut,

@@ -9,7 +9,6 @@ import { WarehouseFormDialog } from './warehouse-form-dialog'
 import { CloneCatalogItemDialog } from './clone-catalog-item-dialog'
 import { ReorderRowButtons, moveItemInList } from './reorder-row-buttons'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { DataTable, type Column } from '@/components/ui/data-table'
 import { useExport } from '@/hooks/common/use-export'
 import {

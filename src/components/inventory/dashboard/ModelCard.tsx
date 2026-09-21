@@ -27,7 +27,7 @@ export function ModelCard({
   available,
   assigned,
   maintenance,
-  retired,
+  retired: _retired,
   batchCount,
   individualCount,
   onClick,

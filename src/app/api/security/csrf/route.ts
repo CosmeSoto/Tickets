@@ -11,7 +11,7 @@ import {
   SecurityConfigs,
 } from '@/lib/security/middleware'
 
-async function handler(request: NextRequest, context: any) {
+async function handler(request: NextRequest, _context: any) {
   if (request.method === 'GET') {
     // Generar nuevo token CSRF
     const csrfToken = SecurityMiddleware.generateCsrfToken()

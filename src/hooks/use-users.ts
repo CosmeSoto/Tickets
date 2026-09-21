@@ -11,8 +11,6 @@ import { useToast } from '@/hooks/use-toast'
 import { useModuleData } from '@/hooks/common/use-module-data'
 import { usePagination } from '@/hooks/common/use-pagination'
 import { type UserRole } from '@/lib/constants/user-constants'
-import { formatLastSeen } from '@/lib/utils/date-utils'
-
 export interface UserData {
   id: string
   email: string

@@ -4,7 +4,7 @@
  * FormCard — tarjeta de documento para el feed de usuario
  */
 
-import { Download, FileText, Star } from 'lucide-react'
+import { Download, Star } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { Card, CardContent } from '@/components/ui/card'

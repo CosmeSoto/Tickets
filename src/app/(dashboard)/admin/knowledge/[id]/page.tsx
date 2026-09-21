@@ -7,7 +7,6 @@ import {
   ArrowLeft,
   Eye,
   Calendar,
-  User,
   Tag,
   BookOpen,
   Share2,

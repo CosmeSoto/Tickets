@@ -14,8 +14,6 @@ import { SuggestionEngine } from './SuggestionEngine'
 import { CategoryTree } from './CategoryTree'
 import { FrequentCategories } from './FrequentCategories'
 import { ConfirmationPanel } from './ConfirmationPanel'
-import { RelatedArticles } from './RelatedArticles'
-
 // Import hooks
 import { useCategorySearch } from '../hooks/useCategorySearch'
 import { useCategorySuggestions } from '../hooks/useCategorySuggestions'

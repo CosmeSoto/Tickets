@@ -4,7 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { ConfigService } from '@/lib/services/config-service'
 
 // API para administradores - obtener configuración completa del sistema de ayuda
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
 
@@ -16,14 +16,17 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      data: config
+      data: config,
     })
   } catch (error) {
     console.error('Error fetching admin help config:', error)
-    return NextResponse.json({ 
-      success: false,
-      error: 'Error interno del servidor' 
-    }, { status: 500 })
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Error interno del servidor',
+      },
+      { status: 500 }
+    )
   }
 }
 
@@ -37,26 +40,32 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json()
-    
+
     // Validar que los datos requeridos estén presentes
     if (!body.supportEmail || !body.companyName) {
-      return NextResponse.json({ 
-        success: false,
-        error: 'Email de soporte y nombre de empresa son requeridos' 
-      }, { status: 400 })
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Email de soporte y nombre de empresa son requeridos',
+        },
+        { status: 400 }
+      )
     }
 
     await ConfigService.updateHelpSystemConfig(body)
 
     return NextResponse.json({
       success: true,
-      message: 'Configuración actualizada exitosamente'
+      message: 'Configuración actualizada exitosamente',
     })
   } catch (error) {
     console.error('Error updating admin help config:', error)
-    return NextResponse.json({ 
-      success: false,
-      error: 'Error interno del servidor' 
-    }, { status: 500 })
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Error interno del servidor',
+      },
+      { status: 500 }
+    )
   }
 }

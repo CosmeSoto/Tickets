@@ -5,7 +5,6 @@
  */
 
 import prisma from './prisma'
-import { randomUUID } from 'crypto'
 import { AuditServiceComplete } from './services/audit-service-complete'
 
 export interface AuditLogInput {

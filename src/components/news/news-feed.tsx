@@ -6,7 +6,6 @@ import { useUserModules } from '@/hooks/use-user-modules'
 import {
   Newspaper,
   Calendar,
-  Users,
   AlertTriangle,
   Gift,
   PartyPopper,
@@ -17,7 +16,6 @@ import {
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { NewsCard } from './news-card'
 import { NewsDetail } from './news-detail'

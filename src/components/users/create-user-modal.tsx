@@ -78,7 +78,7 @@ export function CreateUserModal({
 
   useEffect(() => {
     if (isOpen) {
-      setFormData(prev => ({ ...EMPTY_FORM, role: suggestedRole ?? 'CLIENT' }))
+      setFormData(_prev => ({ ...EMPTY_FORM, role: suggestedRole ?? 'CLIENT' }))
       setErrors({})
       setAvatarPreview(null)
       setShowPassword(false)

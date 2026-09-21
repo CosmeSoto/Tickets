@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     // Verificar variables de entorno críticas
     const envCheck = {
@@ -44,15 +44,18 @@ export async function GET(request: NextRequest) {
           clientId: !!process.env.AZURE_AD_CLIENT_ID,
           clientSecret: !!process.env.AZURE_AD_CLIENT_SECRET,
           tenantId: !!process.env.AZURE_AD_TENANT_ID,
-        }
+        },
       },
-      envCheck
+      envCheck,
     })
   } catch (error) {
-    return NextResponse.json({
-      status: 'error',
-      message: (error as Error).message,
-      timestamp: new Date().toISOString(),
-    }, { status: 500 })
+    return NextResponse.json(
+      {
+        status: 'error',
+        message: (error as Error).message,
+        timestamp: new Date().toISOString(),
+      },
+      { status: 500 }
+    )
   }
 }

@@ -8,7 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { DatabaseUtils } from '@/lib/database/prisma-enhanced'
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     // Verificar salud básica de la conexión
     const healthCheck = await DatabaseUtils.checkHealth()
@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
 }
 
 // Endpoint para limpiar conexiones inactivas (solo para admins)
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   try {
     // TODO: Agregar autenticación de admin aquí
     // const user = await validateAdmin(request);

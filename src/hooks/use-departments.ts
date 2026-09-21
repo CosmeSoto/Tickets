@@ -234,7 +234,7 @@ export function useDepartments(options: UseDepartmentsOptions = {}) {
     getItemName: (item: DepartmentData) => item.name,
     canDelete: (item: DepartmentData) =>
       (item._count?.users || 0) === 0 && (item._count?.categories || 0) === 0,
-    canUpdate: (item: DepartmentData) => true,
+    canUpdate: (_item: DepartmentData) => true,
     onBulkDelete: async (items: DepartmentData[]) => {
       const promises = items.map(item =>
         fetch(`/api/departments/${item.id}`, {

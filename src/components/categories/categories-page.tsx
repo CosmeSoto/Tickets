@@ -48,11 +48,7 @@ import { BackToTickets } from '@/components/tickets/back-to-tickets'
 
 // Componentes comunes
 import { DataTableAdvanced } from '@/components/common/data-table-advanced'
-import type {
-  ColumnConfig,
-  ActionConfig,
-  MassActionConfig,
-} from '@/components/common/data-table-advanced'
+import { ColumnConfig, ActionConfig } from '@/components/common/data-table-advanced'
 
 // Componentes específicos del módulo
 import { CategoryTree } from '@/components/ui/category-tree'

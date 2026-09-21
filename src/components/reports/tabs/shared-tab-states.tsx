@@ -2,7 +2,7 @@
  * Shared loading and empty states for report tabs
  */
 
-import { Loader2, FileText } from 'lucide-react'
+import { FileText } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 
 export function TabLoadingState() {

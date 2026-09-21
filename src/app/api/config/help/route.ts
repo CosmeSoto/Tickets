@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { ConfigService } from '@/lib/services/config-service'
 
 // API pública para obtener configuración del sistema de ayuda
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const config = await ConfigService.getHelpSystemConfig()
 

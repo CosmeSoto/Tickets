@@ -5,7 +5,6 @@ import { randomUUID } from 'crypto'
 import { DEFAULT_SYSTEM_NAME } from '@/lib/branding-constants'
 import { withAttributeLabels } from '@/lib/inventory/attribute-labels'
 import {
-  Building2,
   Package,
   Tag,
   User,

@@ -4,7 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { NotificationService } from '@/lib/services/notification-service'
 import { invalidateCache } from '@/lib/api-cache'
 
-async function markAllNotificationsAsRead(request: NextRequest) {
+async function markAllNotificationsAsRead(_request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
 

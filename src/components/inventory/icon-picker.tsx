@@ -4,34 +4,90 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover'
-import {
-  // Tecnología
-  Laptop, Monitor, Printer, Phone, Tablet, Keyboard, Mouse, Headphones,
-  Camera, Cpu, HardDrive, Wifi, Router, Server, Battery, Cable, Usb,
-  Bluetooth, Tv, Gamepad2, Watch, Projector, Speaker, Mic, Radio, Disc,
-  // Inventario general
-  Package, Box, Boxes, Wrench, Settings, Zap, Shield, Globe, Cloud, Database,
-  // Edificios / infraestructura
-  Building2, Building, Home, Warehouse, Store, Factory, Hotel, School,
-  // Naturaleza / exteriores
-  TreePine, Leaf, Flower2, Sun, Wind, Droplets,
-  // Seguridad
-  Lock, Key, Eye, AlertTriangle, ShieldCheck, Fingerprint,
-  // Documentos / admin
-  FolderOpen, FileText, ClipboardList, Archive, BookOpen, Briefcase,
-  // Herramientas / mantenimiento
-  Hammer, Paintbrush, Scissors, Ruler, Gauge,
-  // Limpieza / servicios
-  Sparkles, Trash2, RefreshCw, Recycle,
-  // Comercial
-  ShoppingCart, Tag, BarChart2, TrendingUp, DollarSign, CreditCard,
-  // Otros
-  Star, Heart, Flag, Map, Compass, Truck, Car, Bike, Plane,
+  Laptop,
+  Monitor,
+  Printer,
+  Phone,
+  Tablet,
+  Keyboard,
+  Mouse,
+  Headphones,
+  Camera,
+  Cpu,
+  HardDrive,
+  Wifi,
+  Router,
+  Server,
+  Battery,
+  Cable,
+  Usb,
+  Bluetooth,
+  Tv,
+  Gamepad2,
+  Watch,
+  Projector,
+  Speaker,
+  Mic,
+  Radio,
+  Disc,
+  Package,
+  Box,
+  Boxes,
+  Wrench,
+  Settings,
+  Zap,
+  Shield,
+  Globe,
+  Cloud,
+  Database,
+  Building2,
+  Building,
+  Home,
+  Warehouse,
+  Store,
+  Factory,
+  Hotel,
+  School,
+  TreePine,
+  Leaf,
+  Flower2,
+  Sun,
+  Wind,
+  Droplets,
+  Lock,
+  Key,
+  Eye,
+  AlertTriangle,
+  ShieldCheck,
+  Fingerprint,
+  FolderOpen,
+  FileText,
+  ClipboardList,
+  Archive,
+  BookOpen,
+  Briefcase,
+  Hammer,
+  Paintbrush,
+  Scissors,
+  Ruler,
+  Gauge,
+  Sparkles,
+  Trash2,
+  RefreshCw,
+  Recycle,
+  ShoppingCart,
+  Tag,
+  BarChart2,
+  TrendingUp,
+  DollarSign,
+  CreditCard,
+  Star,
+  Flag,
+  Map,
+  Truck,
+  Car,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -150,33 +206,33 @@ export function IconPicker({ value, onChange }: IconPickerProps) {
   const SelectedIconComponent = selectedIcon?.icon
 
   return (
-    <div className="space-y-2">
+    <div className='space-y-2'>
       <Label>Ícono</Label>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          <Button variant="outline" className="w-full justify-start gap-2">
+          <Button variant='outline' className='w-full justify-start gap-2'>
             {SelectedIconComponent ? (
               <>
-                <SelectedIconComponent className="h-4 w-4" />
+                <SelectedIconComponent className='h-4 w-4' />
                 <span>{selectedIcon?.label ?? value}</span>
               </>
             ) : (
-              <span className="text-muted-foreground">Seleccionar ícono...</span>
+              <span className='text-muted-foreground'>Seleccionar ícono...</span>
             )}
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-80 p-3" align="start">
+        <PopoverContent className='w-80 p-3' align='start'>
           <Input
-            placeholder="Buscar ícono..."
+            placeholder='Buscar ícono...'
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="mb-3"
+            onChange={e => setSearch(e.target.value)}
+            className='mb-3'
           />
-          <div className="grid grid-cols-6 gap-1 max-h-[240px] overflow-y-auto">
+          <div className='grid grid-cols-6 gap-1 max-h-[240px] overflow-y-auto'>
             {filtered.map(({ name, icon: Icon, label }) => (
               <button
                 key={name}
-                type="button"
+                type='button'
                 className={`flex flex-col items-center justify-center p-2 rounded-md hover:bg-accent transition-colors ${
                   value === name ? 'bg-primary/10 ring-1 ring-primary' : ''
                 }`}
@@ -187,13 +243,13 @@ export function IconPicker({ value, onChange }: IconPickerProps) {
                 }}
                 title={label}
               >
-                <Icon className="h-5 w-5" />
-                <span className="text-[10px] mt-1 truncate w-full text-center">{label}</span>
+                <Icon className='h-5 w-5' />
+                <span className='text-[10px] mt-1 truncate w-full text-center'>{label}</span>
               </button>
             ))}
           </div>
           {filtered.length === 0 && (
-            <p className="text-sm text-muted-foreground text-center py-4">
+            <p className='text-sm text-muted-foreground text-center py-4'>
               No se encontraron íconos
             </p>
           )}

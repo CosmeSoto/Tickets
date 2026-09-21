@@ -1,6 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Progress } from '@/components/ui/progress'
-import { Package, CheckCircle, UserCheck, Wrench, Archive } from 'lucide-react'
+import { Package, CheckCircle, UserCheck, Wrench } from 'lucide-react'
 import { BatchMetrics as BatchMetricsType } from '@/types/inventory/batch-inventory'
 
 interface BatchMetricsProps {

@@ -3,20 +3,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useAuthReady } from '@/hooks/auth/use-auth-ready'
 import { useRouter, useParams } from 'next/navigation'
-import {
-  BookOpen,
-  Eye,
-  ThumbsUp,
-  ThumbsDown,
-  Calendar,
-  User,
-  Tag,
-  ArrowLeft,
-  Edit,
-  Share2,
-} from 'lucide-react'
-import { formatDistanceToNow } from 'date-fns'
-import { es } from 'date-fns/locale'
+import { Tag, ArrowLeft, Edit, Share2 } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
@@ -25,7 +12,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { ArticleVote } from '@/components/knowledge/article-vote'
 import { ArticleSourcePanel } from '@/components/knowledge/article-source-panel'
 import { useToast } from '@/hooks/use-toast'

@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx'
 import type { TypeAttributeDef } from './types'
-import { VALID_CONDITIONS, getConditionGuideText } from './constants'
+import { getConditionGuideText } from './constants'
 import { getAcquisitionModeLabel } from '@/lib/utils/inventory-utils'
 import { EQUIPMENT_SHARED_FIELDS } from '@/lib/inventory/equipment-field-definitions'
 

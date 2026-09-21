@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './car
 import { Button } from './button'
 import { Textarea } from './textarea'
 import { Badge } from './badge'
-import { Star, MessageSquare, User, CheckCircle } from 'lucide-react'
+import { Star, MessageSquare, User } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './tooltip'
 

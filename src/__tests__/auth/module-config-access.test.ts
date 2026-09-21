@@ -52,11 +52,7 @@ import {
   canReadModuleFamilyConfig,
   canWriteModuleFamilyConfig,
 } from '@/lib/auth/module-config-access'
-import {
-  adminCanOperateInventoryFamily,
-  adminCanOperateTicketFamily,
-  adminCanViewTicketFamily,
-} from '@/lib/auth/family-scope'
+import { adminCanOperateInventoryFamily, adminCanViewTicketFamily } from '@/lib/auth/family-scope'
 import { checkFamilyAccess } from '@/lib/inventory/family-access'
 
 describe('module-config-access permissions', () => {

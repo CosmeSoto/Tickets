@@ -1,7 +1,5 @@
 import * as React from 'react'
 import { cn } from '@/lib/utils'
-import { type StandardComponentProps } from '@/lib/ui-standards'
-
 export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   'data-testid'?: string
 }

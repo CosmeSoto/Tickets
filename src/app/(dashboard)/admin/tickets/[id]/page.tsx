@@ -21,7 +21,6 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import {
-  useTicketData,
   useUserData,
   type Ticket,
   getStatusConfig,

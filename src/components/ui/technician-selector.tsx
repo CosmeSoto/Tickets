@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Search, ChevronDown, User, Users, Star, Zap } from 'lucide-react'
+import { Search, ChevronDown, User, Star, Zap } from 'lucide-react'
 import { Badge } from './badge'
 import { Button } from './button'
 import { cn } from '@/lib/utils'

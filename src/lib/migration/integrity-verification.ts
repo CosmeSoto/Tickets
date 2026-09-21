@@ -110,7 +110,7 @@ export class IntegrityVerification {
     options: VerificationOptions = {}
   ): Promise<IntegrityVerificationResult> {
     const startTime = Date.now()
-    
+
     this.logger.info('Starting comprehensive data integrity verification', {
       users: data.users.length,
       tickets: data.tickets.length,
@@ -121,22 +121,22 @@ export class IntegrityVerification {
     const checks: IntegrityCheck[] = []
 
     // Core integrity checks
-    checks.push(...await this.performReferentialIntegrityChecks(data))
-    checks.push(...await this.performStructuralIntegrityChecks(data))
-    checks.push(...await this.performBusinessRuleChecks(data))
+    checks.push(...(await this.performReferentialIntegrityChecks(data)))
+    checks.push(...(await this.performStructuralIntegrityChecks(data)))
+    checks.push(...(await this.performBusinessRuleChecks(data)))
 
     // Optional checks
     if (options.includePerformanceChecks) {
-      checks.push(...await this.performPerformanceChecks(data))
+      checks.push(...(await this.performPerformanceChecks(data)))
     }
 
     if (options.includeSecurityChecks) {
-      checks.push(...await this.performSecurityChecks(data))
+      checks.push(...(await this.performSecurityChecks(data)))
     }
 
     // Deep validation if requested
     if (options.deepValidation) {
-      checks.push(...await this.performDeepValidation(data))
+      checks.push(...(await this.performDeepValidation(data)))
     }
 
     // Calculate scores and summary
@@ -252,16 +252,26 @@ export class IntegrityVerification {
     }
 
     // Check if migration is complete
-    const hasMissingRecords = Object.values(result.missingRecords).some(records => records.length > 0)
-    const hasUnexpectedChanges = Object.values(result.modifiedRecords).some(records => records.length > 0)
-    
+    const hasMissingRecords = Object.values(result.missingRecords).some(
+      records => records.length > 0
+    )
+    const hasUnexpectedChanges = Object.values(result.modifiedRecords).some(
+      records => records.length > 0
+    )
+
     result.complete = !hasMissingRecords && !hasUnexpectedChanges
 
     this.logger.info('Migration completeness verification completed', {
       status: result.complete,
-      missing: Object.values(result.missingRecords).reduce((sum, records) => sum + records.length, 0),
+      missing: Object.values(result.missingRecords).reduce(
+        (sum, records) => sum + records.length,
+        0
+      ),
       extra: Object.values(result.extraRecords).reduce((sum, records) => sum + records.length, 0),
-      modified: Object.values(result.modifiedRecords).reduce((sum, records) => sum + records.length, 0),
+      modified: Object.values(result.modifiedRecords).reduce(
+        (sum, records) => sum + records.length,
+        0
+      ),
     } as any)
 
     return result
@@ -276,10 +286,10 @@ export class IntegrityVerification {
     // Check ticket-user relationships
     checks.push(await this.checkTicketUserReferences(data.tickets, data.users))
     checks.push(await this.checkTicketAssigneeReferences(data.tickets, data.users))
-    
+
     // Check ticket-category relationships
     checks.push(await this.checkTicketCategoryReferences(data.tickets, data.categories))
-    
+
     // Check category hierarchy
     checks.push(await this.checkCategoryHierarchy(data.categories))
 
@@ -317,10 +327,10 @@ export class IntegrityVerification {
 
     // Check business rules for tickets
     checks.push(await this.checkTicketBusinessRules(data.tickets))
-    
+
     // Check business rules for users
     checks.push(await this.checkUserBusinessRules(data.users))
-    
+
     // Check business rules for categories
     checks.push(await this.checkCategoryBusinessRules(data.categories))
 
@@ -389,16 +399,22 @@ export class IntegrityVerification {
       severity: affectedRecords > 0 ? 'critical' : 'info',
       details: `Found ${affectedRecords} tickets with invalid user references`,
       affectedRecords,
-      suggestions: affectedRecords > 0 ? [
-        'Remove tickets with invalid user references',
-        'Create missing user records',
-        'Update user references to valid IDs',
-      ] : [],
+      suggestions:
+        affectedRecords > 0
+          ? [
+              'Remove tickets with invalid user references',
+              'Create missing user records',
+              'Update user references to valid IDs',
+            ]
+          : [],
       executionTime: Date.now() - startTime,
     }
   }
 
-  private async checkTicketAssigneeReferences(tickets: any[], users: any[]): Promise<IntegrityCheck> {
+  private async checkTicketAssigneeReferences(
+    tickets: any[],
+    users: any[]
+  ): Promise<IntegrityCheck> {
     const startTime = Date.now()
     const userIds = new Set(users.map(u => u.id).filter(Boolean))
     let affectedRecords = 0
@@ -418,16 +434,22 @@ export class IntegrityVerification {
       severity: affectedRecords > 0 ? 'error' : 'info',
       details: `Found ${affectedRecords} tickets with invalid assignee references`,
       affectedRecords,
-      suggestions: affectedRecords > 0 ? [
-        'Remove invalid assignee references',
-        'Create missing user records for assignees',
-        'Update assignee references to valid IDs',
-      ] : [],
+      suggestions:
+        affectedRecords > 0
+          ? [
+              'Remove invalid assignee references',
+              'Create missing user records for assignees',
+              'Update assignee references to valid IDs',
+            ]
+          : [],
       executionTime: Date.now() - startTime,
     }
   }
 
-  private async checkTicketCategoryReferences(tickets: any[], categories: any[]): Promise<IntegrityCheck> {
+  private async checkTicketCategoryReferences(
+    tickets: any[],
+    categories: any[]
+  ): Promise<IntegrityCheck> {
     const startTime = Date.now()
     const categoryIds = new Set(categories.map(c => c.id).filter(Boolean))
     let affectedRecords = 0
@@ -447,11 +469,14 @@ export class IntegrityVerification {
       severity: affectedRecords > 0 ? 'error' : 'info',
       details: `Found ${affectedRecords} tickets with invalid category references`,
       affectedRecords,
-      suggestions: affectedRecords > 0 ? [
-        'Remove invalid category references',
-        'Create missing category records',
-        'Update category references to valid IDs',
-      ] : [],
+      suggestions:
+        affectedRecords > 0
+          ? [
+              'Remove invalid category references',
+              'Create missing category records',
+              'Update category references to valid IDs',
+            ]
+          : [],
       executionTime: Date.now() - startTime,
     }
   }
@@ -476,16 +501,23 @@ export class IntegrityVerification {
       severity: affectedRecords > 0 ? 'error' : 'info',
       details: `Found ${affectedRecords} categories with invalid parent references`,
       affectedRecords,
-      suggestions: affectedRecords > 0 ? [
-        'Remove invalid parent references',
-        'Create missing parent categories',
-        'Update parent references to valid IDs',
-      ] : [],
+      suggestions:
+        affectedRecords > 0
+          ? [
+              'Remove invalid parent references',
+              'Create missing parent categories',
+              'Update parent references to valid IDs',
+            ]
+          : [],
       executionTime: Date.now() - startTime,
     }
   }
 
-  private async checkRequiredFields(records: any[], tableName: string, requiredFields: string[]): Promise<IntegrityCheck> {
+  private async checkRequiredFields(
+    records: any[],
+    tableName: string,
+    requiredFields: string[]
+  ): Promise<IntegrityCheck> {
     const startTime = Date.now()
     let affectedRecords = 0
 
@@ -507,11 +539,14 @@ export class IntegrityVerification {
       severity: affectedRecords > 0 ? 'error' : 'info',
       details: `Found ${affectedRecords} records with missing required fields`,
       affectedRecords,
-      suggestions: affectedRecords > 0 ? [
-        'Fill in missing required fields',
-        'Remove records with missing required data',
-        'Set default values for missing fields',
-      ] : [],
+      suggestions:
+        affectedRecords > 0
+          ? [
+              'Fill in missing required fields',
+              'Remove records with missing required data',
+              'Set default values for missing fields',
+            ]
+          : [],
       executionTime: Date.now() - startTime,
     }
   }
@@ -563,16 +598,23 @@ export class IntegrityVerification {
       severity: affectedRecords > 0 ? 'warning' : 'info',
       details: `Found ${affectedRecords} records with incorrect data types`,
       affectedRecords,
-      suggestions: affectedRecords > 0 ? [
-        'Convert fields to correct data types',
-        'Validate data before migration',
-        'Add type checking in migration scripts',
-      ] : [],
+      suggestions:
+        affectedRecords > 0
+          ? [
+              'Convert fields to correct data types',
+              'Validate data before migration',
+              'Add type checking in migration scripts',
+            ]
+          : [],
       executionTime: Date.now() - startTime,
     }
   }
 
-  private async checkUniqueConstraints(records: any[], tableName: string, uniqueFields: string[]): Promise<IntegrityCheck> {
+  private async checkUniqueConstraints(
+    records: any[],
+    tableName: string,
+    uniqueFields: string[]
+  ): Promise<IntegrityCheck> {
     const startTime = Date.now()
     let affectedRecords = 0
 
@@ -598,11 +640,14 @@ export class IntegrityVerification {
       severity: affectedRecords > 0 ? 'error' : 'info',
       details: `Found ${affectedRecords} duplicate values in unique fields`,
       affectedRecords,
-      suggestions: affectedRecords > 0 ? [
-        'Remove duplicate records',
-        'Merge duplicate records',
-        'Update duplicate values to be unique',
-      ] : [],
+      suggestions:
+        affectedRecords > 0
+          ? [
+              'Remove duplicate records',
+              'Merge duplicate records',
+              'Update duplicate values to be unique',
+            ]
+          : [],
       executionTime: Date.now() - startTime,
     }
   }
@@ -710,14 +755,15 @@ export class IntegrityVerification {
       passed: totalRecords <= maxRecommendedRecords,
       severity: totalRecords > maxRecommendedRecords ? 'warning' : 'info',
       details: `Total records: ${totalRecords}, recommended limit: ${maxRecommendedRecords}`,
-      affectedRecords: totalRecords > maxRecommendedRecords ? totalRecords - maxRecommendedRecords : 0,
+      affectedRecords:
+        totalRecords > maxRecommendedRecords ? totalRecords - maxRecommendedRecords : 0,
       executionTime: Date.now() - startTime,
     }
   }
 
-  private async checkIndexableFields(data: any): Promise<IntegrityCheck> {
+  private async checkIndexableFields(_data: any): Promise<IntegrityCheck> {
     const startTime = Date.now()
-    
+
     // Check for fields that should be indexed
     const indexableFields = ['id', 'email', 'userId', 'categoryId', 'status', 'priority']
     let recommendations = 0
@@ -768,11 +814,14 @@ export class IntegrityVerification {
       severity: affectedRecords > 0 ? 'critical' : 'info',
       details: `Found ${affectedRecords} records with potentially sensitive data`,
       affectedRecords,
-      suggestions: affectedRecords > 0 ? [
-        'Remove sensitive data from migration',
-        'Encrypt sensitive fields',
-        'Use data masking for non-production environments',
-      ] : [],
+      suggestions:
+        affectedRecords > 0
+          ? [
+              'Remove sensitive data from migration',
+              'Encrypt sensitive fields',
+              'Use data masking for non-production environments',
+            ]
+          : [],
       executionTime: Date.now() - startTime,
     }
   }
@@ -785,7 +834,7 @@ export class IntegrityVerification {
     const dangerousPatterns = [/<script/i, /javascript:/i, /on\w+=/i]
 
     const allRecords = [...data.users, ...data.tickets, ...data.categories]
-    
+
     for (const record of allRecords) {
       for (const value of Object.values(record)) {
         if (typeof value === 'string') {
@@ -808,18 +857,21 @@ export class IntegrityVerification {
       severity: affectedRecords > 0 ? 'error' : 'info',
       details: `Found ${affectedRecords} records with potentially malicious content`,
       affectedRecords,
-      suggestions: affectedRecords > 0 ? [
-        'Sanitize all user input',
-        'Remove potentially malicious content',
-        'Implement input validation',
-      ] : [],
+      suggestions:
+        affectedRecords > 0
+          ? [
+              'Sanitize all user input',
+              'Remove potentially malicious content',
+              'Implement input validation',
+            ]
+          : [],
       executionTime: Date.now() - startTime,
     }
   }
 
-  private async checkDataConsistencyPatterns(data: any): Promise<IntegrityCheck> {
+  private async checkDataConsistencyPatterns(_data: any): Promise<IntegrityCheck> {
     const startTime = Date.now()
-    
+
     // Deep pattern analysis
     return {
       id: 'data_consistency_patterns',
@@ -839,12 +891,12 @@ export class IntegrityVerification {
 
     // Check temporal consistency (created/updated dates)
     const allRecords = [...data.users, ...data.tickets, ...data.categories]
-    
+
     for (const record of allRecords) {
       if (record.createdAt && record.updatedAt) {
         const created = new Date(record.createdAt)
         const updated = new Date(record.updatedAt)
-        
+
         if (updated < created) {
           affectedRecords++
         }
@@ -888,7 +940,7 @@ export class IntegrityVerification {
     if (checks.length === 0) return 100
 
     let score = 100
-    
+
     for (const check of checks) {
       if (!check.passed) {
         switch (check.severity) {
@@ -911,52 +963,57 @@ export class IntegrityVerification {
   }
 
   private calculateDataQualityScore(checks: IntegrityCheck[]): number {
-    const qualityChecks = checks.filter(c => 
-      c.category === 'structural' || c.category === 'business'
+    const qualityChecks = checks.filter(
+      c => c.category === 'structural' || c.category === 'business'
     )
-    
+
     if (qualityChecks.length === 0) return 100
-    
+
     const passedQualityChecks = qualityChecks.filter(c => c.passed).length
     return Math.round((passedQualityChecks / qualityChecks.length) * 100)
   }
 
   private calculateMigrationIntegrityScore(checks: IntegrityCheck[]): number {
     const integrityChecks = checks.filter(c => c.category === 'referential')
-    
+
     if (integrityChecks.length === 0) return 100
-    
+
     const passedIntegrityChecks = integrityChecks.filter(c => c.passed).length
     return Math.round((passedIntegrityChecks / integrityChecks.length) * 100)
   }
 
   private generateIntegrityRecommendations(checks: IntegrityCheck[]): string[] {
     const recommendations: string[] = []
-    
+
     const failedChecks = checks.filter(c => !c.passed)
-    
+
     if (failedChecks.length === 0) {
       recommendations.push('Data integrity verification passed - no issues found')
       return recommendations
     }
 
     // Group by category
-    const categorizedFailures = failedChecks.reduce((acc, check) => {
-      if (!acc[check.category]) acc[check.category] = []
-      acc[check.category].push(check)
-      return acc
-    }, {} as Record<string, IntegrityCheck[]>)
+    const categorizedFailures = failedChecks.reduce(
+      (acc, check) => {
+        if (!acc[check.category]) acc[check.category] = []
+        acc[check.category].push(check)
+        return acc
+      },
+      {} as Record<string, IntegrityCheck[]>
+    )
 
     for (const [category, categoryChecks] of Object.entries(categorizedFailures)) {
       const criticalCount = categoryChecks.filter(c => c.severity === 'critical').length
       const errorCount = categoryChecks.filter(c => c.severity === 'error').length
-      
+
       if (criticalCount > 0) {
         recommendations.push(`Critical ${category} issues found - immediate attention required`)
       } else if (errorCount > 0) {
         recommendations.push(`${category} errors detected - should be fixed before production`)
       } else {
-        recommendations.push(`${category} warnings found - consider addressing for optimal data quality`)
+        recommendations.push(
+          `${category} warnings found - consider addressing for optimal data quality`
+        )
       }
     }
 
@@ -984,7 +1041,7 @@ export class IntegrityVerification {
       for (const value of Object.values(record)) {
         if (value == null) nullValues++
       }
-      
+
       // Basic validation - record is invalid if it has no id
       if (!record.id) invalidRecords++
     }
@@ -1030,7 +1087,9 @@ export class IntegrityVerification {
     return checks
   }
 
-  private calculateOverallConsistency(checks: ConsistencyCheck[]): 'excellent' | 'good' | 'fair' | 'poor' {
+  private calculateOverallConsistency(
+    checks: ConsistencyCheck[]
+  ): 'excellent' | 'good' | 'fair' | 'poor' {
     if (checks.length === 0) return 'excellent'
 
     const passedChecks = checks.filter(c => c.passed).length

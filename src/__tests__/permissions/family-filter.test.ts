@@ -7,7 +7,6 @@
 
 import {
   applyEquipmentFamilyFilter,
-  applyAssetRequestFamilyFilter,
   hasAccessToEquipment,
   hasAccessToFamily,
   getAccessibleFamilies,

@@ -1,14 +1,6 @@
 'use client'
 
-import {
-  RefreshCw,
-  Building,
-  ChevronRight,
-  Home,
-  Users,
-  AlertTriangle,
-  ExternalLink,
-} from 'lucide-react'
+import { RefreshCw, Building, Home, AlertTriangle, ExternalLink } from 'lucide-react'
 import { useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -29,7 +21,6 @@ import { CategorySelector } from '@/components/ui/category-selector'
 import { TechnicianSelector } from '@/components/ui/technician-selector'
 import { DepartmentSelector } from '@/components/ui/department-selector'
 import { AssignmentStrategyPreview } from '@/components/ui/assignment-strategy-preview'
-import { CategoryHierarchyModal } from '@/components/ui/category-hierarchy'
 import {
   Dialog,
   DialogContent,

@@ -47,14 +47,17 @@ export interface ValidationStatistics {
   validRecords: number
   invalidRecords: number
   recordsWithWarnings: number
-  fieldStatistics: Record<string, {
-    nullCount: number
-    uniqueCount: number
-    duplicateCount: number
-    averageLength?: number
-    minValue?: any
-    maxValue?: any
-  }>
+  fieldStatistics: Record<
+    string,
+    {
+      nullCount: number
+      uniqueCount: number
+      duplicateCount: number
+      averageLength?: number
+      minValue?: any
+      maxValue?: any
+    }
+  >
 }
 
 // Data integrity check result
@@ -99,31 +102,31 @@ export class DataValidationScripts {
         name: 'email_format',
         description: 'Email addresses must be valid',
         severity: 'error',
-        validate: async (data) => this.validateEmailFormat(data),
+        validate: async data => this.validateEmailFormat(data),
       },
       {
         name: 'email_uniqueness',
         description: 'Email addresses must be unique',
         severity: 'critical',
-        validate: async (data) => this.validateEmailUniqueness(data),
+        validate: async data => this.validateEmailUniqueness(data),
       },
       {
         name: 'required_fields',
         description: 'Required fields must not be empty',
         severity: 'error',
-        validate: async (data) => this.validateRequiredUserFields(data),
+        validate: async data => this.validateRequiredUserFields(data),
       },
       {
         name: 'role_validity',
         description: 'User roles must be valid',
         severity: 'error',
-        validate: async (data) => this.validateUserRoles(data),
+        validate: async data => this.validateUserRoles(data),
       },
       {
         name: 'name_length',
         description: 'User names should have reasonable length',
         severity: 'warning',
-        validate: async (data) => this.validateNameLength(data),
+        validate: async data => this.validateNameLength(data),
       },
     ]
 
@@ -139,37 +142,37 @@ export class DataValidationScripts {
         name: 'required_fields',
         description: 'Required fields must not be empty',
         severity: 'error',
-        validate: async (data) => this.validateRequiredTicketFields(data),
+        validate: async data => this.validateRequiredTicketFields(data),
       },
       {
         name: 'status_validity',
         description: 'Ticket status must be valid',
         severity: 'error',
-        validate: async (data) => this.validateTicketStatus(data),
+        validate: async data => this.validateTicketStatus(data),
       },
       {
         name: 'priority_validity',
         description: 'Ticket priority must be valid',
         severity: 'error',
-        validate: async (data) => this.validateTicketPriority(data),
+        validate: async data => this.validateTicketPriority(data),
       },
       {
         name: 'user_references',
         description: 'User references must be valid',
         severity: 'critical',
-        validate: async (data) => this.validateTicketUserReferences(data),
+        validate: async data => this.validateTicketUserReferences(data),
       },
       {
         name: 'title_length',
         description: 'Ticket titles should have reasonable length',
         severity: 'warning',
-        validate: async (data) => this.validateTicketTitleLength(data),
+        validate: async data => this.validateTicketTitleLength(data),
       },
       {
         name: 'description_content',
         description: 'Ticket descriptions should not be empty',
         severity: 'warning',
-        validate: async (data) => this.validateTicketDescription(data),
+        validate: async data => this.validateTicketDescription(data),
       },
     ]
 
@@ -185,25 +188,25 @@ export class DataValidationScripts {
         name: 'required_fields',
         description: 'Required fields must not be empty',
         severity: 'error',
-        validate: async (data) => this.validateRequiredCategoryFields(data),
+        validate: async data => this.validateRequiredCategoryFields(data),
       },
       {
         name: 'name_uniqueness',
         description: 'Category names must be unique',
         severity: 'error',
-        validate: async (data) => this.validateCategoryNameUniqueness(data),
+        validate: async data => this.validateCategoryNameUniqueness(data),
       },
       {
         name: 'parent_references',
         description: 'Parent category references must be valid',
         severity: 'error',
-        validate: async (data) => this.validateCategoryParentReferences(data),
+        validate: async data => this.validateCategoryParentReferences(data),
       },
       {
         name: 'circular_references',
         description: 'Categories must not have circular parent references',
         severity: 'critical',
-        validate: async (data) => this.validateCategoryCircularReferences(data),
+        validate: async data => this.validateCategoryCircularReferences(data),
       },
     ]
 
@@ -872,15 +875,21 @@ export class DataValidationScripts {
       severity: affectedRecords > 0 ? 'critical' : 'info',
       details: `Found ${affectedRecords} invalid user references in tickets`,
       affectedRecords,
-      suggestions: affectedRecords > 0 ? [
-        'Remove tickets with invalid user references',
-        'Create missing user records',
-        'Update user references to valid IDs',
-      ] : [],
+      suggestions:
+        affectedRecords > 0
+          ? [
+              'Remove tickets with invalid user references',
+              'Create missing user records',
+              'Update user references to valid IDs',
+            ]
+          : [],
     }
   }
 
-  private async checkTicketCategoryIntegrity(tickets: any[], categories: any[]): Promise<IntegrityCheck> {
+  private async checkTicketCategoryIntegrity(
+    tickets: any[],
+    categories: any[]
+  ): Promise<IntegrityCheck> {
     const categoryIds = new Set(categories.map(c => c.id).filter(Boolean))
     let affectedRecords = 0
 
@@ -897,11 +906,14 @@ export class DataValidationScripts {
       severity: affectedRecords > 0 ? 'error' : 'info',
       details: `Found ${affectedRecords} invalid category references in tickets`,
       affectedRecords,
-      suggestions: affectedRecords > 0 ? [
-        'Remove invalid category references',
-        'Create missing category records',
-        'Update category references to valid IDs',
-      ] : [],
+      suggestions:
+        affectedRecords > 0
+          ? [
+              'Remove invalid category references',
+              'Create missing category records',
+              'Update category references to valid IDs',
+            ]
+          : [],
     }
   }
 
@@ -922,15 +934,18 @@ export class DataValidationScripts {
       severity: affectedRecords > 0 ? 'error' : 'info',
       details: `Found ${affectedRecords} invalid parent references in categories`,
       affectedRecords,
-      suggestions: affectedRecords > 0 ? [
-        'Remove invalid parent references',
-        'Create missing parent categories',
-        'Update parent references to valid IDs',
-      ] : [],
+      suggestions:
+        affectedRecords > 0
+          ? [
+              'Remove invalid parent references',
+              'Create missing parent categories',
+              'Update parent references to valid IDs',
+            ]
+          : [],
     }
   }
 
-  private async checkDataConsistency(data: any): Promise<IntegrityCheck> {
+  private async checkDataConsistency(_data: any): Promise<IntegrityCheck> {
     // Implement data consistency checks
     return {
       name: 'data_consistency',
@@ -942,7 +957,7 @@ export class DataValidationScripts {
     }
   }
 
-  private async checkOrphanedRecords(data: any): Promise<IntegrityCheck> {
+  private async checkOrphanedRecords(_data: any): Promise<IntegrityCheck> {
     // Implement orphaned records check
     return {
       name: 'orphaned_records',
@@ -954,7 +969,7 @@ export class DataValidationScripts {
     }
   }
 
-  private async checkDuplicateRecords(data: any): Promise<IntegrityCheck> {
+  private async checkDuplicateRecords(_data: any): Promise<IntegrityCheck> {
     // Implement duplicate records check
     return {
       name: 'duplicate_records',
@@ -969,10 +984,10 @@ export class DataValidationScripts {
   private calculateDataQualityScore(results: any): number {
     // Implement data quality score calculation
     let score = 100
-    
+
     // Deduct points for errors and warnings
     const allResults = [results.users, results.tickets, results.categories]
-    
+
     for (const result of allResults) {
       score -= result.errors.filter((e: any) => e.severity === 'critical').length * 10
       score -= result.errors.filter((e: any) => e.severity === 'error').length * 5
@@ -982,7 +997,8 @@ export class DataValidationScripts {
     // Deduct points for integrity failures
     if (!results.integrity.passed) {
       score -= results.integrity.summary.criticalFailures * 15
-      score -= (results.integrity.summary.failedChecks - results.integrity.summary.criticalFailures) * 5
+      score -=
+        (results.integrity.summary.failedChecks - results.integrity.summary.criticalFailures) * 5
     }
 
     return Math.max(0, score)
@@ -995,15 +1011,15 @@ export class DataValidationScripts {
     if (results.users.errors.length > 0) {
       recommendations.push('Fix user data validation errors before migration')
     }
-    
+
     if (results.tickets.errors.length > 0) {
       recommendations.push('Resolve ticket data issues to ensure data integrity')
     }
-    
+
     if (results.categories.errors.length > 0) {
       recommendations.push('Address category data problems for proper hierarchy')
     }
-    
+
     if (!results.integrity.passed) {
       recommendations.push('Fix referential integrity issues before proceeding')
     }

@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Badge, BadgeProps } from './badge'
+import { BadgeProps } from './badge'
 import { cn } from '@/lib/utils'
 import { getStatusConfig, getPriorityConfig, type Ticket } from '@/hooks/use-ticket-data'
 import { USER_ROLE_COLORS, type UserRole } from '@/lib/constants/user-constants'

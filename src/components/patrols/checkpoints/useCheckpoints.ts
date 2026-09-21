@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback } from 'react'
 import { useToast } from '@/hooks/use-toast'
 import type { Checkpoint, CheckpointFormData } from './types'
 import type { QRPrintItem, PrintFormat } from '@/components/common/qr/qr-print-dialog'
@@ -43,7 +43,7 @@ export function useCheckpoints({ checkpoints, reload }: UseCheckpointsOptions) {
   }, [])
 
   const handleSave = useCallback(
-    async (form: CheckpointFormData, families: { id: string; name: string; code: string }[]) => {
+    async (form: CheckpointFormData, _families: { id: string; name: string; code: string }[]) => {
       if (!form.name.trim() || !form.location.trim() || !form.familyId) {
         toast({
           title: 'Campos requeridos',

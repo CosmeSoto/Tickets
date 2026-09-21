@@ -1,7 +1,7 @@
 import { stat, access } from 'fs/promises'
 import prisma from '@/lib/prisma'
 import { BackupInfo, BackupStats, BackupCreateMode, BackupKind } from './backup-types'
-import { getBackupConfig, hasPgTools, calculateChecksum, formatFileSize } from './backup-utils'
+import { hasPgTools, calculateChecksum, formatFileSize } from './backup-utils'
 import { loadBackupMetadata, extractMetadataFromDump } from './backup-metadata'
 import { createBackup } from './backup-create'
 import { restoreBackup } from './backup-restore'

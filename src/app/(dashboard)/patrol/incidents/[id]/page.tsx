@@ -24,7 +24,7 @@ import { es } from 'date-fns/locale'
 import { useToast } from '@/hooks/use-toast'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { IncidentFormDialog } from '@/components/patrols/incidents/incident-form-dialog'
 import { toPublicUploadUrl } from '@/lib/uploads/public-upload-url'
 import {

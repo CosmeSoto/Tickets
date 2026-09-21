@@ -217,7 +217,7 @@ export function SessionTimeoutMonitor() {
     let lastResetTime = 0
     const THROTTLE_MS = 2000 // Throttle de 2 segundos (más flexible)
 
-    const handleActivity = (e: Event) => {
+    const handleActivity = (_e: Event) => {
       const now = Date.now()
       if (now - lastResetTime < THROTTLE_MS) return
 

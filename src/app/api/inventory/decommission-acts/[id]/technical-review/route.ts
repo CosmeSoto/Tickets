@@ -3,8 +3,8 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
-import { getAssetFamilyId, isTechnicianOfFamily } from '@/lib/inventory-access'
-import { notifyUser, notifyAdmins } from '@/lib/api/notify'
+import { isTechnicianOfFamily } from '@/lib/inventory-access'
+import { notifyUser } from '@/lib/api/notify'
 
 /**
  * POST /api/inventory/decommission-acts/[id]/technical-review

@@ -19,7 +19,6 @@ import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { Separator } from '@/components/ui/separator'
 import {
   Table,
   TableBody,

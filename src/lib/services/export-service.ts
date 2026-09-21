@@ -783,7 +783,7 @@ export class ExportService {
     return 'Sobrecargado'
   }
 
-  private static getTechnicianShift(tech: any): string {
+  private static getTechnicianShift(_tech: any): string {
     // Simulación de turno basada en patrones de actividad
     const currentHour = new Date().getHours()
 

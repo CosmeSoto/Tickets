@@ -15,7 +15,7 @@ import { requireSuperAdmin } from '@/lib/auth/require-super-admin'
 /**
  * GET /api/admin/config - Get configuration summary
  */
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   const startTime = Date.now()
 
   try {
