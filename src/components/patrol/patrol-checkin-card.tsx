@@ -1,5 +1,6 @@
 'use client'
 import { DEFAULT_TIMEZONE } from '@/lib/constants'
+import Image from 'next/image'
 
 import { MapPin, Clock, Image as ImageIcon, Ticket, WifiOff } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
@@ -54,7 +55,7 @@ export function PatrolCheckInCard({ checkIn, className }: PatrolCheckInCardProps
       )}
     >
       {/* Miniatura de foto */}
-      <div className='flex-shrink-0 w-14 h-14 rounded-md overflow-hidden bg-muted border border-border'>
+      <div className='relative flex-shrink-0 w-14 h-14 rounded-md overflow-hidden bg-muted border border-border'>
         {photo ? (
           photo.deletedAt ? (
             <div className='w-full h-full flex flex-col items-center justify-center text-muted-foreground/50 gap-0.5'>
@@ -62,10 +63,12 @@ export function PatrolCheckInCard({ checkIn, className }: PatrolCheckInCardProps
               <span className='text-[9px] text-center leading-tight'>Eliminada</span>
             </div>
           ) : (
-            <img
-              src={toPublicUploadUrl(`/uploads/${photo.path}`) ?? undefined}
+            <Image
+              src={toPublicUploadUrl(`/uploads/${photo.path}`) ?? ''}
               alt='Foto del check-in'
-              className='w-full h-full object-cover'
+              fill
+              className='object-cover'
+              unoptimized
             />
           )
         ) : (

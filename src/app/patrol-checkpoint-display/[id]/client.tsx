@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useRef, useCallback } from 'react'
+import Image from 'next/image'
 import { Loader2, Clock, MapPin, RefreshCw } from 'lucide-react'
 
 interface CheckpointInfo {
@@ -134,11 +135,14 @@ export default function PatrolCheckpointDisplayClient({
         </div>
 
         <div className='bg-white p-6 rounded-2xl inline-block'>
-          <img
+          <Image
             key={qrKey}
             src={`/api/patrols/checkpoints/${checkpointId}/qr-display?t=${Date.now()}`}
             alt='QR Code'
+            width={320}
+            height={320}
             className='w-80 h-80'
+            unoptimized
             suppressHydrationWarning
           />
         </div>

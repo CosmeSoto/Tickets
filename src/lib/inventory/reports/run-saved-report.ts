@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { generateReportPDF, toCSV } from '@/lib/inventory/report-utils'
+import { getSystemBranding } from '@/lib/branding'
 import { ALL_FILTER, getTemplateBySlug } from './catalog'
 import { exportReportCsv, runInventoryReportDataset } from './engine'
 import { resolveReportScope } from './scope'
@@ -72,7 +73,12 @@ async function reportToPdf(
     pdfRows = []
   }
 
-  const pdfBuffer = await generateReportPDF(pdfTitle, summary, headers, pdfRows)
+  const { companyName, logoUrl, logoDarkUrl } = await getSystemBranding()
+  const pdfBuffer = await generateReportPDF(pdfTitle, summary, headers, pdfRows, {
+    companyName,
+    logoUrl,
+    logoDarkUrl,
+  })
   return Buffer.from(pdfBuffer)
 }
 
@@ -110,7 +116,9 @@ export async function runSavedReportForUser(
   }
 }
 
-export async function runSavedReportById(savedReportId: string): Promise<SavedReportRunResult | null> {
+export async function runSavedReportById(
+  savedReportId: string
+): Promise<SavedReportRunResult | null> {
   const saved = await prisma.inventory_saved_reports.findUnique({
     where: { id: savedReportId },
     select: {

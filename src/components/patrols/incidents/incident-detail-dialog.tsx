@@ -278,6 +278,10 @@ export function IncidentDetailDialog({
               {/* Photo */}
               {incident.photos && incident.photos.length > 0 && (
                 <div>
+                  {/* Alto natural (con tope), no una caja fija: next/image
+                      `fill` reservaría siempre 256px de alto aunque la foto
+                      real sea más baja. */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={
                       incident.photos[0].url ||

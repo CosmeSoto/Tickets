@@ -1,8 +1,9 @@
 import { notFound } from 'next/navigation'
+import Image from 'next/image'
 import { headers } from 'next/headers'
 import { prisma } from '@/lib/prisma'
 import { randomUUID } from 'crypto'
-import { DEFAULT_SYSTEM_NAME } from '@/lib/branding-constants'
+import { getSystemBranding } from '@/lib/branding'
 import { withAttributeLabels } from '@/lib/inventory/attribute-labels'
 import {
   Package,
@@ -49,23 +50,11 @@ interface PageProps {
   params: Promise<{ equipmentId: string }>
 }
 
-async function getSystemBranding() {
-  try {
-    const content = await prisma.landing_page_content.findFirst({ where: { id: 'default' } })
-    return {
-      companyName: (content as any)?.companyName || DEFAULT_SYSTEM_NAME,
-      logoUrl: (content as any)?.companyLogoLightUrl || null,
-    }
-  } catch {
-    return { companyName: DEFAULT_SYSTEM_NAME, logoUrl: null }
-  }
-}
-
 export default async function EquipmentPublicPage({ params }: PageProps) {
   const { equipmentId } = await params
 
   // Obtener branding del sistema y IP del cliente
-  const [branding] = await Promise.all([getSystemBranding()])
+  const branding = await getSystemBranding()
 
   const headersList = await headers()
   const ip =
@@ -163,9 +152,28 @@ export default async function EquipmentPublicPage({ params }: PageProps) {
 
   const familyName = equipment.type?.family?.name ?? null
 
+  const logoUrl = branding.logoUrl || branding.logoDarkUrl
+
   return (
     <div className='min-h-screen bg-gray-50'>
       <div className='max-w-xl mx-auto px-4 py-8 space-y-4'>
+        {/* Logo del sistema */}
+        <div className='flex items-center justify-center'>
+          {logoUrl ? (
+            <div className='relative h-10 w-40'>
+              <Image
+                src={logoUrl}
+                alt={branding.companyName}
+                fill
+                className='object-contain'
+                unoptimized
+              />
+            </div>
+          ) : (
+            <span className='text-sm font-semibold text-gray-700'>{branding.companyName}</span>
+          )}
+        </div>
+
         {/* Tarjeta principal */}
         <div className='bg-white rounded-xl border shadow-sm p-5 space-y-4'>
           {/* Nombre y tipo */}
@@ -363,8 +371,8 @@ export default async function EquipmentPublicPage({ params }: PageProps) {
 
         {/* Foto del equipo */}
         {photoUrl && (
-          <div className='rounded-xl overflow-hidden bg-white border shadow-sm'>
-            <img src={photoUrl} alt={catalogLabel} className='w-full h-64 object-contain' />
+          <div className='relative h-64 w-full rounded-xl overflow-hidden bg-white border shadow-sm'>
+            <Image src={photoUrl} alt={catalogLabel} fill className='object-contain' unoptimized />
           </div>
         )}
 

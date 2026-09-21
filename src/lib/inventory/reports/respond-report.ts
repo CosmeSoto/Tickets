@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { generateReportPDF, toCSV } from '@/lib/inventory/report-utils'
+import { getSystemBranding } from '@/lib/branding'
 import { exportReportXlsx } from './engine'
 import { getTemplateBySlug } from './catalog'
 import type { ReportResponse } from './types'
@@ -315,7 +316,12 @@ export async function respondWithReportFormat(
     const pdfRows = response.data.map(row =>
       (exportCfg?.pdfRowKeys ?? headers).map(key => String(row[key] ?? '—'))
     )
-    const pdfBuffer = await generateReportPDF(pdfTitle, response.summary, headers, pdfRows)
+    const { companyName, logoUrl, logoDarkUrl } = await getSystemBranding()
+    const pdfBuffer = await generateReportPDF(pdfTitle, response.summary, headers, pdfRows, {
+      companyName,
+      logoUrl,
+      logoDarkUrl,
+    })
     return new NextResponse(pdfBuffer, {
       headers: {
         'Content-Type': 'application/pdf',

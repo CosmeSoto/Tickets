@@ -241,6 +241,8 @@ export function IncidentFormDialog({
                 )}
               </FileInputWithCamera>
               {photoPreview && (
+                // Alto natural (con tope) de la vista previa de cámara/archivo
+                // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={photoPreview}
                   alt='Vista previa'

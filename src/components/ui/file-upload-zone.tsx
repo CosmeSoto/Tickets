@@ -38,28 +38,36 @@ function FilePreviewModal({ file, onClose }: { file: File; onClose: () => void }
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      className='fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4'
       onClick={onClose}
     >
       <div
-        className="relative max-h-[90vh] max-w-[90vw] overflow-auto rounded-lg bg-card shadow-xl"
+        className='relative max-h-[90vh] max-w-[90vw] overflow-auto rounded-lg bg-card shadow-xl'
         onClick={e => e.stopPropagation()}
       >
         <button
-          type="button"
+          type='button'
           onClick={onClose}
-          className="absolute right-2 top-2 z-10 rounded-full bg-black/40 p-1 text-white hover:bg-black/60"
+          className='absolute right-2 top-2 z-10 rounded-full bg-black/40 p-1 text-white hover:bg-black/60'
         >
-          <X className="h-4 w-4" />
+          <X className='h-4 w-4' />
         </button>
         {url ? (
-          <img src={url} alt={file.name} className="max-h-[85vh] max-w-[85vw] rounded-lg object-contain" />
+          // Tamaño natural de la imagen dentro de la tarjeta del modal, que
+          // se ajusta al contenido — next/image `fill` forzaría la tarjeta
+          // a un tamaño fijo aunque la imagen real sea pequeña.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={url}
+            alt={file.name}
+            className='max-h-[85vh] max-w-[85vw] rounded-lg object-contain'
+          />
         ) : (
-          <div className="flex h-40 w-40 items-center justify-center">
-            <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          <div className='flex h-40 w-40 items-center justify-center'>
+            <div className='h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent' />
           </div>
         )}
-        <p className="px-3 py-1.5 text-center text-xs text-muted-foreground">{file.name}</p>
+        <p className='px-3 py-1.5 text-center text-xs text-muted-foreground'>{file.name}</p>
       </div>
     </div>
   )
@@ -108,80 +116,90 @@ export function FileUploadZone({
 
   return (
     <>
-      <div className="space-y-1.5">
-        <span className="text-sm font-medium">{label}</span>
+      <div className='space-y-1.5'>
+        <span className='text-sm font-medium'>{label}</span>
 
         {/* Zona de drop — compacta */}
         <div
           className={`flex items-center gap-3 rounded-md border-2 border-dashed px-3 py-2.5 cursor-pointer transition-colors ${
-            dragging ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50 hover:bg-accent/40'
+            dragging
+              ? 'border-primary bg-primary/5'
+              : 'border-border hover:border-primary/50 hover:bg-accent/40'
           }`}
           onClick={() => inputRef.current?.click()}
-          onDragOver={e => { e.preventDefault(); setDragging(true) }}
+          onDragOver={e => {
+            e.preventDefault()
+            setDragging(true)
+          }}
           onDragLeave={() => setDragging(false)}
-          onDrop={e => { e.preventDefault(); setDragging(false); addFiles(e.dataTransfer.files) }}
+          onDrop={e => {
+            e.preventDefault()
+            setDragging(false)
+            addFiles(e.dataTransfer.files)
+          }}
         >
-          <Upload className="h-4 w-4 shrink-0 text-muted-foreground" />
-          <span className="text-sm text-muted-foreground">
-            Arrastra archivos o <span className="text-primary font-medium">haz clic</span>
-            <span className="ml-1 text-xs">· Máx. {maxFileSizeMB} MB</span>
+          <Upload className='h-4 w-4 shrink-0 text-muted-foreground' />
+          <span className='text-sm text-muted-foreground'>
+            Arrastra archivos o <span className='text-primary font-medium'>haz clic</span>
+            <span className='ml-1 text-xs'>· Máx. {maxFileSizeMB} MB</span>
           </span>
         </div>
 
         <input
           ref={inputRef}
-          type="file"
+          type='file'
           multiple
           accept={accept}
-          className="hidden"
+          className='hidden'
           onChange={e => addFiles(e.target.files)}
         />
 
         {/* Lista de archivos */}
         {files.length > 0 && (
-          <ul className="space-y-1">
+          <ul className='space-y-1'>
             {files.map((f, i) => (
               <li
                 key={i}
-                className="flex items-center gap-2 rounded-md border border-border bg-card px-2.5 py-1.5 text-sm"
+                className='flex items-center gap-2 rounded-md border border-border bg-card px-2.5 py-1.5 text-sm'
               >
                 {/* Icono tipo */}
-                {isImage(f)
-                  ? <ImageIcon className="h-3.5 w-3.5 shrink-0 text-blue-500" />
-                  : <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                }
+                {isImage(f) ? (
+                  <ImageIcon className='h-3.5 w-3.5 shrink-0 text-blue-500' />
+                ) : (
+                  <FileText className='h-3.5 w-3.5 shrink-0 text-muted-foreground' />
+                )}
 
                 {/* Nombre + tamaño */}
-                <span className="flex-1 truncate text-foreground">{f.name}</span>
-                <span className="shrink-0 text-xs text-muted-foreground">{formatSize(f.size)}</span>
+                <span className='flex-1 truncate text-foreground'>{f.name}</span>
+                <span className='shrink-0 text-xs text-muted-foreground'>{formatSize(f.size)}</span>
 
                 {/* Acciones */}
-                <div className="flex shrink-0 items-center gap-1">
+                <div className='flex shrink-0 items-center gap-1'>
                   {isImage(f) && (
                     <button
-                      type="button"
-                      title="Vista previa"
+                      type='button'
+                      title='Vista previa'
                       onClick={() => setPreview(f)}
-                      className="rounded p-0.5 hover:bg-muted"
+                      className='rounded p-0.5 hover:bg-muted'
                     >
-                      <Eye className="h-3.5 w-3.5 text-muted-foreground" />
+                      <Eye className='h-3.5 w-3.5 text-muted-foreground' />
                     </button>
                   )}
                   <button
-                    type="button"
-                    title="Descargar"
+                    type='button'
+                    title='Descargar'
                     onClick={() => download(f)}
-                    className="rounded p-0.5 hover:bg-muted"
+                    className='rounded p-0.5 hover:bg-muted'
                   >
-                    <Download className="h-3.5 w-3.5 text-muted-foreground" />
+                    <Download className='h-3.5 w-3.5 text-muted-foreground' />
                   </button>
                   <button
-                    type="button"
-                    title="Eliminar"
+                    type='button'
+                    title='Eliminar'
                     onClick={() => remove(i)}
-                    className="rounded p-0.5 hover:bg-muted"
+                    className='rounded p-0.5 hover:bg-muted'
                   >
-                    <X className="h-3.5 w-3.5 text-muted-foreground" />
+                    <X className='h-3.5 w-3.5 text-muted-foreground' />
                   </button>
                 </div>
               </li>

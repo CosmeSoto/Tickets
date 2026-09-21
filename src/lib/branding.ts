@@ -32,6 +32,8 @@ export interface SystemBranding {
   companyName: string
   pageTitle: string
   metaDescription: string
+  logoUrl: string | null
+  logoDarkUrl: string | null
 }
 
 const DEFAULT_DESCRIPTION =
@@ -43,6 +45,8 @@ const DEFAULT_BRANDING: SystemBranding = {
   companyName: DEFAULT_SYSTEM_NAME,
   pageTitle: DEFAULT_PAGE_TITLE,
   metaDescription: DEFAULT_DESCRIPTION,
+  logoUrl: null,
+  logoDarkUrl: null,
 }
 
 type MemoryEntry = { data: SystemBranding; expiresAt: number }
@@ -89,7 +93,13 @@ export async function getSystemBranding(): Promise<SystemBranding> {
         // id es PK → findUnique (más barato que findFirst)
         prisma.landing_page_content.findUnique({
           where: { id: 'default' },
-          select: { companyName: true, heroTitle: true, metaDescription: true },
+          select: {
+            companyName: true,
+            heroTitle: true,
+            metaDescription: true,
+            companyLogoLightUrl: true,
+            companyLogoDarkUrl: true,
+          },
         }),
       ])
 
@@ -105,6 +115,8 @@ export async function getSystemBranding(): Promise<SystemBranding> {
         companyName,
         pageTitle: `${systemName} - ${heroTitle}`,
         metaDescription: landing?.metaDescription?.trim() || DEFAULT_DESCRIPTION,
+        logoUrl: landing?.companyLogoLightUrl?.trim() || null,
+        logoDarkUrl: landing?.companyLogoDarkUrl?.trim() || null,
       }
 
       writeMemory(result)

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Image from 'next/image'
 import {
   Upload,
   Trash2,
@@ -221,6 +222,11 @@ function PreviewModal({
               className='overflow-auto flex items-center justify-center p-4'
               style={{ maxHeight: 'calc(92vh - 52px)', maxWidth: '92vw' }}
             >
+              {/* Visor con zoom: necesita el tamaño natural real de la imagen
+                  (arbitrario, subida por el usuario) para escalar desde ahí
+                  con transform; next/image `fill` forzaría a llenar el
+                  contenedor y rompería el zoom 100% = tamaño natural. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={previewUrl}
                 alt={attachment.originalName}
@@ -501,10 +507,12 @@ export function EquipmentAttachments({ equipmentId, canManage }: EquipmentAttach
                         className='group relative aspect-square rounded-lg overflow-hidden border border-border bg-muted hover:border-primary/50 transition-all cursor-pointer'
                         title={att.originalName}
                       >
-                        <img
+                        <Image
                           src={`${baseUrl}/${att.id}?preview=true`}
                           alt={att.originalName}
-                          className='h-full w-full object-cover group-hover:scale-105 transition-transform duration-200'
+                          fill
+                          className='object-cover group-hover:scale-105 transition-transform duration-200'
+                          unoptimized
                         />
                         <div className='absolute inset-0 bg-black/0 group-hover:bg-black/25 transition-colors flex items-center justify-center'>
                           <Eye className='h-5 w-5 text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow' />

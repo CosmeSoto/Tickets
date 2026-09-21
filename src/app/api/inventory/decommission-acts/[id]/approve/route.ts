@@ -290,14 +290,8 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
 
     // Generar PDF (fuera de la transacción — fallo no revierte la aprobación)
     try {
-      const systemContent = await prisma.landing_page_content.findFirst({
-        where: { id: 'default' },
-      })
-      const systemInfo = {
-        logoUrl: (systemContent as any)?.companyLogoLightUrl || null,
-        logoDarkUrl: (systemContent as any)?.companyLogoDarkUrl || null,
-        companyName: (systemContent as any)?.companyName || 'Sistema de Inventario',
-      }
+      const { logoUrl, logoDarkUrl, companyName } = await getSystemBranding()
+      const systemInfo = { logoUrl, logoDarkUrl, companyName }
 
       const attachmentPaths = (decommissionRequest.attachments || []).map((a: any) => a.path)
 

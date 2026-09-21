@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import {
   CheckCircle,
   XCircle,
@@ -395,7 +396,13 @@ export function DecommissionApprovalPanel({
                   className='relative aspect-square rounded-md overflow-hidden border bg-muted hover:opacity-90 transition-opacity'
                   onClick={() => setSelectedImage(url)}
                 >
-                  <img src={url} alt={att.originalName} className='w-full h-full object-cover' />
+                  <Image
+                    src={url}
+                    alt={att.originalName}
+                    fill
+                    className='object-cover'
+                    unoptimized
+                  />
                 </button>
               )
             })}
@@ -746,6 +753,11 @@ export function DecommissionApprovalPanel({
           className='fixed inset-0 z-50 flex items-center justify-center bg-black/80'
           onClick={() => setSelectedImage(null)}
         >
+          {/* Tamaño natural de la imagen (arbitrario) dentro del lightbox —
+              next/image `fill` dejaría las esquinas redondeadas aplicadas a
+              una caja invisible de 90vh/90vw en vez de a la imagen real
+              cuando su proporción no coincide con esa caja. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={selectedImage}
             alt='Evidencia'

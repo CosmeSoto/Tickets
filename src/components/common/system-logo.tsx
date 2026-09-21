@@ -92,8 +92,11 @@ export function SystemLogo({ className = '', showText = true, size = 'md' }: Sys
 
   return (
     <div className={`flex items-center space-x-2 ${className}`}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
       {logoUrl ? (
+        // Logo subido por el admin, de dimensiones/aspecto arbitrarios, usado
+        // en 6+ layouts distintos (login, sidebar, mantenimiento, páginas
+        // públicas) — se dimensiona solo por CSS (alto fijo, ancho auto).
+        // eslint-disable-next-line @next/next/no-img-element
         <img
           src={logoUrl}
           alt={companyName}

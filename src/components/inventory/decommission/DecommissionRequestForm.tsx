@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
+import Image from 'next/image'
 import { Loader2, Upload, X, AlertTriangle, Package, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -365,10 +366,12 @@ export function DecommissionRequestForm({
                 key={i}
                 className='relative group rounded-md overflow-hidden border bg-muted aspect-square'
               >
-                <img
+                <Image
                   src={URL.createObjectURL(img)}
                   alt={img.name}
-                  className='w-full h-full object-cover'
+                  fill
+                  className='object-cover'
+                  unoptimized
                 />
                 <button
                   type='button'

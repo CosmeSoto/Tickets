@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { FileInputWithCamera } from '@/components/common/file-input-with-camera'
@@ -164,10 +165,12 @@ export function AttachmentsField({
                       >
                         {isExistingItem ? (
                           existingPreviewUrl ? (
-                            <img
+                            <Image
                               src={existingPreviewUrl}
                               alt={item.originalName}
-                              className='h-full w-full object-cover'
+                              fill
+                              className='object-cover'
+                              unoptimized
                               onError={e => {
                                 ;(e.target as HTMLImageElement).style.display = 'none'
                               }}
@@ -181,10 +184,12 @@ export function AttachmentsField({
                             </div>
                           )
                         ) : (
-                          <img
+                          <Image
                             src={newFileUrl!}
                             alt={item.name}
-                            className='h-full w-full object-cover'
+                            fill
+                            className='object-cover'
+                            unoptimized
                             onLoad={() => URL.revokeObjectURL(newFileUrl!)}
                           />
                         )}
@@ -322,6 +327,10 @@ export function AttachmentsField({
             >
               <X className='h-4 w-4' />
             </button>
+            {/* Tamaño natural de la imagen (arbitrario) dentro del modal, que
+                se ajusta al contenido — next/image `fill` forzaría al modal
+                a un tamaño fijo aunque la imagen real sea pequeña. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={previewUrl}
               alt={previewName}

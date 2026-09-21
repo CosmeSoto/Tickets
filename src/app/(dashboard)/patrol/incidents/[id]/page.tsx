@@ -7,6 +7,7 @@
  */
 
 import { use, useState, useEffect, useCallback } from 'react'
+import Image from 'next/image'
 import { useAuthReady } from '@/hooks/auth/use-auth-ready'
 import { useRouter } from 'next/navigation'
 import {
@@ -277,11 +278,14 @@ export default function IncidentDetailPage({ params }: { params: Promise<{ id: s
               <p className='text-xs text-muted-foreground mb-2'>Fotos adjuntas</p>
               <div className='flex gap-2 flex-wrap'>
                 {incident.photos.map(photo => (
-                  <img
+                  <Image
                     key={photo.id}
-                    src={toPublicUploadUrl(`/uploads/${photo.path}`) ?? undefined}
+                    src={toPublicUploadUrl(`/uploads/${photo.path}`) ?? ''}
                     alt='Foto de novedad'
+                    width={96}
+                    height={96}
                     className='w-24 h-24 rounded-lg object-cover border'
+                    unoptimized
                   />
                 ))}
               </div>

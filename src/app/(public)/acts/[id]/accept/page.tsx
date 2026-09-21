@@ -3,10 +3,9 @@ import { AlertCircle, CheckCircle, Clock, Shield } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { ActDetailsDisplay } from '@/components/inventory/act-details-display'
 import { ActAcceptanceForm } from '@/components/inventory/act-acceptance-form'
-import prisma from '@/lib/prisma'
 import { DeliveryActService } from '@/lib/services/delivery-act.service'
 import Image from 'next/image'
-import { DEFAULT_SYSTEM_NAME } from '@/lib/branding-constants'
+import { getSystemBranding } from '@/lib/branding'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -29,18 +28,6 @@ async function getActDetails(id: string, token: string) {
   } catch (error) {
     console.error('Error obteniendo acta por token:', error)
     return null
-  }
-}
-
-async function getSystemBranding() {
-  try {
-    const content = await prisma.landing_page_content.findFirst({ where: { id: 'default' } })
-    return {
-      companyName: (content as any)?.companyName || DEFAULT_SYSTEM_NAME,
-      logoUrl: (content as any)?.companyLogoLightUrl || null,
-    }
-  } catch {
-    return { companyName: DEFAULT_SYSTEM_NAME, logoUrl: null }
   }
 }
 
@@ -68,7 +55,7 @@ export default async function ActAcceptancePage({ params, searchParams }: PagePr
   const { id } = await params
   const { token } = await searchParams
 
-  const [branding] = await Promise.all([getSystemBranding()])
+  const branding = await getSystemBranding()
 
   // Sin token
   if (!token) {
@@ -179,17 +166,18 @@ function PublicHeader({
   branding,
   act,
 }: {
-  branding: { companyName: string; logoUrl: string | null }
+  branding: { companyName: string; logoUrl: string | null; logoDarkUrl?: string | null }
   act?: any
 }) {
+  const logoUrl = branding.logoUrl || branding.logoDarkUrl
   return (
     <header className='border-b bg-card'>
       <div className='container max-w-3xl py-5 flex items-center justify-between gap-4'>
         <div className='flex items-center gap-3'>
-          {branding.logoUrl ? (
+          {logoUrl ? (
             <div className='relative h-10 w-32'>
               <Image
-                src={branding.logoUrl}
+                src={logoUrl}
                 alt={branding.companyName}
                 fill
                 className='object-contain object-left'

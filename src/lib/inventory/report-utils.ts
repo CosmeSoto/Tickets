@@ -2,10 +2,7 @@
  * Utilidades de servidor para endpoints de reportes de inventario.
  * Para formato puro (cliente + servidor) usar report-format.ts.
  */
-export type {
-  ReportResponse,
-  ReportSummaryItem,
-} from '@/lib/inventory/report-format'
+export type { ReportResponse, ReportSummaryItem } from '@/lib/inventory/report-format'
 export {
   CONSUMABLE_STATUS_ES,
   DECOMMISSION_REASON_ES,
@@ -20,6 +17,25 @@ export {
 
 import type { ReportSummaryItem } from '@/lib/inventory/report-format'
 import { formatDate } from '@/lib/inventory/report-format'
+import fs from 'fs'
+import { getUploadDir } from '@/lib/upload-path'
+
+export interface ReportPDFBranding {
+  companyName: string
+  logoUrl?: string | null
+  logoDarkUrl?: string | null
+}
+
+function loadLogoBuffer(logoUrl: string): Buffer | null {
+  try {
+    const relativePath = logoUrl.replace('/api/uploads/', '')
+    const filePath = getUploadDir(relativePath)
+    if (fs.existsSync(filePath)) return fs.readFileSync(filePath)
+    return null
+  } catch {
+    return null
+  }
+}
 
 /**
  * Obtiene los IDs de familias accesibles para reportes de inventario (scope visibility).
@@ -64,7 +80,8 @@ export async function generateReportPDF(
   title: string,
   summary: ReportSummaryItem[],
   headers: string[],
-  rows: string[][]
+  rows: string[][],
+  branding?: ReportPDFBranding
 ): Promise<ArrayBuffer> {
   const PDFDocument = (await import('pdfkit')).default
 
@@ -79,6 +96,22 @@ export async function generateReportPDF(
     })
     doc.on('error', reject)
 
+    const logoUrl = branding?.logoDarkUrl || branding?.logoUrl
+    const logoBuffer = logoUrl ? loadLogoBuffer(logoUrl) : null
+    if (logoBuffer) {
+      doc.image(logoBuffer, 40, 30, { fit: [120, 40] })
+    } else if (branding?.companyName) {
+      doc
+        .fontSize(11)
+        .font('Helvetica-Bold')
+        .fillColor('#1E293B')
+        .text(branding.companyName, 40, 40)
+    }
+    if (logoBuffer || branding?.companyName) {
+      doc.moveDown(2)
+    }
+
+    doc.fillColor('#000000')
     doc.fontSize(18).font('Helvetica-Bold').text(title, { align: 'center' })
     doc
       .fontSize(10)

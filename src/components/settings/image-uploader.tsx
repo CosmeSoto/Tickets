@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import Image from 'next/image'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Upload, X, Loader2 } from 'lucide-react'
@@ -141,7 +142,7 @@ export function ImageUploader({ label, currentUrl, onUpload, type }: ImageUpload
         <div className='relative border rounded-lg p-3 bg-muted/50'>
           <div className='flex items-center space-x-3'>
             <div className='relative w-16 h-16 bg-white dark:bg-gray-800 rounded border flex items-center justify-center overflow-hidden flex-shrink-0'>
-              <img src={preview} alt='Preview' className='max-w-full max-h-full object-contain' />
+              <Image src={preview} alt='Preview' fill className='object-contain' unoptimized />
             </div>
             <div className='flex-1 min-w-0'>
               <p className='text-sm font-medium'>Imagen cargada</p>

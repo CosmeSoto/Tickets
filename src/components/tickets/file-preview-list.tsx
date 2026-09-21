@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Image from 'next/image'
 import { X, File, FileText, Image as ImageIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
@@ -38,7 +39,11 @@ function FileThumbnail({ file }: { file: File }) {
   }, [file])
 
   if (url) {
-    return <img src={url} alt={file.name} className='h-10 w-10 rounded object-cover border' />
+    return (
+      <div className='relative h-10 w-10 rounded border overflow-hidden'>
+        <Image src={url} alt={file.name} fill className='object-cover' unoptimized />
+      </div>
+    )
   }
 
   return (
@@ -106,6 +111,9 @@ export function FilePreviewList({ files, onRemove }: FilePreviewListProps) {
           <div className='text-center'>
             <p className='text-sm text-muted-foreground mb-3'>{previewName}</p>
             {previewUrl && (
+              // Alto natural (con tope) — next/image `fill` reservaría
+              // siempre 70vh de alto aunque la imagen real sea más baja.
+              // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={previewUrl}
                 alt={previewName}

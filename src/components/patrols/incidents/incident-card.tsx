@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Pencil, Trash2, Clock, ExternalLink } from 'lucide-react'
@@ -120,10 +121,13 @@ export function IncidentCard({
         {/* Photo thumbnail */}
         {incident.photos.length > 0 && (
           <div className='flex-shrink-0'>
-            <img
-              src={toPublicUploadUrl(`/uploads/${incident.photos[0].path}`) ?? undefined}
+            <Image
+              src={toPublicUploadUrl(`/uploads/${incident.photos[0].path}`) ?? ''}
               alt='Foto de novedad'
+              width={56}
+              height={56}
               className='w-14 h-14 rounded-md object-cover border'
+              unoptimized
             />
           </div>
         )}
