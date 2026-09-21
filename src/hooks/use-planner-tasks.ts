@@ -79,7 +79,7 @@ export function usePlannerTasks() {
 
   const updateStatus = useCallback(
     async (task: PlannerTask, status: PlannerTaskStatus) => {
-      const previous = tasks
+      const previousStatus = task.status
       setTasks(current => current.map(t => (t.id === task.id ? { ...t, status } : t)))
       try {
         const url =
@@ -96,7 +96,12 @@ export function usePlannerTasks() {
           throw new Error(data.message || 'No fue posible actualizar la tarea.')
         }
       } catch (err) {
-        setTasks(previous)
+        // Revierte solo esta tarea (no todo el arreglo) — restaurar un
+        // snapshot completo pisaría cualquier otro cambio (otra edición,
+        // un arrastre, una creación) que haya llegado entre medio.
+        setTasks(current =>
+          current.map(t => (t.id === task.id ? { ...t, status: previousStatus } : t))
+        )
         toast({
           title: 'Error',
           description: err instanceof Error ? err.message : 'No fue posible actualizar la tarea.',
@@ -104,7 +109,7 @@ export function usePlannerTasks() {
         })
       }
     },
-    [tasks, toast]
+    [toast]
   )
 
   const createPersonalTask = useCallback(
@@ -161,8 +166,11 @@ export function usePlannerTasks() {
 
   const deletePersonalTask = useCallback(
     async (taskId: string) => {
-      const previous = tasks
-      setTasks(current => current.filter(t => t.id !== taskId))
+      let removed: PlannerTask | undefined
+      setTasks(current => {
+        removed = current.find(t => t.id === taskId)
+        return current.filter(t => t.id !== taskId)
+      })
       try {
         const res = await fetch(`/api/planner/personal-tasks/${taskId}`, { method: 'DELETE' })
         const data = await res.json()
@@ -171,7 +179,14 @@ export function usePlannerTasks() {
         }
         return true
       } catch (err) {
-        setTasks(previous)
+        // Reinserta solo la tarea borrada (no todo el arreglo) — restaurar un
+        // snapshot completo perdería cualquier otro cambio concurrente.
+        if (removed) {
+          const restored = removed
+          setTasks(current =>
+            current.some(t => t.id === taskId) ? current : [...current, restored]
+          )
+        }
         toast({
           title: 'Error',
           description: err instanceof Error ? err.message : 'No fue posible eliminar la tarea.',
@@ -180,7 +195,7 @@ export function usePlannerTasks() {
         return false
       }
     },
-    [tasks, toast]
+    [toast]
   )
 
   return {

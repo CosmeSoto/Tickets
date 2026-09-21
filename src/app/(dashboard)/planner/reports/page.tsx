@@ -166,9 +166,14 @@ export default function PlannerReportsPage() {
   useEffect(() => {
     const filtersChanged = prevFiltersKey.current !== filtersKey
     prevFiltersKey.current = filtersKey
-    const targetPage = filtersChanged ? 1 : page
-    if (filtersChanged && page !== 1) setPage(1)
-    void runReport('json', targetPage)
+    if (filtersChanged && page !== 1) {
+      // Solo actualiza la página — este mismo efecto se vuelve a ejecutar
+      // con page=1 y filtersChanged ya en false, y ESA corrida es la que
+      // pide el reporte. Pedirlo también acá duplicaba la misma consulta.
+      setPage(1)
+      return
+    }
+    void runReport('json', page)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtersKey, page])
 

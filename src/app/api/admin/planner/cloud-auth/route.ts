@@ -10,15 +10,17 @@
 
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
+import { randomUUID } from 'crypto'
 import { authOptions } from '@/lib/auth'
 import { requireSuperAdmin } from '@/lib/auth/require-super-admin'
 import { getOAuthCredentials } from '@/lib/oauth-config'
 import { buildMicrosoftAuthorizeUrl } from '@/lib/oauth/microsoft-authorize'
 import prisma from '@/lib/prisma'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
+import { PLANNER_OAUTH_CALLBACK_PATH, PLANNER_OAUTH_NONCE_COOKIE } from '@/lib/planner/oauth-shared'
 
 const REDIRECT_URI_BASE = process.env.NEXTAUTH_URL ?? 'http://localhost:3000'
-const REDIRECT_URI = `${REDIRECT_URI_BASE}/api/admin/planner/cloud-auth/callback`
+const REDIRECT_URI = `${REDIRECT_URI_BASE}${PLANNER_OAUTH_CALLBACK_PATH}`
 const REFRESH_TOKEN_KEY = 'plannerMicrosoftRefreshToken'
 const PLANNER_SCOPE =
   'https://graph.microsoft.com/Tasks.ReadWrite https://graph.microsoft.com/Group.Read.All offline_access'
@@ -40,16 +42,25 @@ export async function GET() {
     return NextResponse.json({ authorized: false, oauthConfigured: false, authUrl: null })
   }
 
-  return NextResponse.json({
+  const nonce = randomUUID()
+  const response = NextResponse.json({
     authorized: false,
     oauthConfigured: true,
     authUrl: buildMicrosoftAuthorizeUrl({
       credentials: creds,
       redirectUri: REDIRECT_URI,
       scope: PLANNER_SCOPE,
-      state: `planner:${session!.user!.id}`,
+      state: `admin-planner:${session!.user!.id}:${nonce}`,
     }),
   })
+  response.cookies.set(PLANNER_OAUTH_NONCE_COOKIE, nonce, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: 600,
+    path: '/api/planner',
+  })
+  return response
 }
 
 export async function DELETE() {

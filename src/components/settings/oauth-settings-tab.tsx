@@ -184,14 +184,13 @@ export function OAuthSettingsTab() {
               <div>
                 <CardTitle>Microsoft (Planner + To Do)</CardTitle>
                 <CardDescription>
-                  Un solo registro de aplicación en Entra ID cubre dos flujos de sincronización de
-                  tareas: <strong>Planner</strong> (una única cuenta de servicio compartida,
-                  conectada por el Super Admin en Configuración de Tareas) y{' '}
+                  Un solo registro de aplicación en Entra ID, con un solo Redirect URI, cubre dos
+                  flujos de sincronización de tareas: <strong>Planner</strong> (una única cuenta de
+                  servicio compartida, conectada por el Super Admin en Configuración de Tareas) y{' '}
                   <strong>Microsoft To Do</strong> (cada usuario conecta su propia cuenta desde su
-                  perfil, para sus tareas independientes). No hace falta un segundo App Registration
-                  ni una segunda credencial — solo agrega los dos Redirect URI de abajo al mismo
-                  registro y los permisos delegados de ambos (Tasks.ReadWrite, Group.Read.All,
-                  offline_access).
+                  perfil, para sus tareas independientes). Agrega el Redirect URI de abajo y los
+                  permisos delegados de ambos (Tasks.ReadWrite, Group.Read.All, User.Read,
+                  offline_access) — nada más que configurar dos veces.
                 </CardDescription>
               </div>
             </div>
@@ -204,11 +203,8 @@ export function OAuthSettingsTab() {
             clientIdPlaceholder='00000000-0000-0000-0000-000000000000'
             showTenantId
             tenantPlaceholder='common'
-            redirectUriPath={[
-              '/api/admin/planner/cloud-auth/callback',
-              '/api/planner/ms-todo/callback',
-            ]}
-            scopes='https://graph.microsoft.com/Tasks.ReadWrite https://graph.microsoft.com/Group.Read.All offline_access'
+            redirectUriPath='/api/planner/oauth-callback'
+            scopes='https://graph.microsoft.com/Tasks.ReadWrite https://graph.microsoft.com/Group.Read.All https://graph.microsoft.com/User.Read offline_access'
             enabledLabel='Habilitar estas credenciales'
             enabledDescription='Debe estar activo para conectar la cuenta dedicada de Planner y para que los usuarios puedan vincular su Microsoft To Do personal.'
             onStateChange={s => setPlannerEnabled(s.isEnabled)}

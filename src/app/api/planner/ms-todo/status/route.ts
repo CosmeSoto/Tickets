@@ -28,6 +28,15 @@ export async function GET() {
     select: { syncError: true, updatedAt: true },
   })
 
+  // account.updatedAt es la última vez que se RENOVÓ el token (puede pasar
+  // sin que ninguna tarea se haya sincronizado) — la fecha real de la última
+  // sincronización es el lastSyncedAt más reciente entre los enlaces.
+  const lastSync = await prisma.personal_task_ms_todo_links.findFirst({
+    where: { userId: session.user.id, lastSyncedAt: { not: null } },
+    orderBy: { lastSyncedAt: 'desc' },
+    select: { lastSyncedAt: true },
+  })
+
   let connectedEmail: string | null = null
   try {
     const accessToken = await MsTodoGraphService.getAccessToken(session.user.id)
@@ -40,7 +49,7 @@ export async function GET() {
   return NextResponse.json({
     connected: true,
     connectedEmail,
-    lastSyncedAt: account.updatedAt.toISOString(),
+    lastSyncedAt: lastSync?.lastSyncedAt?.toISOString() ?? null,
     lastSyncError: lastError?.syncError ?? null,
   })
 }

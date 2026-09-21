@@ -13,10 +13,11 @@ import { authOptions } from '@/lib/auth'
 import { getOAuthCredentials } from '@/lib/oauth-config'
 import { buildMicrosoftAuthorizeUrl } from '@/lib/oauth/microsoft-authorize'
 import { assertCanViewPlanner } from '@/lib/planner/access'
-import { MS_TODO_SCOPE, MS_TODO_OAUTH_NONCE_COOKIE } from '@/lib/services/ms-todo-graph-service'
+import { MS_TODO_SCOPE } from '@/lib/services/ms-todo-graph-service'
+import { PLANNER_OAUTH_CALLBACK_PATH, PLANNER_OAUTH_NONCE_COOKIE } from '@/lib/planner/oauth-shared'
 
 const REDIRECT_URI_BASE = process.env.NEXTAUTH_URL ?? 'http://localhost:3000'
-const REDIRECT_URI = `${REDIRECT_URI_BASE}/api/planner/ms-todo/callback`
+const REDIRECT_URI = `${REDIRECT_URI_BASE}${PLANNER_OAUTH_CALLBACK_PATH}`
 
 export async function GET() {
   const session = await getServerSession(authOptions)
@@ -45,15 +46,15 @@ export async function GET() {
       credentials: creds,
       redirectUri: REDIRECT_URI,
       scope: MS_TODO_SCOPE,
-      state: `todo:${session.user.id}:${nonce}`,
+      state: `user-todo:${session.user.id}:${nonce}`,
     }),
   })
-  response.cookies.set(MS_TODO_OAUTH_NONCE_COOKIE, nonce, {
+  response.cookies.set(PLANNER_OAUTH_NONCE_COOKIE, nonce, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     maxAge: 600,
-    path: '/api/planner/ms-todo',
+    path: '/api/planner',
   })
   return response
 }

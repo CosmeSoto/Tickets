@@ -9,7 +9,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
-import { combineDateAndTime, validateTimeRange } from '@/lib/time-utils'
+import { combineDateAndTime, validateTimeRange, isValidTimeFormat } from '@/lib/time-utils'
 import { createAuditLog } from '@/lib/audit'
 import {
   assertCanViewPlanner,
@@ -17,7 +17,10 @@ import {
   isFamilyWithinPlannerScope,
 } from '@/lib/planner/access'
 import { MsTodoSyncService } from '@/lib/services/ms-todo-sync-service'
-import { isValidPersonalTaskPriority } from '@/lib/planner/personal-task-validation'
+import {
+  isValidPersonalTaskPriority,
+  isValidDateOnlyString,
+} from '@/lib/planner/personal-task-validation'
 
 export async function POST(request: NextRequest) {
   try {
@@ -45,6 +48,25 @@ export async function POST(request: NextRequest) {
 
     if (body.priority !== undefined && !isValidPersonalTaskPriority(body.priority)) {
       return NextResponse.json({ success: false, message: 'Prioridad inválida' }, { status: 400 })
+    }
+
+    if (body.dueDate && !isValidDateOnlyString(body.dueDate)) {
+      return NextResponse.json(
+        { success: false, message: 'Fecha inválida — usa el formato AAAA-MM-DD' },
+        { status: 400 }
+      )
+    }
+    if (body.startTime && !isValidTimeFormat(body.startTime as string)) {
+      return NextResponse.json(
+        { success: false, message: 'Hora de inicio inválida — usa el formato HH:mm' },
+        { status: 400 }
+      )
+    }
+    if (body.endTime && !isValidTimeFormat(body.endTime as string)) {
+      return NextResponse.json(
+        { success: false, message: 'Hora de fin inválida — usa el formato HH:mm' },
+        { status: 400 }
+      )
     }
 
     if (

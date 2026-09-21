@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
-import { combineDateAndTime, validateTimeRange } from '@/lib/time-utils'
+import { combineDateAndTime, validateTimeRange, isValidTimeFormat } from '@/lib/time-utils'
 import { createAuditLog } from '@/lib/audit'
 import {
   assertCanViewPlanner,
@@ -19,6 +19,7 @@ import { MsTodoSyncService } from '@/lib/services/ms-todo-sync-service'
 import {
   isValidPersonalTaskPriority,
   isValidPersonalTaskStatus,
+  isValidDateOnlyString,
 } from '@/lib/planner/personal-task-validation'
 
 function serializeTask(task: {
@@ -89,6 +90,24 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
     if (body.priority !== undefined && !isValidPersonalTaskPriority(body.priority)) {
       return NextResponse.json({ success: false, message: 'Prioridad inválida' }, { status: 400 })
+    }
+    if (body.dueDate && !isValidDateOnlyString(body.dueDate)) {
+      return NextResponse.json(
+        { success: false, message: 'Fecha inválida — usa el formato AAAA-MM-DD' },
+        { status: 400 }
+      )
+    }
+    if (body.startTime && !isValidTimeFormat(body.startTime as string)) {
+      return NextResponse.json(
+        { success: false, message: 'Hora de inicio inválida — usa el formato HH:mm' },
+        { status: 400 }
+      )
+    }
+    if (body.endTime && !isValidTimeFormat(body.endTime as string)) {
+      return NextResponse.json(
+        { success: false, message: 'Hora de fin inválida — usa el formato HH:mm' },
+        { status: 400 }
+      )
     }
 
     const updateData: Record<string, unknown> = { updatedAt: new Date() }

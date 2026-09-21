@@ -24,12 +24,6 @@ export const MS_TODO_SCOPE =
   'https://graph.microsoft.com/Tasks.ReadWrite https://graph.microsoft.com/User.Read offline_access'
 export const MS_TODO_PROVIDER = 'microsoft-todo'
 export const MS_TODO_LIST_NAME = 'Tareas (Gestión Operaciones)'
-/** Cookie httpOnly de vida corta que guarda el nonce anti-CSRF del flujo de
- *  conexión (ver /api/planner/ms-todo/connect y callback/route.ts) — sin
- *  esto, `state` solo llevaría el userId (adivinable/conocido), y alguien
- *  podría enlazar su propia cuenta de Microsoft a la sesión de otra persona
- *  con solo lograr que esa persona abra un callback armado a mano. */
-export const MS_TODO_OAUTH_NONCE_COOKIE = 'ms_todo_oauth_nonce'
 
 export class MsTodoNotConnectedError extends Error {
   constructor() {

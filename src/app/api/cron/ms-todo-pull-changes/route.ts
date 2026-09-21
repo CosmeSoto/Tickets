@@ -34,12 +34,24 @@ export async function GET(request: NextRequest) {
 
     for (const account of accounts) {
       const userId = account.providerId
+
+      // Try/catch independientes: si listar tareas falla (lista borrada,
+      // 429, token vencido), retryErroredLinks debe correr igual para ese
+      // usuario — antes un solo try envolvía ambas llamadas, y una falla en
+      // el sondeo dejaba a ese usuario sin reintentos para siempre.
       try {
         const result = await MsTodoSyncService.pullChangesForUser(userId)
         totals.applied += result.applied
         totals.skipped += result.skipped
         totals.errors += result.errors
+      } catch (err) {
+        totals.errors++
+        const message = err instanceof Error ? err.message : 'Error desconocido'
+        errorsByUser[userId] = message
+        console.error('[CRON] ms-todo-pull-changes: error con el usuario', userId, message)
+      }
 
+      try {
         // Reintenta tareas cuyo push nunca llegó a Microsoft (token vencido,
         // 5xx transitorio) — sin esto quedarían desincronizadas para
         // siempre, ya que solo un nuevo POST/PATCH del usuario dispara push.
@@ -48,8 +60,10 @@ export async function GET(request: NextRequest) {
       } catch (err) {
         totals.errors++
         const message = err instanceof Error ? err.message : 'Error desconocido'
-        errorsByUser[userId] = message
-        console.error('[CRON] ms-todo-pull-changes: error con el usuario', userId, message)
+        errorsByUser[userId] = errorsByUser[userId]
+          ? `${errorsByUser[userId]}; retry: ${message}`
+          : message
+        console.error('[CRON] ms-todo-pull-changes: error reintentando para', userId, message)
       }
     }
 

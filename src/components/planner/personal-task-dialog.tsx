@@ -14,7 +14,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { TaskDetailFields, type TaskDetailFieldsValue } from '@/components/ui/task-detail-fields'
-import { useFamilyOptions } from '@/hooks/use-family-options'
 import type { PersonalTaskInput } from '@/hooks/use-planner-tasks'
 import type { PlannerTask } from '@/hooks/use-planner-tasks'
 import { toLocalDateAndTimeParts } from '@/lib/forms/form-date'
@@ -58,10 +57,30 @@ export function PersonalTaskDialog({
   onUpdate,
   onDelete,
 }: PersonalTaskDialogProps) {
-  const { families } = useFamilyOptions()
+  const [families, setFamilies] = useState<{ id: string; name: string }[]>([])
   const [form, setForm] = useState(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
+
+  // Mismo alcance que valida el backend (getPlannerAccess / isFamilyWithinPlannerScope
+  // en las rutas de tareas independientes) — antes se usaba useFamilyOptions
+  // (alcance de INVENTARIO), que podía ofrecer áreas que el backend luego
+  // rechazaba con 403 al guardar, o no ofrecer una que la tarea ya tenía.
+  useEffect(() => {
+    fetch('/api/planner/reports/catalog')
+      .then(res => res.json())
+      .then(data => setFamilies(data.families ?? []))
+      .catch(() => {})
+  }, [])
+
+  // Si la tarea ya trae un área que no está en el alcance actual (cambió el
+  // acceso después de etiquetarla), se agrega igual a la lista para que el
+  // select no quede en blanco silenciosamente reenviando un id que ya no
+  // corresponde a ninguna opción visible.
+  const familyOptions =
+    task?.family && !families.some(f => f.id === task.family!.id)
+      ? [...families, { id: task.family.id, name: task.family.name }]
+      : families
 
   useEffect(() => {
     if (!open) return
@@ -154,7 +173,7 @@ export function PersonalTaskDialog({
             onChange={patch => setForm(f => ({ ...f, ...patch }))}
           />
 
-          {families.length > 0 && (
+          {familyOptions.length > 0 && (
             <div className='space-y-1.5'>
               <Label htmlFor='ptask-family' className='text-sm'>
                 Área (opcional)
@@ -166,7 +185,7 @@ export function PersonalTaskDialog({
                 className='w-full px-3 py-2 border border-border rounded-md text-sm bg-background'
               >
                 <option value=''>Sin área</option>
-                {families.map(f => (
+                {familyOptions.map(f => (
                   <option key={f.id} value={f.id}>
                     {f.name}
                   </option>

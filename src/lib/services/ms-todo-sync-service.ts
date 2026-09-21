@@ -24,6 +24,26 @@ interface PersonalTaskForSync {
   dueDate: Date | null
 }
 
+/** Prefijo del msTaskId placeholder que usa markLinkError cuando el PRIMER
+ *  intento de crear la tarea en Microsoft falla (nunca llegó a tener un id
+ *  real). Ver hasRealMsTaskId — syncStatus NO alcanza para saber si un link
+ *  apunta a una tarea real: un link 'synced' que luego falla al actualizarse
+ *  cae a 'error' sin perder su msTaskId real. */
+const ERROR_ID_PREFIX = 'error:'
+
+type MsTodoLink = { msTaskId: string; syncStatus: string }
+
+/** true si el link tiene un id de Microsoft real y utilizable — ni un
+ *  placeholder de error nunca-creado, ni uno confirmado borrado del lado de
+ *  Microsoft (pullChangesForUser lo marca 'deleted', un estado aparte de
+ *  'error' para que retryErroredLinks no lo resucite solo).
+ *  Deliberadamente NO es un type predicate (`link is MsTodoLink`): con un
+ *  tipo de entrada no-union (el resultado completo de Prisma), TS termina
+ *  angostando la rama "false" a `never` en vez del tipo original. */
+function hasRealMsTaskId(link: MsTodoLink | null | undefined): boolean {
+  return !!link && !link.msTaskId.startsWith(ERROR_ID_PREFIX) && link.syncStatus !== 'deleted'
+}
+
 async function hasConnectedAccount(userId: string): Promise<boolean> {
   const account = await prisma.oauth_accounts.findUnique({
     where: { provider_providerId: { provider: MS_TODO_PROVIDER, providerId: userId } },
@@ -52,7 +72,7 @@ async function markLinkError(personalTaskId: string, userId: string, message: st
         personalTaskId,
         userId,
         msTaskListId: '',
-        msTaskId: `error:${personalTaskId}`,
+        msTaskId: `${ERROR_ID_PREFIX}${personalTaskId}`,
         syncStatus: 'error',
         syncError: message.slice(0, 500),
       },
@@ -72,15 +92,16 @@ export class MsTodoSyncService {
         where: { personalTaskId: task.id },
       })
 
-      // Solo un link con syncStatus 'synced' tiene un msTaskId real en
-      // Microsoft — un link en 'error' (o inexistente) significa que la
-      // tarea todavía no existe allá, así que hay que CREARLA (no
-      // actualizarla), incluso si ya hubo un intento previo fallido.
-      if (link?.syncStatus === 'synced') {
+      // hasRealMsTaskId, NO syncStatus === 'synced': un link puede caer a
+      // 'error' después de haberse creado bien (una actualización posterior
+      // falló) y seguir teniendo un msTaskId real y válido — tratar eso como
+      // "hay que crearla de nuevo" duplicaba la tarea en Microsoft en cada
+      // reintento (el link.msTaskId real se sobreescribía con uno nuevo).
+      if (hasRealMsTaskId(link)) {
         const result = await MsTodoGraphService.updateTask(
           accessToken,
-          link.msTaskListId,
-          link.msTaskId,
+          link!.msTaskListId,
+          link!.msTaskId,
           {
             title: task.title,
             status: task.status,
@@ -88,7 +109,7 @@ export class MsTodoSyncService {
           }
         )
         await prisma.personal_task_ms_todo_links.update({
-          where: { id: link.id },
+          where: { id: link!.id },
           data: {
             etag: result.etag,
             syncStatus: 'synced',
@@ -107,7 +128,7 @@ export class MsTodoSyncService {
         link?.msTaskListId ||
         (
           await prisma.personal_task_ms_todo_links.findFirst({
-            where: { userId, syncStatus: 'synced' },
+            where: { userId, msTaskListId: { not: '' } },
             select: { msTaskListId: true },
           })
         )?.msTaskListId
@@ -162,11 +183,14 @@ export class MsTodoSyncService {
       const link = await prisma.personal_task_ms_todo_links.findUnique({
         where: { personalTaskId },
       })
-      if (!link || link.syncStatus !== 'synced') return // nunca llegó a crearse allá — nada que borrar
+      // hasRealMsTaskId, no "syncStatus === 'synced'": un link en 'error' con
+      // un msTaskId real (una actualización fallida, no la creación) SÍ debe
+      // borrarse en Microsoft — omitirlo dejaba la tarea huérfana allá.
+      if (!hasRealMsTaskId(link)) return
 
       const accessToken = await MsTodoGraphService.getAccessToken(userId)
-      await MsTodoGraphService.deleteTask(accessToken, link.msTaskListId, link.msTaskId)
-      await prisma.personal_task_ms_todo_links.delete({ where: { id: link.id } })
+      await MsTodoGraphService.deleteTask(accessToken, link!.msTaskListId, link!.msTaskId)
+      await prisma.personal_task_ms_todo_links.delete({ where: { id: link!.id } })
     } catch (err) {
       if (err instanceof MsTodoNotConnectedError) return
       const message = err instanceof Error ? err.message : 'Error desconocido'
@@ -211,10 +235,16 @@ export class MsTodoSyncService {
       const graphTask = graphTaskById.get(link.msTaskId)
 
       if (!graphTask) {
+        // 'deleted', no 'error': distingue "la borraron a propósito en
+        // Microsoft" de "falló la sincronización" — retryErroredLinks solo
+        // reintenta 'error', así que esto no la resucita sola en el próximo
+        // cron. Un push posterior explícito (el usuario edita la tarea en la
+        // app) sí la vuelve a crear — hasRealMsTaskId trata 'deleted' como
+        // "sin id real", así que pushTask toma la rama de creación.
         await prisma.personal_task_ms_todo_links
           .update({
             where: { id: link.id },
-            data: { syncStatus: 'error', syncError: 'Eliminada en Microsoft To Do' },
+            data: { syncStatus: 'deleted', syncError: 'Eliminada en Microsoft To Do' },
           })
           .catch(() => {})
         continue

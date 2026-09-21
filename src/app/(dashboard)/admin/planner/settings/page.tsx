@@ -308,12 +308,8 @@ export default function PlannerSettingsPage() {
               </div>
             </div>
             {!connected && (
-              <div className='mt-3 space-y-1.5'>
-                <RedirectUriNote path='/api/admin/planner/cloud-auth/callback' />
-                <RedirectUriNote
-                  path='/api/planner/ms-todo/callback'
-                  label='Además registra este segundo Redirect URI (lo usa Microsoft To Do por usuario, misma app):'
-                />
+              <div className='mt-3'>
+                <RedirectUriNote path='/api/planner/oauth-callback' />
               </div>
             )}
           </CardContent>

@@ -298,7 +298,7 @@ export async function POST(request: NextRequest) {
       request.headers.get('origin') || request.headers.get('referer')?.split('/admin')[0] || ''
     const defaultRedirectUri =
       provider === 'azure-ad-planner'
-        ? `${baseUrl}/api/admin/planner/cloud-auth/callback, ${baseUrl}/api/planner/ms-todo/callback`
+        ? `${baseUrl}/api/planner/oauth-callback`
         : `${baseUrl}/api/auth/callback/${provider}`
     const redirectUri = config.redirectUri || defaultRedirectUri
 

@@ -26,9 +26,11 @@ export interface OAuthCredentials {
  * delegado POR USUARIO de Microsoft To Do (ver /api/planner/ms-todo/**,
  * MsTodoGraphService) — cada usuario consiente por su cuenta desde su
  * propio perfil y su token se guarda en oauth_accounts (una fila por
- * usuario), nunca en system_settings. Es el mismo App Registration en Entra
- * con dos Redirect URI registrados (uno por flujo) y el superset de
- * permisos delegados que ambos necesitan.
+ * usuario), nunca en system_settings. Ambos flujos comparten además un
+ * único callback (/api/planner/oauth-callback, ver oauth-shared.ts) — `state`
+ * es lo que distingue uno del otro, así que un solo Redirect URI alcanza
+ * para el mismo App Registration y el superset de permisos delegados que
+ * ambos necesitan.
  */
 export type OAuthProviderKey = 'google' | 'azure-ad' | 'azure-ad-planner' | 'azure-ad-sharepoint'
 
