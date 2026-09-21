@@ -236,18 +236,25 @@ export function OAuthSettingsTab() {
                 autoriza: no hay ventana emergente de consentimiento.
               </p>
               <p>
-                Después de guardar, un administrador de Microsoft 365 debe otorgarle a esta app el
-                permiso <code className='font-mono'>Sites.Selected</code> sobre el sitio específico
-                — un paso aparte que se hace con PowerShell o Graph Explorer, fuera de esta app. Sin
-                ese paso, conectar el sitio en Ajustes → Almacenamiento fallará con error 403.
+                <code className='font-mono'>Sites.Selected</code> se otorga en{' '}
+                <strong>dos pasos separados</strong>, en este orden — falta cualquiera de los dos y
+                falla con error 403:
               </p>
               <p>
-                Importante: el permiso debe otorgarse con rol{' '}
-                <code className='font-mono'>write</code>, no solo{' '}
-                <code className='font-mono'>read</code>. Con solo lectura, conectar el sitio va a
+                <strong>1)</strong> En Azure Portal → esta app → API permissions, agregar{' '}
+                <code className='font-mono'>Sites.Selected</code> como permiso de{' '}
+                <strong>aplicación</strong> (Application permission) de Microsoft Graph, y un
+                administrador debe presionar <strong>&quot;Grant admin consent&quot;</strong> para
+                el tenant. Sin este consentimiento a nivel de la app, el paso 2 no tiene ningún
+                efecto aunque parezca completarse sin error.
+              </p>
+              <p>
+                <strong>2)</strong> Ya con eso hecho, otorgarle a esta app acceso al sitio
+                específico con rol <code className='font-mono'>write</code> (no solo{' '}
+                <code className='font-mono'>read</code>) — un paso aparte con PowerShell (PnP) o
+                Graph Explorer, fuera de esta app. Con solo lectura, conectar el sitio abajo va a
                 funcionar (son llamadas de consulta) pero subir un archivo real va a fallar después
-                con otro error 403 — más difícil de relacionar con el permiso si no se sabe de
-                antemano.
+                con otro 403 — más difícil de relacionar con el permiso si no se sabe de antemano.
               </p>
             </AlertDescription>
           </Alert>
