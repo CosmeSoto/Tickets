@@ -315,6 +315,32 @@ export function PermissionsAndModulesSection({
               }}
             />
 
+            {/* ── Tareas (Planner) ── */}
+            <ModuleAccessCard
+              moduleKey='planner'
+              moduleName='Tareas (Planner)'
+              role={formData.role}
+              enabled={formData.plannerEnabled || formData.canManagePlanner}
+              onToggle={v => onToggle('plannerEnabled', v)}
+              families={plannerFamilies}
+              assignedFamilyIds={plannerFamilyIds}
+              nativeFamilyId={nativeFamilyId}
+              nativeFamily={nativeFamilyForCards}
+              readOnlyFamilyIds={plannerReadOnlyIds}
+              onAssignFamily={handlers.handleAssignPlannerFamily}
+              onUnassignFamily={handlers.handleUnassignPlannerFamily}
+              options={
+                formData.role === 'TECHNICIAN' || formData.role === 'CLIENT'
+                  ? {
+                      canManagePlanner: formData.canManagePlanner,
+                      onToggleManagePlanner: v => onToggle('canManagePlanner', v),
+                    }
+                  : undefined
+              }
+              loading={loadingFamilies}
+              disabled={loading}
+            />
+
             {/* ── Inventario ── */}
             <ModuleAccessCard
               moduleKey='inventory'
@@ -531,32 +557,6 @@ export function PermissionsAndModulesSection({
                   ? {
                       canManageAccess: formData.canManageAccess,
                       onToggleManageAccess: v => onToggle('canManageAccess', v),
-                    }
-                  : undefined
-              }
-              loading={loadingFamilies}
-              disabled={loading}
-            />
-
-            {/* ── Tareas (Planner) ── */}
-            <ModuleAccessCard
-              moduleKey='planner'
-              moduleName='Tareas (Planner)'
-              role={formData.role}
-              enabled={formData.plannerEnabled || formData.canManagePlanner}
-              onToggle={v => onToggle('plannerEnabled', v)}
-              families={plannerFamilies}
-              assignedFamilyIds={plannerFamilyIds}
-              nativeFamilyId={nativeFamilyId}
-              nativeFamily={nativeFamilyForCards}
-              readOnlyFamilyIds={plannerReadOnlyIds}
-              onAssignFamily={handlers.handleAssignPlannerFamily}
-              onUnassignFamily={handlers.handleUnassignPlannerFamily}
-              options={
-                formData.role === 'TECHNICIAN' || formData.role === 'CLIENT'
-                  ? {
-                      canManagePlanner: formData.canManagePlanner,
-                      onToggleManagePlanner: v => onToggle('canManagePlanner', v),
                     }
                   : undefined
               }
