@@ -373,6 +373,7 @@ export class CloudStorageService {
     driveBase: string,
     buffer: Buffer,
     fileName: string,
+    mimeType: string,
     module: string,
     entityId: string
   ): Promise<CloudAttachmentUploadResult> {
@@ -395,7 +396,7 @@ export class CloudStorageService {
           method: 'PUT',
           headers: {
             Authorization: `Bearer ${accessToken}`,
-            'Content-Type': 'application/octet-stream',
+            'Content-Type': mimeType || 'application/octet-stream',
           },
           body: buffer as BodyInit,
         }
@@ -499,7 +500,7 @@ export class CloudStorageService {
   private static async uploadToOneDrive(
     buffer: Buffer,
     fileName: string,
-    _mimeType: string,
+    mimeType: string,
     module: string,
     entityId: string
   ): Promise<CloudAttachmentUploadResult> {
@@ -512,7 +513,15 @@ export class CloudStorageService {
       creds.clientSecret,
       creds.tenantId
     )
-    return this.uploadToDriveLike(accessToken, '/me/drive', buffer, fileName, module, entityId)
+    return this.uploadToDriveLike(
+      accessToken,
+      '/me/drive',
+      buffer,
+      fileName,
+      mimeType,
+      module,
+      entityId
+    )
   }
 
   private static async downloadFromOneDrive(
@@ -737,7 +746,7 @@ export class CloudStorageService {
   private static async uploadToSharePoint(
     buffer: Buffer,
     fileName: string,
-    _mimeType: string,
+    mimeType: string,
     module: string,
     entityId: string
   ): Promise<CloudAttachmentUploadResult> {
@@ -748,6 +757,7 @@ export class CloudStorageService {
       `/drives/${driveId}`,
       buffer,
       fileName,
+      mimeType,
       module,
       entityId
     )
