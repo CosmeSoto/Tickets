@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { exec } from 'child_process'
 import { promisify } from 'util'
@@ -14,7 +14,7 @@ import { requireBackupSuperAdmin } from '../_auth'
 
 const execAsync = promisify(exec)
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const { errorResponse } = await requireBackupSuperAdmin()
     if (errorResponse) return errorResponse
@@ -250,20 +250,7 @@ async function calculatePerformanceMetrics() {
     const compressedBackups = completedBackups.filter(b => b.compressed)
 
     if (compressedBackups.length > 0) {
-      let totalDbSize = 0
-      let totalDiskSize = 0
-
-      for (const backup of compressedBackups.slice(0, 10)) {
-        // Tamaño registrado en BD (post-compresión)
-        totalDbSize += backup.size
-
-        // Intentar leer el tamaño original estimado desde el nombre del archivo
-        // (el tamaño en BD ya es el comprimido, así que usamos una estimación de ratio típico)
-        totalDiskSize += backup.size
-      }
-
-      // Si todos los backups completados son comprimidos, calcular ratio real
-      // comparando el tamaño promedio de comprimidos vs no comprimidos
+      // Ratio real: comparar el tamaño promedio de comprimidos vs no comprimidos
       const uncompressedBackups = completedBackups.filter(b => !b.compressed)
       if (uncompressedBackups.length > 0 && compressedBackups.length > 0) {
         const avgCompressed =

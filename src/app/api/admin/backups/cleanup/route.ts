@@ -1,11 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { unlink, access } from 'fs/promises'
 import { randomUUID } from 'crypto'
 import { requireBackupSuperAdmin } from '../_auth'
 import { reconcileStaleBackupRecords } from '@/lib/services/backup/backup-cleanup'
 
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
     const { errorResponse } = await requireBackupSuperAdmin()
     if (errorResponse) return errorResponse

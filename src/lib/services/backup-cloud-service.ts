@@ -14,7 +14,6 @@ import { readFile, stat } from 'fs/promises'
 import { basename } from 'path'
 import { getOAuthCredentials } from '@/lib/oauth-config'
 import prisma from '@/lib/prisma'
-import { randomUUID } from 'crypto'
 
 export type CloudProvider = 'google-drive' | 'onedrive'
 

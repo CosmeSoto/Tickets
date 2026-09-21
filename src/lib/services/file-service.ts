@@ -553,7 +553,7 @@ export class FileService {
 
   /**
    * Lee los bytes de un adjunto sin importar dónde vive — disco local o nube
-   * (Google Drive/OneDrive). `null` significa "no disponible ahora mismo"
+   * (Google Drive/OneDrive/SharePoint). `null` significa "no disponible ahora mismo"
    * (borrado del disco, o borrado/movido directamente en la nube por fuera
    * de la app) — el caller debe responder 404, nunca lanzar un 500 crudo.
    * Única fuente de verdad para esto — reusada también por
@@ -707,7 +707,7 @@ export class FileService {
     return attachments
   }
 
-  static async deleteNewsFile(fileId: string, userId: string) {
+  static async deleteNewsFile(fileId: string, _userId: string) {
     const attachment = await prisma.news_attachments.findUnique({
       where: { id: fileId },
     })

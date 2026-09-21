@@ -311,6 +311,63 @@ export class CloudStorageService {
   // forma de API — un sitio de SharePoint es, para Graph, otro "drive" más;
   // solo cambia la base de la ruta: `/me/drive` vs `/drives/{id}`) ──────────
 
+  /**
+   * A diferencia de Google Drive, no encontramos documentación categórica
+   * de Microsoft que garantice que un PUT a una ruta con carpetas
+   * intermedias inexistentes las cree automáticamente — así que, igual que
+   * con Google Drive, se aseguran explícitamente antes de subir en vez de
+   * asumirlo (más código, pero cero incertidumbre en la primera subida
+   * real). Usa el mismo patrón "buscar, si no existe crear" — un 409 al
+   * crear significa que otra subida concurrente ya la creó justo antes.
+   */
+  private static async getOrCreateDriveLikeFolderPath(
+    accessToken: string,
+    driveBase: string,
+    segments: string[]
+  ): Promise<void> {
+    let pathSoFar = ''
+    for (const segment of segments) {
+      const parentPath = pathSoFar
+      pathSoFar = pathSoFar ? `${pathSoFar}/${segment}` : segment
+      const encodedFullPath = pathSoFar
+        .split('/')
+        .map(s => encodeURIComponent(s))
+        .join('/')
+
+      const checkRes = await fetch(
+        `https://graph.microsoft.com/v1.0${driveBase}/root:/${encodedFullPath}`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      )
+      if (checkRes.ok) continue
+
+      const encodedParentPath = parentPath
+        .split('/')
+        .filter(Boolean)
+        .map(s => encodeURIComponent(s))
+        .join('/')
+      const createUrl = encodedParentPath
+        ? `https://graph.microsoft.com/v1.0${driveBase}/root:/${encodedParentPath}:/children`
+        : `https://graph.microsoft.com/v1.0${driveBase}/root/children`
+
+      const createRes = await fetch(createUrl, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: segment,
+          folder: {},
+          '@microsoft.graph.conflictBehavior': 'fail',
+        }),
+      })
+      if (!createRes.ok && createRes.status !== 409) {
+        const err = await createRes.text()
+        throw new Error(`No se pudo crear la carpeta "${segment}": ${createRes.status} — ${err}`)
+      }
+    }
+  }
+
   private static async uploadToDriveLike(
     accessToken: string,
     driveBase: string,
@@ -319,7 +376,10 @@ export class CloudStorageService {
     module: string,
     entityId: string
   ): Promise<CloudAttachmentUploadResult> {
-    const folderPath = `${ROOT_FOLDER_NAME}/${module}/${entityId}`
+    const folderSegments = [ROOT_FOLDER_NAME, module, entityId]
+    await this.getOrCreateDriveLikeFolderPath(accessToken, driveBase, folderSegments)
+
+    const folderPath = folderSegments.join('/')
     const encodedPath = folderPath
       .split('/')
       .map(segment => encodeURIComponent(segment))
@@ -359,11 +419,21 @@ export class CloudStorageService {
         body: JSON.stringify({ item: { '@microsoft.graph.conflictBehavior': 'replace' } }),
       }
     )
-    if (!sessionRes.ok) throw new Error('No se pudo crear sesión de upload')
+    if (!sessionRes.ok) {
+      const err = await sessionRes.json().catch(() => ({}))
+      throw new Error(
+        `No se pudo crear la sesión de subida: ${sessionRes.status} — ${err.error?.message ?? err.error ?? 'error desconocido'}`
+      )
+    }
 
     const session = await sessionRes.json()
     const uploadUrl = session.uploadUrl
-    const chunkSize = 4 * 1024 * 1024
+    // Graph exige que cada fragmento (salvo el último) sea múltiplo exacto
+    // de 320 KiB (327680 bytes) — un fragmento de 4 MiB (como estaba antes)
+    // NO lo es (4 MiB / 320 KiB = 12.8) y Graph rechaza la sesión completa
+    // al llegar al fragmento fuera de rango. 10 MiB sí es múltiplo exacto
+    // (×32) y está dentro del rango recomendado por Microsoft (5–10 MiB).
+    const chunkSize = 10 * 1024 * 1024
     let offset = 0
     let lastResponse: any = null
 
@@ -379,7 +449,8 @@ export class CloudStorageService {
         body: chunk as BodyInit,
       })
       if (!chunkRes.ok && chunkRes.status !== 202) {
-        throw new Error(`Error en chunk upload: ${chunkRes.status}`)
+        const err = await chunkRes.text().catch(() => '')
+        throw new Error(`Error subiendo fragmento del archivo: ${chunkRes.status} — ${err}`)
       }
       if (chunkRes.status === 201 || chunkRes.status === 200) {
         lastResponse = await chunkRes.json()
