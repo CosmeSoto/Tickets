@@ -82,7 +82,7 @@ export function CheckpointFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={v => !saving && onOpenChange(v)}>
-      <DialogContent className='sm:max-w-lg'>
+      <DialogContent className='sm:max-w-2xl'>
         <DialogHeader>
           <DialogTitle>{editingId ? 'Editar Checkpoint' : 'Nuevo Checkpoint'}</DialogTitle>
           <DialogDescription>
@@ -98,58 +98,79 @@ export function CheckpointFormDialog({
             void onSave(form, families)
           }}
         >
-          <div className='space-y-4 py-2 max-h-[60vh] overflow-y-auto pr-1'>
-            {/* Área */}
-            <div className='space-y-1.5'>
-              <Label htmlFor='cp-family' className='text-sm'>
-                Área <span className='text-destructive'>*</span>
-              </Label>
-              <Select
-                value={form.familyId}
-                onValueChange={v => setForm(f => ({ ...f, familyId: v }))}
-                disabled={saving || !!editingId}
-              >
-                <SelectTrigger id='cp-family' className='h-9'>
-                  <SelectValue placeholder='Selecciona un área' />
-                </SelectTrigger>
-                <SelectContent>
-                  {families.map(f => (
-                    <SelectItem key={f.id} value={f.id}>
-                      {f.name} ({f.code})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          <div className='space-y-4 py-2 max-h-[75vh] overflow-y-auto pr-1'>
+            <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
+              {/* Área */}
+              <div className='space-y-1.5'>
+                <Label htmlFor='cp-family' className='text-sm'>
+                  Área <span className='text-destructive'>*</span>
+                </Label>
+                <Select
+                  value={form.familyId}
+                  onValueChange={v => setForm(f => ({ ...f, familyId: v }))}
+                  disabled={saving || !!editingId}
+                >
+                  <SelectTrigger id='cp-family' className='h-9'>
+                    <SelectValue placeholder='Selecciona un área' />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {families.map(f => (
+                      <SelectItem key={f.id} value={f.id}>
+                        {f.name} ({f.code})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Nombre */}
+              <div className='space-y-1.5'>
+                <Label htmlFor='cp-name' className='text-sm'>
+                  Nombre <span className='text-destructive'>*</span>
+                </Label>
+                <Input
+                  id='cp-name'
+                  value={form.name}
+                  onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                  placeholder='Ej: Entrada Principal'
+                  disabled={saving}
+                  maxLength={200}
+                />
+              </div>
             </div>
 
-            {/* Nombre */}
-            <div className='space-y-1.5'>
-              <Label htmlFor='cp-name' className='text-sm'>
-                Nombre <span className='text-destructive'>*</span>
-              </Label>
-              <Input
-                id='cp-name'
-                value={form.name}
-                onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                placeholder='Ej: Entrada Principal'
-                disabled={saving}
-                maxLength={200}
-              />
-            </div>
+            <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
+              {/* Ubicación */}
+              <div className='space-y-1.5'>
+                <Label htmlFor='cp-location' className='text-sm'>
+                  Descripción de ubicación <span className='text-destructive'>*</span>
+                </Label>
+                <Input
+                  id='cp-location'
+                  value={form.location}
+                  onChange={e => setForm(f => ({ ...f, location: e.target.value }))}
+                  placeholder='Ej: Planta baja, junto a ascensores'
+                  disabled={saving}
+                  maxLength={500}
+                />
+              </div>
 
-            {/* Ubicación */}
-            <div className='space-y-1.5'>
-              <Label htmlFor='cp-location' className='text-sm'>
-                Descripción de ubicación <span className='text-destructive'>*</span>
-              </Label>
-              <Input
-                id='cp-location'
-                value={form.location}
-                onChange={e => setForm(f => ({ ...f, location: e.target.value }))}
-                placeholder='Ej: Planta baja, junto a ascensores'
-                disabled={saving}
-                maxLength={500}
-              />
+              {/* Radio geofence */}
+              <div className='space-y-1.5'>
+                <Label htmlFor='cp-radius' className='text-sm'>
+                  Radio de geofence (metros, opcional)
+                </Label>
+                <Input
+                  id='cp-radius'
+                  type='number'
+                  min={1}
+                  max={10000}
+                  value={form.geofenceRadiusMeters}
+                  onChange={e => setForm(f => ({ ...f, geofenceRadiusMeters: e.target.value }))}
+                  placeholder='Deja vacío para usar el default del área'
+                  disabled={saving}
+                />
+              </div>
             </div>
 
             {/* Descripción */}
@@ -168,7 +189,7 @@ export function CheckpointFormDialog({
             </div>
 
             {/* GPS */}
-            <div className='grid grid-cols-2 gap-3'>
+            <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
               <div className='space-y-1.5'>
                 <Label htmlFor='cp-lat' className='text-sm'>
                   Latitud (opcional)
@@ -197,23 +218,6 @@ export function CheckpointFormDialog({
                   disabled={saving}
                 />
               </div>
-            </div>
-
-            {/* Radio geofence */}
-            <div className='space-y-1.5'>
-              <Label htmlFor='cp-radius' className='text-sm'>
-                Radio de geofence (metros, opcional)
-              </Label>
-              <Input
-                id='cp-radius'
-                type='number'
-                min={1}
-                max={10000}
-                value={form.geofenceRadiusMeters}
-                onChange={e => setForm(f => ({ ...f, geofenceRadiusMeters: e.target.value }))}
-                placeholder='Deja vacío para usar el default del área'
-                disabled={saving}
-              />
             </div>
 
             {/* Switches */}
