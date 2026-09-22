@@ -158,8 +158,8 @@ export function BackupConfiguration({ onConfigChange }: BackupConfigurationProps
           title: 'OAuth no configurado',
           description:
             provider === 'google-drive'
-              ? 'Configura y habilita Google en Configuración del sistema → OAuth antes de conectar Drive para backups.'
-              : 'Configura y habilita Microsoft (Azure AD) en Configuración del sistema → OAuth antes de conectar OneDrive para backups.',
+              ? 'Configura y habilita Google en Ajustes → OAuth antes de conectar Drive para backups.'
+              : 'Configura y habilita Microsoft (Azure AD) en Ajustes → OAuth antes de conectar OneDrive para backups.',
           variant: 'destructive',
         })
         return
@@ -621,6 +621,13 @@ export function BackupConfiguration({ onConfigChange }: BackupConfigurationProps
             </CardDescription>
           </CardHeader>
           <CardContent className='space-y-5'>
+            {(!cloudAuthStatus.googleDrive || !cloudAuthStatus.oneDrive) && (
+              <RedirectUriNote
+                path={BACKUPS_CALLBACK_PATH}
+                label='Antes de autorizar: habilita el proveedor en Ajustes → OAuth y registra este Redirect URI en el portal:'
+              />
+            )}
+
             {/* Google Drive */}
             <div className='rounded-lg border border-border p-4 space-y-3'>
               <div className='flex items-center justify-between'>
@@ -680,8 +687,6 @@ export function BackupConfiguration({ onConfigChange }: BackupConfigurationProps
                   )}
                 </div>
               </div>
-
-              {!cloudAuthStatus.googleDrive && <RedirectUriNote path={BACKUPS_CALLBACK_PATH} />}
 
               {cloudAuthStatus.googleDrive && (
                 <div className='flex items-center justify-between pt-1 border-t border-border'>
@@ -745,8 +750,6 @@ export function BackupConfiguration({ onConfigChange }: BackupConfigurationProps
                 </div>
               </div>
 
-              {!cloudAuthStatus.oneDrive && <RedirectUriNote path={BACKUPS_CALLBACK_PATH} />}
-
               {cloudAuthStatus.oneDrive && (
                 <div className='flex items-center justify-between pt-1 border-t border-border'>
                   <Label className='text-xs text-muted-foreground'>Usar para backups</Label>
@@ -760,17 +763,6 @@ export function BackupConfiguration({ onConfigChange }: BackupConfigurationProps
                 </div>
               )}
             </div>
-
-            {/* Aviso si ningún OAuth está configurado */}
-            {!cloudAuthStatus.googleDrive && !cloudAuthStatus.oneDrive && (
-              <div className='p-3 bg-muted/50 border border-border rounded-lg'>
-                <p className='text-xs text-muted-foreground leading-relaxed'>
-                  Para usar cloud storage, primero activa Google o Microsoft OAuth en{' '}
-                  <strong className='text-foreground'>Configuración → OAuth</strong> y luego
-                  autoriza el acceso aquí.
-                </p>
-              </div>
-            )}
           </CardContent>
         </Card>
 

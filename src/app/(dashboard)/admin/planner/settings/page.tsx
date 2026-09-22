@@ -160,7 +160,7 @@ export default function PlannerSettingsPage() {
         toast({
           title: 'OAuth no configurado',
           description:
-            'Configura y habilita las credenciales de Microsoft en Configuración del sistema → OAuth antes de conectar la cuenta dedicada.',
+            'Configura y habilita las credenciales de Microsoft en Ajustes → OAuth antes de conectar la cuenta dedicada.',
           variant: 'destructive',
         })
         return

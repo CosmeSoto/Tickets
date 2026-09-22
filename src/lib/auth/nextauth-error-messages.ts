@@ -1,4 +1,10 @@
-export type NextAuthErrorKind = 'credentials' | 'network' | 'server' | 'validation' | 'account' | 'session'
+export type NextAuthErrorKind =
+  | 'credentials'
+  | 'network'
+  | 'server'
+  | 'validation'
+  | 'account'
+  | 'session'
 
 export type NextAuthErrorMessage = {
   type: NextAuthErrorKind
@@ -11,7 +17,9 @@ export type NextAuthErrorMessage = {
  * Mensajes en español para códigos de error de NextAuth (?error= en /login).
  * @see https://next-auth.js.org/configuration/pages#error-page
  */
-export function getNextAuthErrorMessage(code: string | null | undefined): NextAuthErrorMessage | null {
+export function getNextAuthErrorMessage(
+  code: string | null | undefined
+): NextAuthErrorMessage | null {
   if (!code?.trim()) return null
 
   switch (code) {
@@ -43,7 +51,7 @@ export function getNextAuthErrorMessage(code: string | null | undefined): NextAu
         type: 'server',
         message: 'OAuth no está configurado correctamente en el servidor',
         suggestion:
-          'El administrador debe revisar Client ID, Secret y Redirect URI en Configuración → OAuth.',
+          'El administrador debe revisar Client ID, Secret y Redirect URI en Ajustes → OAuth.',
         code,
       }
     case 'OAuthSignin':

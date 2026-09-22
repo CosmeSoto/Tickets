@@ -73,8 +73,7 @@ export class BackupCloudService {
     const creds = await getOAuthCredentials('google')
     if (!creds) {
       throw new Error(
-        'Google OAuth no está configurado o habilitado. ' +
-          'Ve a Configuración → OAuth para activarlo.'
+        'Google OAuth no está configurado o habilitado. ' + 'Ve a Ajustes → OAuth para activarlo.'
       )
     }
 
@@ -231,7 +230,7 @@ export class BackupCloudService {
     if (!creds) {
       throw new Error(
         'Microsoft OAuth no está configurado o habilitado. ' +
-          'Ve a Configuración → OAuth para activarlo.'
+          'Ve a Ajustes → OAuth para activarlo.'
       )
     }
 

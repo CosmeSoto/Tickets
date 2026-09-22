@@ -153,6 +153,8 @@ export function AttachmentsStorageTab() {
   if (settings.sharePoint.enabled && settings.sharePoint.configured)
     eligibleForActive.push('sharepoint')
 
+  const needsAuthorization = !settings.googleDrive.authorized || !settings.oneDrive.authorized
+
   return (
     <div className='space-y-6'>
       <Card>
@@ -186,6 +188,13 @@ export function AttachmentsStorageTab() {
           )}
         </CardContent>
       </Card>
+
+      {needsAuthorization && (
+        <RedirectUriNote
+          path={ATTACHMENTS_CALLBACK_PATH}
+          label='Antes de autorizar: habilita el proveedor en Ajustes → OAuth y registra este Redirect URI en el portal:'
+        />
+      )}
 
       <ProviderCard
         icon={<Cloud className='h-5 w-5' />}
@@ -262,12 +271,9 @@ function ProviderCard({
             <HardDrive className='h-4 w-4 mr-2' /> Revocar acceso
           </Button>
         ) : (
-          <>
-            <Button variant='outline' size='sm' onClick={onAuthorize}>
-              <Cloud className='h-4 w-4 mr-2' /> Autorizar acceso
-            </Button>
-            <RedirectUriNote path={ATTACHMENTS_CALLBACK_PATH} />
-          </>
+          <Button variant='outline' size='sm' onClick={onAuthorize}>
+            <Cloud className='h-4 w-4 mr-2' /> Autorizar acceso
+          </Button>
         )}
       </CardContent>
     </Card>
