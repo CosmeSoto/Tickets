@@ -227,7 +227,18 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       }).catch(() => {})
     }
 
-    void MsTodoSyncService.pushTask(updated, session.user.id)
+    // pushTask reenvía título/estado/fecha límite tal cual están en `updated`
+    // (sin comparar contra lo que Microsoft tiene ahora) — dispararlo en CADA
+    // edición, aunque solo haya cambiado prioridad/descripción/notas/área,
+    // podía pisar en silencio un cambio hecho directo en Microsoft To Do
+    // dentro de la ventana entre ese cambio y el próximo pull del cron. Solo
+    // vale la pena sincronizar cuando alguno de los tres campos que de verdad
+    // se envían a Graph cambió en este PATCH.
+    const syncRelevantChange =
+      'title' in updateData || 'status' in updateData || 'dueDate' in updateData
+    if (syncRelevantChange) {
+      void MsTodoSyncService.pushTask(updated, session.user.id)
+    }
 
     return NextResponse.json({
       success: true,
