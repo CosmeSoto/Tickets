@@ -5,10 +5,10 @@
  *     compartida (Planner) — token en system_settings.
  *   - 'user-todo': cualquier usuario conecta su PROPIA cuenta de Microsoft
  *     To Do desde /profile — token en oauth_accounts, una fila por usuario.
- * Ambos usan el mismo App Registration ('azure-ad-planner', ver
- * oauth-config.ts) — `state` (armado en cada ruta de "connect") es lo único
- * que distingue un flujo del otro, así que basta con UN Redirect URI
- * registrado en el portal de Azure en vez de dos.
+ * Ambos usan el mismo App Registration ('azure-ad', ver oauth-config.ts —
+ * la misma credencial que login/OneDrive) — `state` (armado en cada ruta de
+ * "connect") es lo único que distingue un flujo del otro, así que basta con
+ * UN Redirect URI registrado en el portal de Azure en vez de dos.
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
@@ -83,8 +83,8 @@ export async function GET(request: NextRequest) {
     }
 
     try {
-      const creds = await getOAuthCredentials('azure-ad-planner')
-      if (!creds) throw new Error('Microsoft OAuth (Planner) no configurado')
+      const creds = await getOAuthCredentials('azure-ad')
+      if (!creds) throw new Error('Microsoft OAuth no configurado')
 
       const data = await exchangeMicrosoftCodeForTokens({
         credentials: creds,
@@ -129,10 +129,10 @@ export async function GET(request: NextRequest) {
 
   if (flow === 'user-todo') {
     try {
-      // Mismo App Registration que Planner ('azure-ad-planner') — no una
+      // Mismo App Registration que login/Planner ('azure-ad') — no una
       // credencial separada, ver oauth-config.ts.
-      const creds = await getOAuthCredentials('azure-ad-planner')
-      if (!creds) throw new Error('Microsoft OAuth (Planner/To Do) no configurado')
+      const creds = await getOAuthCredentials('azure-ad')
+      if (!creds) throw new Error('Microsoft OAuth no configurado')
 
       const data = await exchangeMicrosoftCodeForTokens({
         credentials: creds,

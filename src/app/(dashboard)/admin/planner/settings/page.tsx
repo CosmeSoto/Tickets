@@ -160,7 +160,7 @@ export default function PlannerSettingsPage() {
         toast({
           title: 'OAuth no configurado',
           description:
-            'Configura y habilita "azure-ad-planner" en Configuración del sistema → OAuth antes de conectar la cuenta dedicada.',
+            'Configura y habilita las credenciales de Microsoft en Configuración del sistema → OAuth antes de conectar la cuenta dedicada.',
           variant: 'destructive',
         })
         return
@@ -247,13 +247,13 @@ export default function PlannerSettingsPage() {
             <CardTitle>Credenciales de la aplicación (Azure AD)</CardTitle>
             <CardDescription>
               Se configuran una sola vez para todo el sistema en Ajustes → OAuth, junto con las
-              demás credenciales de Microsoft (login, SharePoint). Esta misma credencial también
-              habilita que cada usuario conecte su propia cuenta de Microsoft To Do desde su perfil
-              (Mi Perfil → Microsoft To Do) — no requiere configurarse aparte.
+              demás credenciales de Microsoft (login, SharePoint, OneDrive). Esa misma credencial
+              también habilita que cada usuario conecte su propia cuenta de Microsoft To Do desde su
+              perfil (Mi Perfil → Microsoft To Do) — no requiere configurarse aparte acá.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <OAuthCredentialsStatusLink provider='azure-ad-planner' />
+            <OAuthCredentialsStatusLink provider='azure-ad' />
           </CardContent>
         </Card>
 

@@ -47,7 +47,6 @@ function ProviderStatusBadge({ isEnabled }: { isEnabled: boolean }) {
 export function OAuthSettingsTab() {
   const [googleEnabled, setGoogleEnabled] = useState(false)
   const [microsoftEnabled, setMicrosoftEnabled] = useState(false)
-  const [plannerEnabled, setPlannerEnabled] = useState(false)
   const [sharePointEnabled, setSharePointEnabled] = useState(false)
 
   return (
@@ -132,7 +131,7 @@ export function OAuthSettingsTab() {
         </CardContent>
       </Card>
 
-      {/* Microsoft OAuth (login) */}
+      {/* Microsoft OAuth — una sola credencial para todos los flujos delegados */}
       <Card>
         <CardHeader>
           <div className='flex items-center justify-between'>
@@ -143,7 +142,16 @@ export function OAuthSettingsTab() {
               <div>
                 <CardTitle>Microsoft OAuth</CardTitle>
                 <CardDescription>
-                  Configuración para Outlook, Hotmail y cuentas Microsoft
+                  Un solo registro de aplicación en Entra ID cubre <strong>todo</strong> lo que este
+                  sistema usa de Microsoft con permisos delegados (el usuario autoriza vía
+                  popup/redirect): iniciar sesión con Microsoft, adjuntos y backups en OneDrive (si
+                  se activan en Ajustes → Almacenamiento / Backups), la cuenta de servicio de
+                  Planner y que cada usuario conecte su Microsoft To Do personal desde su perfil. Se
+                  configura <strong>una sola vez, acá</strong> — las demás pantallas solo muestran
+                  si está lista y un enlace de vuelta a esta tarjeta, nunca un formulario aparte.
+                  Cada flujo tiene su propio Redirect URI fijo; abajo están los dos que siempre
+                  hacen falta (login y Planner/To Do); si además activas adjuntos o backups por
+                  OneDrive, esas pantallas te muestran su Redirect URI adicional.
                 </CardDescription>
               </div>
             </div>
@@ -163,51 +171,12 @@ export function OAuthSettingsTab() {
                 &quot;consumers&quot; solo para personales
               </p>
             }
-            redirectUriPath='/api/auth/callback/azure-ad'
-            scopes='openid profile email User.Read'
+            redirectUriPath={['/api/auth/callback/azure-ad', '/api/planner/oauth-callback']}
+            scopes='openid profile email User.Read Tasks.ReadWrite Group.Read.All offline_access'
             enabledLabel='Habilitar Microsoft OAuth'
-            enabledDescription='Permite a los usuarios registrarse e iniciar sesión con Microsoft'
+            enabledDescription='Habilita el login con Microsoft y, con el mismo interruptor, la cuenta de Planner y el Microsoft To Do personal de cada usuario.'
             saveLabel='Guardar Configuración de Microsoft'
             onStateChange={s => setMicrosoftEnabled(s.isEnabled)}
-          />
-        </CardContent>
-      </Card>
-
-      {/* Microsoft (Planner + To Do) */}
-      <Card>
-        <CardHeader>
-          <div className='flex items-center justify-between'>
-            <div className='flex items-center space-x-3'>
-              <div className='p-2 bg-muted rounded-lg'>
-                <MicrosoftIcon />
-              </div>
-              <div>
-                <CardTitle>Microsoft (Planner + To Do)</CardTitle>
-                <CardDescription>
-                  Un solo registro de aplicación en Entra ID, con un solo Redirect URI, cubre dos
-                  flujos de sincronización de tareas: <strong>Planner</strong> (una única cuenta de
-                  servicio compartida, conectada por el Super Admin en Configuración de Tareas) y{' '}
-                  <strong>Microsoft To Do</strong> (cada usuario conecta su propia cuenta desde su
-                  perfil, para sus tareas independientes). Agrega el Redirect URI de abajo y los
-                  permisos delegados de ambos (Tasks.ReadWrite, Group.Read.All, User.Read,
-                  offline_access) — nada más que configurar dos veces.
-                </CardDescription>
-              </div>
-            </div>
-            <ProviderStatusBadge isEnabled={plannerEnabled} />
-          </div>
-        </CardHeader>
-        <CardContent className='space-y-4'>
-          <OAuthCredentialsFields
-            provider='azure-ad-planner'
-            clientIdPlaceholder='00000000-0000-0000-0000-000000000000'
-            showTenantId
-            tenantPlaceholder='common'
-            redirectUriPath='/api/planner/oauth-callback'
-            scopes='https://graph.microsoft.com/Tasks.ReadWrite https://graph.microsoft.com/Group.Read.All https://graph.microsoft.com/User.Read offline_access'
-            enabledLabel='Habilitar estas credenciales'
-            enabledDescription='Debe estar activo para conectar la cuenta dedicada de Planner y para que los usuarios puedan vincular su Microsoft To Do personal.'
-            onStateChange={s => setPlannerEnabled(s.isEnabled)}
           />
         </CardContent>
       </Card>

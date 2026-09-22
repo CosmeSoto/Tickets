@@ -64,7 +64,7 @@ export interface PlannerTaskSummary {
 export class PlannerGraphService {
   /** Igual que BackupCloudService.getMicrosoftAccessToken, para el scope de Planner. */
   static async getAccessToken(): Promise<string> {
-    const creds = await getOAuthCredentials('azure-ad-planner')
+    const creds = await getOAuthCredentials('azure-ad')
     if (!creds) {
       throw new Error(
         'La conexión con Microsoft Planner no está configurada. Ve a Configuración → Tareas/Planner para conectarla.'

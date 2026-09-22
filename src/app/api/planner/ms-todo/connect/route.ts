@@ -26,10 +26,10 @@ export async function GET() {
   const denied = await assertCanViewPlanner(session.user.id, session.user.role)
   if (denied) return denied
 
-  // Mismo App Registration que la cuenta de servicio de Planner
-  // ('azure-ad-planner') — ver el comentario de OAuthProviderKey en
-  // oauth-config.ts. No hace falta configurar una segunda credencial.
-  const creds = await getOAuthCredentials('azure-ad-planner')
+  // Mismo App Registration que login/Planner ('azure-ad') — ver el
+  // comentario de OAuthProviderKey en oauth-config.ts. No hace falta
+  // configurar una segunda credencial.
+  const creds = await getOAuthCredentials('azure-ad')
   if (!creds) {
     return NextResponse.json({ oauthConfigured: false, authUrl: null })
   }

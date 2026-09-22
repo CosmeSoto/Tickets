@@ -2,13 +2,14 @@
 
 /**
  * Campos de credenciales de una app OAuth (Client ID/Secret/Tenant/Enable +
- * Guardar/Probar), reutilizados por las 3 pantallas que configuran una fila
- * de `oauth_configs`: Ajustes → OAuth (Google y Microsoft/login),
- * Configuración de Planner (azure-ad-planner) y Ajustes → Almacenamiento →
- * SharePoint (azure-ad-sharepoint). Antes de esto, cada pantalla tenía su
- * propia copia de este formulario con la misma forma exacta — este
- * componente reemplaza esas 3 copias sin cambiar el backend, que ya era
- * genérico (`/api/admin/oauth-config` + `/api/admin/oauth-config/test`).
+ * Guardar/Probar). Usado una sola vez por cada fila real de `oauth_configs`
+ * en Ajustes → OAuth: Google, 'azure-ad' (Microsoft — login, OneDrive,
+ * Planner y Microsoft To Do comparten esta misma fila) y
+ * 'azure-ad-sharepoint' (credenciales de aplicación, un modelo distinto).
+ * Ninguna otra pantalla del sistema debe tener su propia copia de este
+ * formulario — las pantallas de función (Configuración de Tareas, Ajustes →
+ * Almacenamiento, Ajustes → Backups) solo muestran un estado de solo lectura
+ * (`OAuthCredentialsStatusLink`) con un enlace de vuelta a acá.
  *
  * El encabezado/tarjeta (ícono, título, badge, descripción del propósito)
  * sigue siendo responsabilidad de cada pantalla — solo los campos y su
@@ -24,11 +25,7 @@ import { Switch } from '@/components/ui/switch'
 import { Eye, EyeOff, Key, Save, FlaskConical, Loader2, Globe, Copy, Check } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 
-export type OAuthCredentialsProvider =
-  | 'google'
-  | 'azure-ad'
-  | 'azure-ad-planner'
-  | 'azure-ad-sharepoint'
+export type OAuthCredentialsProvider = 'google' | 'azure-ad' | 'azure-ad-sharepoint'
 
 interface OAuthConfigApiRow {
   provider: string

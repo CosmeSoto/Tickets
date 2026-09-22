@@ -8,7 +8,6 @@ import { decrypt } from '@/lib/crypto'
 const PROVIDER_LABELS: Record<string, string> = {
   google: 'Google',
   'azure-ad': 'Microsoft',
-  'azure-ad-planner': 'Microsoft (Planner + To Do)',
   'azure-ad-sharepoint': 'Microsoft (SharePoint)',
 }
 
@@ -157,10 +156,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { provider } = body
 
-    if (
-      !provider ||
-      !['google', 'azure-ad', 'azure-ad-planner', 'azure-ad-sharepoint'].includes(provider)
-    ) {
+    if (!provider || !['google', 'azure-ad', 'azure-ad-sharepoint'].includes(provider)) {
       return NextResponse.json({ success: false, error: 'Proveedor inválido.' }, { status: 400 })
     }
 
@@ -210,11 +206,7 @@ export async function POST(request: NextRequest) {
     const diagnostics: string[] = []
     let secretVerified = true
 
-    if (
-      provider === 'azure-ad' ||
-      provider === 'azure-ad-planner' ||
-      provider === 'azure-ad-sharepoint'
-    ) {
+    if (provider === 'azure-ad' || provider === 'azure-ad-sharepoint') {
       const tenant = config.tenantId || 'common'
 
       // Paso 1: verificar que el tenant existe
@@ -296,9 +288,15 @@ export async function POST(request: NextRequest) {
     // Todo OK — devolver también la redirect URI para que el usuario confirme que está en el portal
     const baseUrl =
       request.headers.get('origin') || request.headers.get('referer')?.split('/admin')[0] || ''
+    // 'azure-ad' es una sola credencial para varios flujos (login, Planner,
+    // Microsoft To Do, y — si están activos — adjuntos/backups en OneDrive),
+    // cada uno con su propio callback fijo. Solo se listan acá los dos que
+    // hacen falta siempre que este provider esté activo; los de adjuntos y
+    // backups se muestran en sus propias pantallas de configuración cuando
+    // corresponde, para no abrumar a quien solo usa login/Planner.
     const defaultRedirectUri =
-      provider === 'azure-ad-planner'
-        ? `${baseUrl}/api/planner/oauth-callback`
+      provider === 'azure-ad'
+        ? `${baseUrl}/api/auth/callback/azure-ad, ${baseUrl}/api/planner/oauth-callback`
         : `${baseUrl}/api/auth/callback/${provider}`
     const redirectUri = config.redirectUri || defaultRedirectUri
 
@@ -309,8 +307,8 @@ export async function POST(request: NextRequest) {
       diagnostics,
       redirectUri,
       message: secretVerified
-        ? `Credenciales de ${label} verificadas correctamente. Asegúrate de que la Redirect URI esté registrada en el portal.`
-        : `Tenant y Client ID de ${label} verificados. El Client Secret no se pudo comprobar por API (ver detalle abajo) — confírmalo completando el inicio de sesión real. Asegúrate de que la Redirect URI esté registrada en el portal.`,
+        ? `Credenciales de ${label} verificadas correctamente. Asegúrate de que la(s) Redirect URI(s) estén registradas en el portal.`
+        : `Tenant y Client ID de ${label} verificados. El Client Secret no se pudo comprobar por API (ver detalle abajo) — confírmalo completando el inicio de sesión real. Asegúrate de que la(s) Redirect URI(s) estén registradas en el portal.`,
     })
   } catch (error) {
     console.error('Error testing OAuth config:', error)

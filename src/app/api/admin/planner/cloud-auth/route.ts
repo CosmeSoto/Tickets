@@ -37,7 +37,7 @@ export async function GET() {
     return NextResponse.json({ authorized: true, oauthConfigured: true })
   }
 
-  const creds = await getOAuthCredentials('azure-ad-planner')
+  const creds = await getOAuthCredentials('azure-ad')
   if (!creds) {
     return NextResponse.json({ authorized: false, oauthConfigured: false, authUrl: null })
   }

@@ -9,30 +9,32 @@ export interface OAuthCredentials {
 }
 
 /**
- * 'azure-ad-planner' y 'azure-ad-sharepoint' son filas independientes de
- * 'azure-ad' (login) — mismo App Registration en Entra ID puede reusarse,
- * pero cada permiso/alcance se administra (habilitar/revocar) sin tocar el
- * login de Microsoft ni entre sí.
+ * 'azure-ad' es UN solo App Registration en Entra ID que cubre TODOS los
+ * flujos delegados de Microsoft (el usuario autoriza vía popup/redirect),
+ * para no pedir el mismo Client ID/Secret en varias pantallas:
+ *   - Login ("iniciar sesión con Microsoft", NextAuth, /api/auth/callback/azure-ad)
+ *   - OneDrive como destino de adjuntos y de backups (ver cloud-storage-service.ts,
+ *     backup-cloud-service.ts) — cada uno con su propio callback aparte.
+ *   - La cuenta de servicio compartida de Planner (Configuración de Tareas,
+ *     conectada una vez por el Super Admin).
+ *   - Microsoft To Do por usuario (cada usuario conecta su propia cuenta
+ *     desde /profile) — token guardado en `oauth_accounts` (una fila por
+ *     usuario), nunca en `system_settings`.
+ * Planner y Microsoft To Do comparten además un único callback
+ * (/api/planner/oauth-callback, ver oauth-shared.ts) — `state` es lo que
+ * distingue uno del otro. Las demás rutas (login, adjuntos, backups) tienen
+ * cada una su propio callback fijo, pero TODAS leen la misma fila
+ * `oauth_configs` con provider='azure-ad' — solo ese Client ID/Secret se
+ * configura, en Ajustes → OAuth, sin repetirlo en cada pantalla de función.
  *
- * 'azure-ad-sharepoint' es distinto en un punto clave: usa credenciales de
- * APLICACIÓN (client_credentials + permiso Sites.Selected), no el flujo
- * delegado (usuario autoriza vía popup) que usan los otros dos. No hay
- * `redirectUri` real ni token de usuario que guardar — ver
- * `CloudStorageService.getSharePointAccessToken`.
- *
- * 'azure-ad-planner' hace doble función a propósito, para no duplicar
- * credenciales en dos pantallas: además de la cuenta de servicio compartida
- * de Planner, la misma fila (mismo Client ID/Secret) habilita el flujo
- * delegado POR USUARIO de Microsoft To Do (ver /api/planner/ms-todo/**,
- * MsTodoGraphService) — cada usuario consiente por su cuenta desde su
- * propio perfil y su token se guarda en oauth_accounts (una fila por
- * usuario), nunca en system_settings. Ambos flujos comparten además un
- * único callback (/api/planner/oauth-callback, ver oauth-shared.ts) — `state`
- * es lo que distingue uno del otro, así que un solo Redirect URI alcanza
- * para el mismo App Registration y el superset de permisos delegados que
- * ambos necesitan.
+ * 'azure-ad-sharepoint' es la única excepción real, no accidental: usa
+ * credenciales de APLICACIÓN (client_credentials + permiso Sites.Selected),
+ * un flujo sin usuario ni popup de consentimiento, con su propio perfil de
+ * seguridad (least-privilege: no conviene que la misma app con permisos de
+ * aplicación tenant-wide sea también la de login). No hay `redirectUri` real
+ * ni token de usuario que guardar — ver `CloudStorageService.getSharePointAccessToken`.
  */
-export type OAuthProviderKey = 'google' | 'azure-ad' | 'azure-ad-planner' | 'azure-ad-sharepoint'
+export type OAuthProviderKey = 'google' | 'azure-ad' | 'azure-ad-sharepoint'
 
 /**
  * Obtiene las credenciales OAuth de un proveedor desde la base de datos

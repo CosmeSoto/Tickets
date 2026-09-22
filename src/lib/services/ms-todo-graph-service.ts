@@ -107,9 +107,9 @@ export class MsTodoGraphService {
       return decrypt(account.accessToken)
     }
 
-    // Mismo App Registration que Planner ('azure-ad-planner') — ver el
+    // Mismo App Registration que login/Planner ('azure-ad') — ver el
     // comentario de OAuthProviderKey en oauth-config.ts.
-    const creds = await getOAuthCredentials('azure-ad-planner')
+    const creds = await getOAuthCredentials('azure-ad')
     if (!creds) {
       throw new Error(
         'La integración con Microsoft To Do no está configurada por el administrador.'
