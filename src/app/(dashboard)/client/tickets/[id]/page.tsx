@@ -10,7 +10,6 @@ import {
   Paperclip,
   AlertCircle,
   CheckCircle,
-  Trash2,
   Edit,
   Save,
   X,
@@ -32,7 +31,6 @@ import { useToast } from '@/hooks/use-toast'
 import { useTicketSSE } from '@/hooks/use-ticket-sse'
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -55,12 +53,10 @@ export default function ClientTicketDetailPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { data: session } = useSession()
-  const { getTicket, updateTicket, deleteTicket, loading } = useTicketData()
+  const { getTicket, updateTicket, loading } = useTicketData()
   const { toast } = useToast()
 
   const [ticket, setTicket] = useState<Ticket | null>(null)
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
-  const [deleting, setDeleting] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const stopPollingRef = useRef<(() => void) | null>(null)
   const [timelineKey, setTimelineKey] = useState(0)
@@ -206,26 +202,6 @@ export default function ClientTicketDetailPage() {
       })
   }
 
-  const handleDelete = async () => {
-    if (!ticket) return
-    stopPollingRef.current?.()
-    setDeleting(true)
-    const ok = await deleteTicket(ticket.id)
-    if (ok) {
-      toast({ title: 'Ticket eliminado' })
-      setShowDeleteDialog(false)
-      router.push('/client/tickets')
-    } else {
-      toast({
-        title: 'Error',
-        description: 'No se pudo eliminar el ticket',
-        variant: 'destructive',
-      })
-      setDeleting(false)
-      setShowDeleteDialog(false)
-    }
-  }
-
   // El skeleton SOLO debe verse en la carga inicial (aún no hay `ticket`) —
   // no en cada recarga en segundo plano con datos ya presentes, que antes
   // desmontaba todo el árbol (Tabs incluidos) y se sentía como que "la
@@ -262,7 +238,6 @@ export default function ClientTicketDetailPage() {
   }
 
   const canEdit = ticket.status === 'OPEN'
-  const canDelete = ticket.status === 'OPEN' && !ticket.assignee
 
   return (
     <TicketDetailLayout
@@ -296,17 +271,6 @@ export default function ClientTicketDetailPage() {
                 <span className='hidden sm:inline'>Guardar</span>
               </Button>
             </>
-          )}
-          {canDelete && !isEditing && (
-            <Button
-              variant='destructive'
-              size='sm'
-              onClick={() => setShowDeleteDialog(true)}
-              disabled={deleting}
-            >
-              <Trash2 className='h-4 w-4 sm:mr-2' />
-              <span className='hidden sm:inline'>Eliminar</span>
-            </Button>
           )}
         </div>
       }
@@ -501,25 +465,6 @@ export default function ClientTicketDetailPage() {
           />
         </div>
       </div>
-
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar ticket?</AlertDialogTitle>
-            <AlertDialogDescription>Esta acción no se puede deshacer.</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              disabled={deleting || !canDelete}
-              className='bg-red-600 hover:bg-red-700'
-            >
-              {deleting ? 'Eliminando...' : 'Eliminar'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       {/* Modal de Calificación */}
       <AlertDialog open={showRatingModal} onOpenChange={setShowRatingModal}>

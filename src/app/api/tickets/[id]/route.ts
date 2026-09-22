@@ -1003,14 +1003,12 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
       return NextResponse.json({ success: false, message: 'Ticket no encontrado' }, { status: 404 })
     }
 
-    // Verificar permisos según el rol — delega en el control de acceso
-    // centralizado (canDeleteTicket) en vez de reimplementar la regla acá.
-    // Antes esta ruta hacía `if (role === 'ADMIN') { /* puede eliminar
-    // cualquier ticket */ }` sin ningún chequeo de scope: un ADMIN de
-    // familia (no super admin) podía borrar CUALQUIER ticket del sistema,
-    // aunque el propio ticket-access.ts documenta que el borrado "sigue
-    // siendo solo nativa / super — no ampliar por patrullas", y el GET/PUT
-    // del mismo ticket sí respetan ese scope.
+    // Verificar permisos — delega en el control de acceso centralizado
+    // (canDeleteTicket) en vez de reimplementar la regla acá. Eliminar un
+    // ticket es irreversible (cascada a comentarios, adjuntos, plan de
+    // resolución, tareas, historial y calificación), así que está
+    // restringido solo al Super Admin — ni un ADMIN de familia ni el
+    // cliente dueño del ticket pueden borrarlo (antes ambos podían).
     try {
       await assertTicketAccess(
         toTicketAccessUser(session.user),
@@ -1034,33 +1032,6 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
       throw err
     }
 
-    // Reglas de negocio adicionales para CLIENT: canDeleteTicket solo valida
-    // propiedad (clientId === user.id); las restricciones de "solo mientras
-    // esté OPEN y sin asignar" son específicas de esta ruta, no de
-    // autorización, y se mantienen tal cual estaban.
-    if (session.user.role === 'CLIENT') {
-      if (existingTicket.status !== 'OPEN') {
-        return NextResponse.json(
-          {
-            success: false,
-            message:
-              'Solo puedes eliminar tickets que aún no han sido revisados o asignados. Este ticket ya está en proceso.',
-          },
-          { status: 403 }
-        )
-      }
-
-      if (existingTicket.assigneeId) {
-        return NextResponse.json(
-          {
-            success: false,
-            message: 'No puedes eliminar este ticket porque ya ha sido asignado a un técnico.',
-          },
-          { status: 403 }
-        )
-      }
-    }
-
     // Eliminar ticket (esto también eliminará comentarios, attachments, historial y notificaciones por cascada)
     await prisma.tickets.delete({
       where: { id: finalId },
@@ -1074,7 +1045,7 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
       userId: session.user.id,
       details: {
         ticketTitle: existingTicket.title,
-        deletedBy: session.user.role === 'ADMIN' ? 'Administrador' : 'Cliente',
+        deletedBy: 'Super Admin',
         userName: session.user.name,
         ticketStatus: existingTicket.status,
         ticketPriority: existingTicket.priority,

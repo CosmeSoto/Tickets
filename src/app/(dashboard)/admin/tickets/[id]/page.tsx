@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import { AlertCircle, Star } from 'lucide-react'
+import { AlertCircle, Star, Trash2 } from 'lucide-react'
 import { TicketDetailLayout } from '@/components/tickets/ticket-detail-layout'
 import { TicketTimeline } from '@/components/ui/ticket-timeline'
 import { TicketRatingSystem } from '@/components/ui/ticket-rating-system'
@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import {
   AlertDialog,
+  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -22,6 +23,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import {
   useUserData,
+  useTicketData,
   type Ticket,
   getStatusConfig,
   getPriorityConfig,
@@ -41,6 +43,7 @@ export default function AdminTicketDetailPage() {
   const router = useRouter()
   const { data: session } = useSession()
   const { getResolvers } = useUserData()
+  const { deleteTicket } = useTicketData()
   const { toast } = useToast()
 
   const [ticket, setTicket] = useState<Ticket | null>(null)
@@ -57,6 +60,8 @@ export default function AdminTicketDetailPage() {
   const [ratingKey, setRatingKey] = useState(0)
   const [newStatus, setNewStatus] = useState<Ticket['status']>('OPEN')
   const [updatingStatus, setUpdatingStatus] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [deletingTicket, setDeletingTicket] = useState(false)
   const prevStatusRef = useRef<string | null>(null)
   const [editForm, setEditForm] = useState({
     title: '',
@@ -346,6 +351,24 @@ export default function AdminTicketDetailPage() {
     }
   }
 
+  const handleDeleteTicket = async () => {
+    if (!ticket) return
+    setDeletingTicket(true)
+    const ok = await deleteTicket(ticket.id)
+    if (ok) {
+      toast({ title: 'Ticket eliminado' })
+      router.push('/admin/tickets')
+    } else {
+      toast({
+        title: 'Error',
+        description: 'No se pudo eliminar el ticket',
+        variant: 'destructive',
+      })
+      setDeletingTicket(false)
+      setShowDeleteDialog(false)
+    }
+  }
+
   const cancelEdit = () => {
     if (!ticket) return
     setSaveError(null)
@@ -552,6 +575,24 @@ export default function AdminTicketDetailPage() {
               Calificar y cerrar ticket
             </Button>
           )}
+
+          {/* Eliminar es irreversible y solo el Super Admin puede (ver
+              canDeleteTicket en ticket-access.ts) — deliberadamente discreto,
+              lejos de las acciones principales del encabezado. */}
+          {isSuperAdmin && (
+            <div className='flex justify-end pt-1'>
+              <Button
+                type='button'
+                variant='ghost'
+                size='sm'
+                className='text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10'
+                onClick={() => setShowDeleteDialog(true)}
+              >
+                <Trash2 className='h-3.5 w-3.5 mr-1.5' />
+                Eliminar ticket
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -592,6 +633,28 @@ export default function AdminTicketDetailPage() {
           </div>
           <AlertDialogFooter>
             <AlertDialogCancel>Más tarde</AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar este ticket?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. Se eliminarán también sus comentarios, adjuntos,
+              plan de resolución, historial y calificación.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingTicket}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteTicket}
+              disabled={deletingTicket}
+              className='bg-red-600 hover:bg-red-700'
+            >
+              {deletingTicket ? 'Eliminando...' : 'Eliminar'}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

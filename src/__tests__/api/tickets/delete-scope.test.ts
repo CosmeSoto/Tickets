@@ -1,16 +1,12 @@
 /**
  * DELETE /api/tickets/[id]
  *
- * Bug de seguridad real: `if (session.user.role === 'ADMIN') { // Admin
- * puede eliminar cualquier ticket }` — sin ningún chequeo de scope. Un ADMIN
- * de familia (no super admin) podía borrar CUALQUIER ticket del sistema,
- * incluidos los de familias totalmente fuera de su alcance, mientras que el
- * GET/PUT del mismo ticket sí respetan `adminCanOperateTicketFamily`
- * (ticket-access.ts::canDeleteTicket, que la ruta nunca llamaba).
- *
- * El fix delega en `assertTicketAccess(..., 'delete')` — el mismo criterio
- * ya usado por GET/PUT — y mantiene las reglas de negocio adicionales para
- * CLIENT (solo OPEN, sin asignar) que no forman parte de la autorización.
+ * Eliminar un ticket es irreversible (cascada a comentarios, adjuntos, plan
+ * de resolución, tareas, historial y calificación) — por eso está
+ * restringido solo al Super Admin (`canDeleteTicket` en ticket-access.ts).
+ * Antes un ADMIN de familia (no super) podía borrar cualquier ticket dentro
+ * de su alcance, y un CLIENT podía borrar su propio ticket mientras seguía
+ * OPEN y sin asignar; ambas rutas quedaron cerradas a propósito.
  */
 
 jest.mock('next-auth', () => ({
@@ -90,33 +86,23 @@ describe('DELETE /api/tickets/[id]', () => {
     ;(prisma.tickets.delete as jest.Mock).mockResolvedValue({})
   })
 
-  it('regresión: rechaza a un ADMIN fuera de su alcance de familia (antes borraba cualquier ticket)', async () => {
+  it('rechaza a un ADMIN de familia que no es Super Admin, aunque esté dentro de su alcance', async () => {
     ;(getServerSession as jest.Mock).mockResolvedValue({
       user: { id: 'admin-1', role: 'ADMIN', isSuperAdmin: false },
     })
     ;(prisma.tickets.findUnique as jest.Mock).mockResolvedValue(baseTicket())
-    ;(adminCanOperateTicketFamily as jest.Mock).mockResolvedValue(false) // fuera de scope
+    // Aunque el scope de familia diera acceso, borrar ya no depende de eso.
+    ;(adminCanOperateTicketFamily as jest.Mock).mockResolvedValue(true)
 
     const res = await DELETE(makeRequest(), params())
 
     expect(res.status).toBe(403)
     expect(prisma.tickets.delete).not.toHaveBeenCalled()
+    // canDeleteTicket ya no consulta el scope de familia en absoluto.
+    expect(adminCanOperateTicketFamily).not.toHaveBeenCalled()
   })
 
-  it('permite a un ADMIN dentro de su alcance de familia', async () => {
-    ;(getServerSession as jest.Mock).mockResolvedValue({
-      user: { id: 'admin-1', role: 'ADMIN', isSuperAdmin: false },
-    })
-    ;(prisma.tickets.findUnique as jest.Mock).mockResolvedValue(baseTicket())
-    ;(adminCanOperateTicketFamily as jest.Mock).mockResolvedValue(true)
-
-    const res = await DELETE(makeRequest(), params())
-
-    expect(res.status).toBe(200)
-    expect(prisma.tickets.delete).toHaveBeenCalledWith({ where: { id: TICKET_ID } })
-  })
-
-  it('Super Admin puede eliminar cualquier ticket sin consultar scope', async () => {
+  it('permite al Super Admin eliminar cualquier ticket', async () => {
     ;(getServerSession as jest.Mock).mockResolvedValue({
       user: { id: 'super-1', role: 'ADMIN', isSuperAdmin: true },
     })
@@ -125,15 +111,16 @@ describe('DELETE /api/tickets/[id]', () => {
     const res = await DELETE(makeRequest(), params())
 
     expect(res.status).toBe(200)
+    expect(prisma.tickets.delete).toHaveBeenCalledWith({ where: { id: TICKET_ID } })
     expect(adminCanOperateTicketFamily).not.toHaveBeenCalled()
   })
 
-  it('regla existente: un cliente no puede eliminar un ticket ya asignado, aunque sea suyo', async () => {
+  it('un cliente ya no puede eliminar ni su propio ticket, aunque esté OPEN y sin asignar', async () => {
     ;(getServerSession as jest.Mock).mockResolvedValue({
       user: { id: 'client-1', role: 'CLIENT', isSuperAdmin: false },
     })
     ;(prisma.tickets.findUnique as jest.Mock).mockResolvedValue(
-      baseTicket({ clientId: 'client-1', assigneeId: 'tech-1' })
+      baseTicket({ clientId: 'client-1', assigneeId: null, status: 'OPEN' })
     )
 
     const res = await DELETE(makeRequest(), params())

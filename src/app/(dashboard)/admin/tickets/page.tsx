@@ -22,12 +22,27 @@ import {
 } from '@/components/tickets/admin/ticket-columns'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { useToast } from '@/hooks/use-toast'
 
 import { useModuleData } from '@/hooks/common/use-module-data'
 import { useTicketFilters } from '@/hooks/common/use-ticket-filters'
 import { usePagination } from '@/hooks/common/use-pagination'
 import { useExport } from '@/hooks/common/use-export'
-import type { Ticket as TicketType } from '@/hooks/use-ticket-data'
+import {
+  useTicketData,
+  getTicketDisplayCode,
+  type Ticket as TicketType,
+} from '@/hooks/use-ticket-data'
 import { filterTicketsAdmin, filterTicketsCreatedBy } from '@/lib/utils/ticket-filters'
 import { ADMIN_TICKET_EXPORT_COLUMN_MAP } from '@/lib/utils/ticket-utils'
 import type { ExportColumn } from '@/lib/utils/export'
@@ -165,8 +180,42 @@ export default function AdminTicketsPage() {
     }
   }, [createdTicketsRaw, session?.user?.id])
 
+  const { toast } = useToast()
+  const { deleteTicket } = useTicketData()
   const handleViewTicket = (ticket: TicketType) => router.push(`/admin/tickets/${ticket.id}`)
-  const rowActions = useMemo(() => renderAdminTicketRowActions(handleViewTicket), []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Eliminar es irreversible y solo el Super Admin puede — por eso el botón
+  // ni siquiera se pasa a la fila cuando no aplica, en vez de mostrarlo
+  // deshabilitado (ver canDeleteTicket en ticket-access.ts, misma regla que
+  // ya aplica la API — esto es solo para no ofrecer un botón que la API va a
+  // rechazar).
+  const [ticketToDelete, setTicketToDelete] = useState<TicketType | null>(null)
+  const [deletingTicket, setDeletingTicket] = useState(false)
+
+  const confirmDeleteTicket = async () => {
+    if (!ticketToDelete) return
+    setDeletingTicket(true)
+    const ok = await deleteTicket(ticketToDelete.id)
+    if (ok) {
+      toast({ title: 'Ticket eliminado' })
+      setTicketToDelete(null)
+      void reloadAll()
+      void reloadCreated()
+    } else {
+      toast({
+        title: 'Error',
+        description: 'No se pudo eliminar el ticket',
+        variant: 'destructive',
+      })
+    }
+    setDeletingTicket(false)
+  }
+
+  const rowActions = useMemo(
+    () =>
+      renderAdminTicketRowActions(handleViewTicket, isSuperAdmin ? setTicketToDelete : undefined),
+    [isSuperAdmin] // eslint-disable-line react-hooks/exhaustive-deps
+  )
 
   // Columnas visibles/ordenadas según el selector — se usan tanto en la tabla
   // como en la exportación (lo que ves es lo que exportas).
@@ -510,6 +559,35 @@ export default function AdminTicketsPage() {
           />
         </TabsContent>
       </Tabs>
+
+      <AlertDialog open={!!ticketToDelete} onOpenChange={open => !open && setTicketToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar este ticket?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. Se eliminarán también sus comentarios, adjuntos,
+              plan de resolución, historial y calificación.
+              {ticketToDelete && (
+                <>
+                  <br />
+                  <span className='font-medium text-foreground'>{ticketToDelete.title}</span> (#
+                  {getTicketDisplayCode(ticketToDelete)})
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingTicket}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteTicket}
+              disabled={deletingTicket}
+              className='bg-red-600 hover:bg-red-700'
+            >
+              {deletingTicket ? 'Eliminando...' : 'Eliminar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </ModuleLayout>
   )
 }

@@ -269,16 +269,13 @@ async function canManageCollaborators(
 
 async function canDeleteTicket(
   user: TicketAccessUser,
-  ticket: TicketAccessRecord
+  _ticket: TicketAccessRecord
 ): Promise<boolean> {
-  if (user.role === 'ADMIN') {
-    // Borrado sigue siendo solo nativa / super — no ampliar por patrullas
-    return adminCanOperateTicketFamily(user.id, ticket.familyId, user.isSuperAdmin === true)
-  }
-  if (user.role === 'CLIENT') {
-    return ticket.clientId === user.id
-  }
-  return false
+  // Eliminar un ticket es irreversible (borra en cascada comentarios,
+  // adjuntos, plan de resolución, tareas, historial y calificación) — se
+  // restringe solo al Super Admin, sin excepción para admins de familia ni
+  // para el cliente que lo creó (antes ambos podían, ver git history).
+  return user.role === 'ADMIN' && user.isSuperAdmin === true
 }
 
 /** Acceso por relación directa (asignado, solicitante, colaborador). */

@@ -1,6 +1,6 @@
 'use client'
 
-import { User, Calendar, Clock, MessageSquare, Paperclip, Eye, Star } from 'lucide-react'
+import { User, Calendar, Clock, MessageSquare, Paperclip, Eye, Star, Trash2 } from 'lucide-react'
 import { StatusBadge, PriorityBadge } from '@/components/ui/status-badge'
 import { Button } from '@/components/ui/button'
 import type { Column } from '@/components/ui/data-table'
@@ -56,20 +56,47 @@ export const ADMIN_TICKET_DEFAULT_VISIBLE_COLUMNS = [
   'createdAt',
 ]
 
-/** Botón "ver" — se pasa como `rowActions` de `DataTable`, no como columna. */
-export function renderAdminTicketRowActions(onView: (ticket: TicketType) => void) {
+/**
+ * Botón "ver" (siempre visible) — se pasa como `rowActions` de `DataTable`,
+ * no como columna. Eliminar un ticket es irreversible y está restringido al
+ * Super Admin (ver canDeleteTicket en ticket-access.ts) — cuando `onDelete`
+ * se pasa (solo el llamador lo hace si `isSuperAdmin`), se agrega un segundo
+ * botón deliberadamente discreto: invisible hasta pasar el mouse sobre la
+ * fila (requiere que `DataTable` marque la fila con la clase `group`), para
+ * no ponerlo al mismo nivel visual que "Ver" y evitar borrados por error.
+ */
+export function renderAdminTicketRowActions(
+  onView: (ticket: TicketType) => void,
+  onDelete?: (ticket: TicketType) => void
+) {
   function AdminTicketRowActions(ticket: TicketType) {
     return (
-      <Button
-        variant='ghost'
-        size='sm'
-        onClick={e => {
-          e.stopPropagation()
-          onView(ticket)
-        }}
-      >
-        <Eye className='h-4 w-4' />
-      </Button>
+      <div className='flex items-center justify-end gap-0.5'>
+        <Button
+          variant='ghost'
+          size='sm'
+          onClick={e => {
+            e.stopPropagation()
+            onView(ticket)
+          }}
+        >
+          <Eye className='h-4 w-4' />
+        </Button>
+        {onDelete && (
+          <Button
+            variant='ghost'
+            size='sm'
+            title='Eliminar ticket (Super Admin)'
+            className='opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity text-muted-foreground hover:text-destructive hover:bg-destructive/10'
+            onClick={e => {
+              e.stopPropagation()
+              onDelete(ticket)
+            }}
+          >
+            <Trash2 className='h-4 w-4' />
+          </Button>
+        )}
+      </div>
     )
   }
   return AdminTicketRowActions

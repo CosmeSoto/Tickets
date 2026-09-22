@@ -505,7 +505,7 @@ export function DataTable<T extends { id: string }>({
                 {paginatedData.map(item => (
                   <TableRow
                     key={item.id}
-                    className={cn(onRowClick && 'cursor-pointer')}
+                    className={cn('group', onRowClick && 'cursor-pointer')}
                     onClick={() => onRowClick?.(item)}
                   >
                     {selectable && (
