@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import { Settings, LayoutGrid, CalendarDays, Plus, BarChart3 } from 'lucide-react'
+import { Settings, LayoutGrid, CalendarDays, Plus } from 'lucide-react'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { Button } from '@/components/ui/button'
 import { useUserModules } from '@/hooks/use-user-modules'
@@ -117,15 +117,6 @@ export default function PlannerPage() {
               Nueva tarea
             </Button>
           )}
-          <Button
-            variant='outline'
-            size='sm'
-            className='h-7 text-xs'
-            onClick={() => router.push('/planner/reports')}
-          >
-            <BarChart3 className='mr-1.5 h-3.5 w-3.5' />
-            Reportes
-          </Button>
           {canManagePlanner && (
             <Button
               variant='outline'

@@ -56,6 +56,7 @@ export const navigationByRole: Record<string, DashboardNavItem[]> = {
       icon: ListTodo,
       children: [
         { name: 'Tablero', href: '/planner', icon: ListTodo },
+        { name: 'Reportes', href: '/planner/reports', icon: BarChart3 },
         { name: 'Configuración', href: '/admin/planner/settings', icon: Settings },
       ],
     },
@@ -181,6 +182,10 @@ export const navigationByRole: Record<string, DashboardNavItem[]> = {
       name: 'Tareas',
       href: '/planner',
       icon: ListTodo,
+      children: [
+        { name: 'Tablero', href: '/planner', icon: ListTodo },
+        { name: 'Reportes', href: '/planner/reports', icon: BarChart3 },
+      ],
     },
     { name: 'Centro de Ayuda', href: '/help/center', icon: HelpCircle },
   ],
@@ -248,6 +253,10 @@ export const navigationByRole: Record<string, DashboardNavItem[]> = {
       name: 'Tareas',
       href: '/planner',
       icon: ListTodo,
+      children: [
+        { name: 'Tablero', href: '/planner', icon: ListTodo },
+        { name: 'Reportes', href: '/planner/reports', icon: BarChart3 },
+      ],
     },
     { name: 'Centro de Ayuda', href: '/help/center', icon: HelpCircle },
   ],
