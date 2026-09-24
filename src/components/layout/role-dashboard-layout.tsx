@@ -113,6 +113,7 @@ export function RoleDashboardLayout({
     processes: hasProcesses,
     access: hasAccess,
     planner: hasPlanner,
+    canManagePlanner,
   } = useUserModules()
 
   if (status === 'unauthenticated') {
@@ -159,6 +160,7 @@ export function RoleDashboardLayout({
     hasProcesses,
     hasAccess,
     hasPlanner,
+    canManagePlanner,
     canRequestAssets,
     hasKnowledge: isSuperAdmin || (hasTickets && !!canAccessKnowledge),
   })

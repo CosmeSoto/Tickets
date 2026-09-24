@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import { Settings, LayoutGrid, CalendarDays, Plus } from 'lucide-react'
+import { LayoutGrid, CalendarDays, Plus } from 'lucide-react'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { Button } from '@/components/ui/button'
 import { useUserModules } from '@/hooks/use-user-modules'
@@ -19,7 +19,7 @@ type ViewMode = 'board' | 'month' | 'week' | 'day'
 export default function PlannerPage() {
   const router = useRouter()
   const { data: session } = useSession()
-  const { planner: plannerEnabled, canManagePlanner } = useUserModules()
+  const { planner: plannerEnabled } = useUserModules()
   const {
     tasks,
     loading,
@@ -115,17 +115,6 @@ export default function PlannerPage() {
             <Button size='sm' className='h-7 text-xs' onClick={() => openCreateDialog()}>
               <Plus className='mr-1.5 h-3.5 w-3.5' />
               Nueva tarea
-            </Button>
-          )}
-          {canManagePlanner && (
-            <Button
-              variant='outline'
-              size='sm'
-              className='h-7 text-xs'
-              onClick={() => router.push('/admin/planner/settings')}
-            >
-              <Settings className='mr-1.5 h-3.5 w-3.5' />
-              Configuración
             </Button>
           )}
         </div>

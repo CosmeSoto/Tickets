@@ -24,6 +24,7 @@ export type RoleNavigationInput = {
   hasProcesses: boolean
   hasAccess: boolean
   hasPlanner: boolean
+  canManagePlanner: boolean
   canRequestAssets: boolean
   /** Tickets + canAccessKnowledge (Super Admin = true) */
   hasKnowledge: boolean
@@ -88,6 +89,7 @@ export function buildRoleNavigation({
   hasProcesses,
   hasAccess,
   hasPlanner,
+  canManagePlanner,
   canRequestAssets,
   hasKnowledge,
 }: RoleNavigationInput): DashboardNavItem[] {
@@ -123,10 +125,15 @@ export function buildRoleNavigation({
           }
         }
         if (item.name === 'Tareas' && item.children?.length) {
+          // La página en sí ya solo deja escribir a Super Admin
+          // (GET admite canManagePlanner, ver /api/admin/planner/settings) —
+          // usar isSuperAdmin acá dejaría a un ADMIN con canManagePlanner
+          // (todo ADMIN lo tiene por defecto) sin forma de ver la pantalla,
+          // aunque sí pueda entrar a ella.
           return {
             ...item,
             children: item.children.filter(
-              child => child.href !== '/admin/planner/settings' || isSuperAdmin
+              child => child.href !== '/admin/planner/settings' || canManagePlanner
             ),
           }
         }
