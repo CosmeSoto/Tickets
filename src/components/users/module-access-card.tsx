@@ -69,7 +69,7 @@ interface ModuleAccessCardProps {
     /** Accesos: puede emitir y revocar pases QR */
     canManageAccess?: boolean
     onToggleManageAccess?: (v: boolean) => void
-    /** Tareas (Planner): puede crear/editar tareas y moverlas en el tablero */
+    /** Tareas: puede crear/editar tareas y moverlas en el tablero */
     canManagePlanner?: boolean
     onToggleManagePlanner?: (v: boolean) => void
   }

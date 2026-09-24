@@ -275,7 +275,7 @@ export class UserModuleGuardService {
       blockers.push(...(await checkAccessPasses(userId)))
     }
 
-    // Tareas (Planner): sin bloqueo — es una vista/tablero sobre resolution_tasks,
+    // Tareas: sin bloqueo — es una vista/tablero sobre resolution_tasks,
     // no el único canal para gestionarlas (siguen editables desde la ficha del
     // ticket aunque se desactive el módulo), a diferencia de Accesos/Inventario.
 

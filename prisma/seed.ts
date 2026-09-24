@@ -739,7 +739,7 @@ async function seedSystemModules() {
     },
     {
       key: 'planner',
-      name: 'Tareas (Planner)',
+      name: 'Tareas',
       description: 'Tablero Kanban y calendario de tareas, sincronizado con Microsoft Planner',
       icon: 'ListTodo',
       isActive: true,

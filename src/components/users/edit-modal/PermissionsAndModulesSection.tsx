@@ -315,10 +315,10 @@ export function PermissionsAndModulesSection({
               }}
             />
 
-            {/* ── Tareas (Planner) ── */}
+            {/* ── Tareas ── */}
             <ModuleAccessCard
               moduleKey='planner'
-              moduleName='Tareas (Planner)'
+              moduleName='Tareas'
               role={formData.role}
               enabled={formData.plannerEnabled || formData.canManagePlanner}
               onToggle={v => onToggle('plannerEnabled', v)}

@@ -71,7 +71,7 @@ async function main() {
     where: { key: 'planner' },
     create: {
       key: 'planner',
-      name: 'Tareas (Planner)',
+      name: 'Tareas',
       description: 'Tablero Kanban y calendario de tareas, sincronizado con Microsoft Planner',
       icon: 'ListTodo',
       isActive: true,
@@ -83,7 +83,7 @@ async function main() {
       familyScoped: true,
     },
     update: {
-      name: 'Tareas (Planner)',
+      name: 'Tareas',
       description: 'Tablero Kanban y calendario de tareas, sincronizado con Microsoft Planner',
       icon: 'ListTodo',
       isActive: true,
