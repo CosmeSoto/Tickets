@@ -1,6 +1,14 @@
 /**
  * FAQs del Centro de Ayuda — español, etiquetadas por módulo.
  * Se muestran solo si el usuario tiene el módulo habilitado (salvo `account`).
+ *
+ * El contenido real ahora vive en la tabla `help_faqs` (editable desde
+ * Configuración Sistema → Ayuda, sin tocar código) — ver
+ * `src/components/settings/help-faqs-tab.tsx` y `/api/help/faqs`. El array
+ * `HELP_FAQS` de este archivo YA NO SE LEE EN TIEMPO DE EJECUCIÓN: solo sirve
+ * como dato semilla para `prisma/seed.ts` (la primera carga de la tabla).
+ * Editar este array después de esa siembra no tiene ningún efecto — usa la
+ * pantalla de administración.
  */
 
 export type HelpModuleId =
@@ -21,6 +29,8 @@ export interface HelpFaqItem {
   /** Roles para los que aplica; si empty = todos */
   roles?: Array<'ADMIN' | 'TECHNICIAN' | 'CLIENT'>
   keywords?: string[]
+  /** Imagen o video (YouTube/Google Drive/imagen directa) — ver MediaUrlInput. */
+  mediaUrl?: string | null
 }
 
 export interface HelpModuleSection {

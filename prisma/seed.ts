@@ -26,6 +26,7 @@ import {
   seedFolioCounters,
   seedSecuritySettings,
 } from './seeds/inventory-settings.seed'
+import { seedHelpFaqs } from './seeds/help-faqs.seed'
 
 const prisma = new PrismaClient()
 const now = new Date()
@@ -143,6 +144,9 @@ async function main() {
 
   // 20. MÓDULOS DEL SISTEMA
   await seedSystemModules()
+
+  // 20b. PREGUNTAS FRECUENTES DEL CENTRO DE AYUDA
+  await seedHelpFaqs(prisma)
 
   // 21. Acceso unificado a áreas (user_family_access) desde tablas legacy
   try {

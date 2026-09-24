@@ -24,7 +24,8 @@ import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { useUserModules } from '@/hooks/use-user-modules'
 import { useSyncDashboardPageMeta } from '@/contexts/dashboard-shell-context'
-import type { HelpModuleId } from '@/features/help/data/faq-by-module'
+import { detectMedia } from '@/components/common/media-url-input'
+import type { HelpFaqItem, HelpModuleId } from '@/features/help/data/faq-by-module'
 import {
   faqMatchesQuery,
   filterHelpFaqs,
@@ -53,6 +54,45 @@ const MODULE_ICONS: Record<HelpModuleId, typeof HelpCircle> = {
   credentials: KeyRound,
 }
 
+/** Mismo criterio que el carrusel de Noticias (news-detail.tsx): imagen
+ *  directa se muestra con <img>, todo lo demás embebible (YouTube, Google
+ *  Drive) con <iframe> sandboxeado; lo no embebible (SharePoint, carpetas de
+ *  Drive) se deja como enlace externo simple. */
+function FaqMedia({ url }: { url: string }) {
+  const media = detectMedia(url)
+  if (!media.canPreview || !media.embedUrl) {
+    return (
+      <a
+        href={url}
+        target='_blank'
+        rel='noopener noreferrer'
+        className='text-xs text-primary underline underline-offset-2'
+      >
+        Ver adjunto
+      </a>
+    )
+  }
+  if (media.type === 'image') {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={media.embedUrl}
+        alt=''
+        className='w-full h-auto max-h-[320px] object-contain rounded-md border'
+      />
+    )
+  }
+  return (
+    <iframe
+      src={media.embedUrl}
+      title='Adjunto'
+      className='w-full h-[220px] sm:h-[300px] rounded-md border-0'
+      allow='autoplay; fullscreen'
+      sandbox='allow-scripts allow-popups allow-presentation'
+    />
+  )
+}
+
 function knowledgeHrefForRole(role?: string): string {
   if (role === 'ADMIN') return '/admin/knowledge'
   if (role === 'TECHNICIAN') return '/technician/knowledge'
@@ -75,6 +115,8 @@ export function HelpHub() {
   const [selectedModule, setSelectedModule] = useState<HelpModuleId | 'all'>('all')
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [config, setConfig] = useState<HelpConfig | null>(null)
+  const [faqs, setFaqs] = useState<HelpFaqItem[]>([])
+  const [faqsLoading, setFaqsLoading] = useState(true)
 
   useSyncDashboardPageMeta({
     title: 'Centro de Ayuda',
@@ -88,6 +130,16 @@ export function HelpHub() {
         if (data?.data) setConfig(data.data)
       })
       .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    fetch('/api/help/faqs')
+      .then(r => (r.ok ? r.json() : null))
+      .then(data => {
+        if (Array.isArray(data?.data)) setFaqs(data.data)
+      })
+      .catch(() => {})
+      .finally(() => setFaqsLoading(false))
   }, [])
 
   const viewerRole = resolveHelpViewerRole(session?.user?.role)
@@ -104,7 +156,10 @@ export function HelpHub() {
     [tickets, inventory, canRequestAssets, patrols, forms, credentials, canAccessKnowledge]
   )
 
-  const visibleFaqs = useMemo(() => filterHelpFaqs(flags, viewerRole), [flags, viewerRole])
+  const visibleFaqs = useMemo(
+    () => filterHelpFaqs(flags, viewerRole, faqs),
+    [flags, viewerRole, faqs]
+  )
 
   const sections = useMemo(() => visibleHelpSections(flags, visibleFaqs), [flags, visibleFaqs])
 
@@ -203,7 +258,7 @@ export function HelpHub() {
           <Badge variant='secondary'>{filteredFaqs.length} temas</Badge>
         </div>
 
-        {modulesLoading ? (
+        {modulesLoading || faqsLoading ? (
           <Card>
             <CardContent className='p-6 text-sm text-muted-foreground'>
               Cargando ayuda según tus módulos…
@@ -244,10 +299,11 @@ export function HelpHub() {
                   )}
                 </button>
                 {open && (
-                  <CardContent className='pt-0 pb-4 px-4 pl-11'>
+                  <CardContent className='pt-0 pb-4 px-4 pl-11 space-y-3'>
                     <p className='text-sm text-muted-foreground whitespace-pre-line leading-relaxed'>
                       {faq.answer}
                     </p>
+                    {faq.mediaUrl && <FaqMedia url={faq.mediaUrl} />}
                   </CardContent>
                 )}
               </Card>

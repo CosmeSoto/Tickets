@@ -896,6 +896,30 @@ model personal_task_ms_todo_links {
   @@map("personal_task_ms_todo_links")
 }
 
+/// Preguntas frecuentes del Centro de Ayuda (/help/center), editable desde
+/// Configuración Sistema → Ayuda sin tocar código. `module` usa las mismas
+/// claves que HelpModuleId (src/features/help/data/faq-by-module.ts):
+/// account/tickets/inventory/patrols/knowledge/forms/credentials — así se
+/// reutiliza el filtrado por módulo activo ya existente
+/// (src/features/help/filter-help-faqs.ts) sin duplicar esa lógica.
+model help_faqs {
+  id        String   @id @default(uuid())
+  module    String
+  category  String
+  question  String
+  answer    String
+  mediaUrl  String?  @map("media_url")
+  roles     String[] @default([])
+  keywords  String[] @default([])
+  order     Int      @default(0)
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([module, isActive])
+  @@map("help_faqs")
+}
+
 model ticket_knowledge_articles {
   id        String             @id @default(uuid())
   ticketId  String             @map("ticket_id")

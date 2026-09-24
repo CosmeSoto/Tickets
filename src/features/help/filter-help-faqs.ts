@@ -1,5 +1,5 @@
 import type { HelpFaqItem, HelpModuleId } from './data/faq-by-module'
-import { HELP_FAQS, HELP_MODULE_SECTIONS } from './data/faq-by-module'
+import { HELP_MODULE_SECTIONS } from './data/faq-by-module'
 
 export type HelpViewerRole = 'ADMIN' | 'TECHNICIAN' | 'CLIENT'
 
@@ -43,7 +43,7 @@ export function isHelpModuleEnabled(moduleId: HelpModuleId, flags: HelpModuleFla
 export function filterHelpFaqs(
   flags: HelpModuleFlags,
   viewerRole: HelpViewerRole,
-  faqs: HelpFaqItem[] = HELP_FAQS
+  faqs: HelpFaqItem[]
 ): HelpFaqItem[] {
   return faqs.filter(faq => {
     if (!isHelpModuleEnabled(faq.module, flags)) return false

@@ -47,6 +47,7 @@ import { validateEnabledEmailSettings } from '@/lib/email/smtp-settings-validati
 import { OAuthSettingsTab } from '@/components/settings/oauth-settings-tab'
 import { SLAPoliciesTab } from '@/components/settings/sla-policies-tab'
 import { AttachmentsStorageTab } from '@/components/settings/attachments-storage-tab'
+import { HelpFaqsTab } from '@/components/settings/help-faqs-tab'
 
 interface SystemSettings {
   // Configuración general
@@ -647,6 +648,9 @@ function SettingsPage() {
             </TabsTrigger>
             <TabsTrigger value='notifications' className='shrink-0 px-3'>
               Notificaciones
+            </TabsTrigger>
+            <TabsTrigger value='help' className='shrink-0 px-3'>
+              Ayuda
             </TabsTrigger>
             {/* Tabs solo para Super Admin */}
             <TabsTrigger value='sla' className='shrink-0 px-3' disabled={!isSuperAdmin}>
@@ -2140,6 +2144,11 @@ function SettingsPage() {
           ) : (
             <AttachmentsStorageTab />
           )}
+        </TabsContent>
+
+        {/* Preguntas frecuentes del Centro de Ayuda */}
+        <TabsContent value='help'>
+          <HelpFaqsTab />
         </TabsContent>
       </Tabs>
     </ModuleLayout>
