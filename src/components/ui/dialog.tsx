@@ -37,10 +37,18 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
  */
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & { hideClose?: boolean }
 >(
   (
-    { className, children, onPointerDownOutside, onInteractOutside, onFocusOutside, ...props },
+    {
+      className,
+      children,
+      onPointerDownOutside,
+      onInteractOutside,
+      onFocusOutside,
+      hideClose,
+      ...props
+    },
     ref
   ) => {
     const allowPortaledOverlay = (event: {
@@ -48,12 +56,11 @@ const DialogContent = React.forwardRef<
       preventDefault: () => void
     }) => {
       const target = event.target as HTMLElement | null
-      // Calendarios, selects, combobox e ImageLightbox portaleados viven fuera del Dialog
+      // Calendarios, selects y combobox portaleados viven fuera del Dialog
       if (
         isCalendarOrSelectInteraction(event) ||
         target?.closest('[data-radix-select-content]') ||
-        target?.closest('[role=listbox]') ||
-        target?.closest('[data-image-lightbox]')
+        target?.closest('[role=listbox]')
       ) {
         event.preventDefault()
         return true
@@ -90,10 +97,12 @@ const DialogContent = React.forwardRef<
             onFocusOutside?.(e)
           }}
         >
-          <DialogPrimitive.Close className='absolute right-4 top-4 z-10 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground'>
-            <X className='h-4 w-4' />
-            <span className='sr-only'>Close</span>
-          </DialogPrimitive.Close>
+          {!hideClose && (
+            <DialogPrimitive.Close className='absolute right-4 top-4 z-10 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground'>
+              <X className='h-4 w-4' />
+              <span className='sr-only'>Close</span>
+            </DialogPrimitive.Close>
+          )}
           {children}
         </DialogPrimitive.Content>
       </DialogPortal>
