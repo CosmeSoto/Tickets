@@ -45,7 +45,11 @@ export function ImageLightbox({ src, alt, onClose, onPrev, onNext, counter }: Im
   if (typeof document === 'undefined') return null
 
   return createPortal(
+    // data-image-lightbox: permite que dialog.tsx (allowPortaledOverlay) ignore
+    // los clics aquí dentro — sin esto, un ImageLightbox abierto sobre un Dialog
+    // de Radix se interpreta como "clic afuera" y cierra el Dialog subyacente.
     <div
+      data-image-lightbox
       className='fixed inset-0 z-[200] bg-black/90 flex items-center justify-center'
       onClick={onClose}
     >
