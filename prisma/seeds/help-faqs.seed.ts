@@ -1,6 +1,6 @@
 import { PrismaClient } from '@prisma/client'
 import { randomUUID } from 'crypto'
-import { HELP_FAQS } from '../../src/features/help/data/faq-by-module'
+import { HELP_FAQS } from './help-faqs-data'
 
 /**
  * Siembra la tabla `help_faqs` con el contenido que antes vivía hardcodeado

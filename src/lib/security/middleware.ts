@@ -38,7 +38,7 @@ export class SecurityMiddleware {
         "img-src 'self' data: https:; " +
         "font-src 'self' data:; " +
         "connect-src 'self'; " +
-        "frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com https://drive.google.com https://onedrive.live.com https://1drv.ms https://view.officeapps.live.com https://www.dropbox.com; " +
+        "frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com https://player.vimeo.com https://drive.google.com https://onedrive.live.com https://1drv.ms https://view.officeapps.live.com https://www.dropbox.com; " +
         "frame-ancestors 'none';"
     )
 

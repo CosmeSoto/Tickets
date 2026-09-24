@@ -37,6 +37,7 @@
     "db:seed-catalogs": "tsx prisma/ensure-catalogs.ts",
     "db:seed-categories": "tsx prisma/ensure-categories.ts",
     "db:seed-departments": "tsx prisma/ensure-departments.ts",
+    "db:seed-help-faqs": "tsx prisma/ensure-help-faqs.ts",
     "db:sync-family-access": "tsx prisma/sync-user-family-access.ts",
     "db:diagnose-family-access": "tsx prisma/sync-user-family-access.ts --diagnose",
     "db:sync": "prisma migrate deploy && prisma generate",

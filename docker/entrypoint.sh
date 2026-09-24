@@ -311,6 +311,16 @@ else
   echo "==> ADVERTENCIA: ensure-system-modules falló."
 fi
 
+# Preguntas del Centro de Ayuda — idempotente por seedKey, corre siempre (no
+# solo cuando la BD está vacía) para que las preguntas nuevas agregadas a
+# HELP_FAQS lleguen también en un rebuild normal, sin necesitar --clean.
+echo "==> Asegurando preguntas del Centro de Ayuda..."
+if $TSX_CLI prisma/ensure-help-faqs.ts; then
+  echo "==> Preguntas de ayuda sincronizadas."
+else
+  echo "==> ADVERTENCIA: ensure-help-faqs falló."
+fi
+
 # Acceso unificado a áreas (user_family_access) — sync idempotente desde tablas legacy
 echo "==> Sincronizando user_family_access (áreas por módulo)..."
 if $TSX_CLI prisma/sync-user-family-access.ts; then

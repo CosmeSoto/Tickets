@@ -29,9 +29,13 @@ import {
   ChevronLeft,
   ChevronRight,
   FileText,
+  ExternalLink,
+  Play,
+  ZoomIn,
 } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { ImageLightbox } from '@/components/ui/image-lightbox'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
@@ -516,11 +520,16 @@ export function NewsDetail({
 
   // Estado para el carousel
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
+  // Estado para el zoom de imágenes (lightbox)
+  const [zoomOpen, setZoomOpen] = useState(false)
 
-  // Obtener medios: imageUrl puede ser Google Drive, OneDrive, YouTube, imagen directa, etc.
-  // Los attachments de imagen también se incluyen en el carrusel.
-  const getMediaItems = (): Array<{ src: string; type: 'image' | 'embed'; label?: string }> => {
-    const items: Array<{ src: string; type: 'image' | 'embed'; label?: string }> = []
+  // Obtener medios: imageUrl puede ser Google Drive, OneDrive, YouTube, Vimeo,
+  // imagen directa, un enlace no embebible (SharePoint, carpeta de Drive, etc.),
+  // o un tipo desconocido. Los attachments de imagen también se incluyen en el
+  // carrusel.
+  type MediaItem = { src: string; type: 'image' | 'embed' | 'link'; label?: string }
+  const getMediaItems = (): MediaItem[] => {
+    const items: MediaItem[] = []
 
     // 1. imageUrl principal
     if (news.imageUrl) {
@@ -528,11 +537,16 @@ export function NewsDetail({
       if (media.canPreview && media.embedUrl) {
         items.push({
           src: media.embedUrl,
-          type: media.type === 'image' ? 'image' : 'embed',
+          type: media.type === 'image' || media.type === 'dropbox' ? 'image' : 'embed',
           label: media.label,
         })
       } else if (media.type === 'image') {
         items.push({ src: news.imageUrl, type: 'image' })
+      } else {
+        // Enlace válido pero no embebible (SharePoint, carpeta de Drive, tipo
+        // desconocido, etc.) — antes se descartaba en silencio y la noticia
+        // quedaba sin ningún indicio de que tenía un enlace adjunto.
+        items.push({ src: news.imageUrl, type: 'link', label: media.label || 'Enlace externo' })
       }
     }
 
@@ -575,56 +589,83 @@ export function NewsDetail({
 
   const mediaItems = getMediaItems()
 
+  // Renderiza un medio (imagen con zoom, iframe embebido, o tarjeta de enlace
+  // no embebible) — compartido entre el slide único y el slide actual del
+  // carrusel para no duplicar la lógica de los 3 tipos.
+  const renderMediaItem = (item: MediaItem, altSuffix?: string) => {
+    if (item.type === 'image') {
+      return (
+        <button
+          type='button'
+          onClick={() => setZoomOpen(true)}
+          className='w-full block relative cursor-zoom-in group'
+          aria-label='Ampliar imagen'
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={item.src}
+            alt={item.label || `${news.title}${altSuffix ?? ''}`}
+            className='w-full h-auto object-contain max-h-[400px]'
+          />
+          <span className='absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/10 transition-colors'>
+            <ZoomIn className='h-6 w-6 text-white opacity-0 group-hover:opacity-100 drop-shadow transition-opacity' />
+          </span>
+        </button>
+      )
+    }
+    if (item.type === 'link') {
+      return (
+        <div className='flex flex-col items-center justify-center gap-3 py-10 px-4 text-center'>
+          <ExternalLink className='h-8 w-8 text-muted-foreground' />
+          <div>
+            <p className='text-sm font-medium'>{item.label || 'Enlace externo'}</p>
+            <p className='text-xs text-muted-foreground mt-1'>
+              Este contenido no se puede previsualizar aquí.
+            </p>
+          </div>
+          <Button
+            type='button'
+            variant='outline'
+            size='sm'
+            onClick={() => window.open(item.src, '_blank', 'noopener,noreferrer')}
+            className='gap-1.5'
+          >
+            <ExternalLink className='h-3.5 w-3.5' />
+            Abrir enlace
+          </Button>
+        </div>
+      )
+    }
+    return (
+      <iframe
+        src={item.src}
+        title={news.title}
+        className='w-full h-[300px] sm:h-[400px] border-0'
+        allow='autoplay; fullscreen'
+        // allow-same-origin: el origen real siempre es uno de los dominios fijos
+        // de detectMedia (youtube-nocookie.com, vimeo, drive.google.com, etc.,
+        // ya restringidos además por el CSP frame-src), nunca uno elegido por
+        // quien pegó la URL. Sin este flag el reproductor no puede acceder a su
+        // storage/cookies para inicializar y queda en negro sin botón de play.
+        sandbox='allow-scripts allow-same-origin allow-popups allow-presentation'
+      />
+    )
+  }
+
   const newsBodyContent = (
     <div className='space-y-4 w-full max-w-full overflow-hidden'>
-      {/* Media: imagen, video, iframe embebido — carrusel si hay múltiples */}
+      {/* Media: imagen, video, iframe embebido o enlace — carrusel si hay múltiples */}
       {mediaItems.length > 0 && (
         <div className='rounded-lg overflow-hidden bg-muted/30 w-full'>
           {mediaItems.length === 1 ? (
             // Un solo elemento
-            mediaItems[0].type === 'image' ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={mediaItems[0].src}
-                alt={news.title}
-                className='w-full h-auto object-contain max-h-[400px]'
-              />
-            ) : (
-              <iframe
-                src={mediaItems[0].src}
-                title={news.title}
-                className='w-full h-[300px] sm:h-[400px] border-0'
-                allow='autoplay; fullscreen'
-                // Sin allow-same-origin: combinado con allow-scripts le permitiría al
-                // contenido embebido (URL pegada al crear la noticia) quitarse su
-                // propio sandbox.
-                sandbox='allow-scripts allow-popups allow-presentation'
-              />
-            )
+            renderMediaItem(mediaItems[0])
           ) : (
             // Carrusel con múltiples medios
             <div className='relative w-full select-none'>
               {/* Slide actual */}
               <div className='w-full'>
-                {mediaItems[currentImageIndex].type === 'image' ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={mediaItems[currentImageIndex].src}
-                    alt={
-                      mediaItems[currentImageIndex].label ||
-                      `${news.title} - ${currentImageIndex + 1}`
-                    }
-                    className='w-full h-auto object-contain max-h-[400px]'
-                  />
-                ) : (
-                  <iframe
-                    src={mediaItems[currentImageIndex].src}
-                    title={news.title}
-                    className='w-full h-[300px] sm:h-[400px] border-0'
-                    allow='autoplay; fullscreen'
-                    sandbox='allow-scripts allow-popups allow-presentation'
-                  />
-                )}
+                {renderMediaItem(mediaItems[currentImageIndex], ` - ${currentImageIndex + 1}`)}
               </div>
 
               {/* Controles de navegación */}
@@ -693,8 +734,12 @@ export function NewsDetail({
                   className='w-full h-full object-cover'
                 />
               ) : (
-                <div className='w-full h-full bg-muted flex items-center justify-center text-xs text-muted-foreground'>
-                  ▶
+                <div className='w-full h-full bg-muted flex items-center justify-center text-muted-foreground'>
+                  {item.type === 'link' ? (
+                    <ExternalLink className='h-4 w-4' />
+                  ) : (
+                    <Play className='h-4 w-4' />
+                  )}
                 </div>
               )}
             </button>
@@ -922,6 +967,27 @@ export function NewsDetail({
         onClose={() => setPreviewFile(null)}
         file={previewFile}
       />
+
+      {zoomOpen && mediaItems[currentImageIndex]?.type === 'image' && (
+        <ImageLightbox
+          src={mediaItems[currentImageIndex].src}
+          alt={mediaItems[currentImageIndex].label || news.title}
+          onClose={() => setZoomOpen(false)}
+          onPrev={
+            mediaItems.length > 1
+              ? () => setCurrentImageIndex(p => (p - 1 + mediaItems.length) % mediaItems.length)
+              : undefined
+          }
+          onNext={
+            mediaItems.length > 1
+              ? () => setCurrentImageIndex(p => (p + 1) % mediaItems.length)
+              : undefined
+          }
+          counter={
+            mediaItems.length > 1 ? `${currentImageIndex + 1} / ${mediaItems.length}` : undefined
+          }
+        />
+      )}
     </Dialog>
   )
 }

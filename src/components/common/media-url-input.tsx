@@ -32,8 +32,18 @@ export type MediaType =
   | 'onedrive'
   | 'dropbox'
   | 'youtube'
+  | 'vimeo'
   | 'office'
   | 'unknown'
+
+/** Extrae el ID de video de una URL de YouTube en cualquiera de sus formatos comunes
+ * (watch?v=, youtu.be, shorts, embed, live) — usado también para miniaturas fuera de detectMedia. */
+export function extractYouTubeId(url: string): string | null {
+  const match = url.match(
+    /(?:youtube\.com\/(?:watch\?v=|shorts\/|embed\/|live\/)|youtu\.be\/)([a-zA-Z0-9_-]{6,})/
+  )
+  return match ? match[1] : null
+}
 
 export interface MediaInfo {
   type: MediaType
@@ -62,13 +72,28 @@ export function detectMedia(url: string): MediaInfo {
   const u = url.trim()
   const lower = u.toLowerCase()
 
-  // YouTube
-  const ytMatch = u.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&?/]+)/)
-  if (ytMatch) {
+  // YouTube — youtube-nocookie.com evita que el reproductor quede en negro sin
+  // botón de play cuando el navegador bloquea cookies/storage de terceros
+  // (modo incógnito, extensiones de privacidad, etc.).
+  const ytId = extractYouTubeId(u)
+  if (ytId) {
     return {
       type: 'youtube',
       label: 'YouTube',
-      embedUrl: `https://www.youtube.com/embed/${ytMatch[1]}`,
+      embedUrl: `https://www.youtube-nocookie.com/embed/${ytId}`,
+      originalUrl: u,
+      canPreview: true,
+      canEmbed: true,
+    }
+  }
+
+  // Vimeo
+  const vimeoMatch = u.match(/vimeo\.com\/(?:video\/)?(\d+)/)
+  if (vimeoMatch) {
+    return {
+      type: 'vimeo',
+      label: 'Vimeo',
+      embedUrl: `https://player.vimeo.com/video/${vimeoMatch[1]}`,
       originalUrl: u,
       canPreview: true,
       canEmbed: true,
@@ -225,6 +250,7 @@ const TYPE_ICONS: Record<MediaType, string> = {
   onedrive: '☁️',
   dropbox: '📦',
   youtube: '▶️',
+  vimeo: '🎥',
   office: '📄',
   unknown: '🔗',
 }
@@ -392,10 +418,13 @@ export function MediaUrlInput({
               title='Vista previa'
               className='w-full h-72 border-0'
               allow='autoplay; fullscreen'
-              // Sin allow-same-origin: combinado con allow-scripts le permitiría al
-              // contenido embebido (una URL que pegó el usuario, no necesariamente
-              // confiable) quitarse su propio sandbox.
-              sandbox='allow-scripts allow-popups allow-forms allow-presentation'
+              // allow-same-origin: el origen real del iframe siempre es uno de los
+              // dominios fijos de detectMedia (youtube-nocookie.com, vimeo,
+              // drive.google.com, etc.), nunca uno elegido por quien pegó la URL —
+              // el propio CSP frame-src ya restringe a esa lista. Sin este flag,
+              // varios reproductores (YouTube incluido) no pueden acceder a su
+              // storage/cookies para inicializar el botón de play y quedan en negro.
+              sandbox='allow-scripts allow-same-origin allow-popups allow-forms allow-presentation'
             />
           ) : (
             /* Fallback: no embebible o imagen falló */

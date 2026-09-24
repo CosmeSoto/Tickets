@@ -20,7 +20,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
-import { detectMedia } from '@/components/common/media-url-input'
+import { detectMedia, extractYouTubeId } from '@/components/common/media-url-input'
 
 type NewsType =
   | 'NEWS'
@@ -134,9 +134,9 @@ export function NewsCard({
       }
       // Para YouTube: usar thumbnail de alta calidad
       if (media.type === 'youtube' && news.imageUrl) {
-        const ytMatch = news.imageUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&?/]+)/)
-        if (ytMatch) {
-          return { src: `https://img.youtube.com/vi/${ytMatch[1]}/mqdefault.jpg`, isImage: true }
+        const ytId = extractYouTubeId(news.imageUrl)
+        if (ytId) {
+          return { src: `https://img.youtube.com/vi/${ytId}/mqdefault.jpg`, isImage: true }
         }
       }
       // Para Google Drive con imagen: usar thumbnail de Drive
@@ -178,6 +178,7 @@ export function NewsCard({
     const media = detectMedia(news.imageUrl)
     const icons: Record<string, string> = {
       youtube: '▶️',
+      vimeo: '🎥',
       'google-drive': '📁',
       onedrive: '☁️',
       dropbox: '📦',

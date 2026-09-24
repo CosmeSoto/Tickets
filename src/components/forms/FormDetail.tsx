@@ -25,6 +25,7 @@ import {
   FileText,
   Edit,
   Trash2,
+  ZoomIn,
 } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -32,6 +33,8 @@ import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { useToast } from '@/hooks/use-toast'
 import { FilePreviewModal } from '@/components/ui/file-preview-modal'
+import { ImageLightbox } from '@/components/ui/image-lightbox'
+import { detectMedia } from '@/components/common/media-url-input'
 import type { FormFeedItem } from './types'
 import { formatFileSize, getFileEmoji } from './types'
 
@@ -41,40 +44,6 @@ import { formatFileSize, getFileEmoji } from './types'
 function isLocalFile(fileUrl: string | null | undefined): boolean {
   if (!fileUrl) return false
   return fileUrl.startsWith('/api/forms/') || fileUrl.startsWith('/api/admin/forms/')
-}
-
-/** Convierte URLs de Google Drive / OneDrive a URLs de vista previa embebible */
-function getEmbedUrl(fileUrl: string): string | null {
-  // Google Drive: https://drive.google.com/file/d/FILE_ID/view
-  const gdMatch = fileUrl.match(/drive\.google\.com\/file\/d\/([^/]+)/)
-  if (gdMatch) {
-    return `https://drive.google.com/file/d/${gdMatch[1]}/preview`
-  }
-
-  // Google Drive compartido: https://drive.google.com/open?id=FILE_ID
-  const gdOpenMatch = fileUrl.match(/drive\.google\.com\/open\?id=([^&]+)/)
-  if (gdOpenMatch) {
-    return `https://drive.google.com/file/d/${gdOpenMatch[1]}/preview`
-  }
-
-  // OneDrive: https://onedrive.live.com/...
-  if (fileUrl.includes('onedrive.live.com') || fileUrl.includes('1drv.ms')) {
-    // OneDrive embed: reemplazar /view por /embed o usar el viewer de Office
-    const embedUrl = fileUrl.replace('/view', '/embed').replace('/download', '/embed')
-    return embedUrl !== fileUrl ? embedUrl : null
-  }
-
-  // SharePoint / OneDrive for Business
-  if (fileUrl.includes('sharepoint.com')) {
-    return `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fileUrl)}`
-  }
-
-  // Dropbox: cambiar ?dl=0 por ?raw=1 para vista previa
-  if (fileUrl.includes('dropbox.com')) {
-    return fileUrl.replace('?dl=0', '?raw=1').replace('?dl=1', '?raw=1')
-  }
-
-  return null
 }
 
 /** Word/Excel — se convierten a HTML en el navegador dentro de FilePreviewModal */
@@ -88,49 +57,11 @@ function isOfficeMime(fileType: string | null | undefined): boolean {
   )
 }
 
-/** Determina si una URL puede mostrarse en iframe/img */
-function canPreviewUrl(
-  fileUrl: string | null | undefined,
-  fileType: string | null | undefined
-): boolean {
-  if (!fileUrl) return false
-
-  // Archivos locales: PDF, imágenes y Word/Excel
-  if (isLocalFile(fileUrl)) {
-    if (!fileType) return false
-    return fileType.includes('pdf') || fileType.includes('image') || isOfficeMime(fileType)
-  }
-
-  // Google Drive — siempre previsualizable
-  if (fileUrl.includes('drive.google.com')) return true
-
-  // OneDrive / SharePoint
-  if (
-    fileUrl.includes('onedrive.live.com') ||
-    fileUrl.includes('1drv.ms') ||
-    fileUrl.includes('sharepoint.com')
-  )
-    return true
-
-  // Dropbox
-  if (fileUrl.includes('dropbox.com')) return true
-
-  // URL directa: detectar por extensión o MIME
-  const urlLower = fileUrl.toLowerCase().split('?')[0]
-  const previewExts = ['.pdf', '.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg']
-  if (previewExts.some(ext => urlLower.endsWith(ext))) return true
-
-  if (fileType) {
-    return fileType.includes('pdf') || fileType.includes('image')
-  }
-
-  return false
-}
-
-/** Etiqueta legible del tipo de archivo */
+/** Etiqueta legible del tipo de archivo — `remoteLabel` viene de detectMedia() para URLs externas. */
 function getFileLabel(
   fileType: string | null | undefined,
-  fileUrl: string | null | undefined
+  fileUrl: string | null | undefined,
+  remoteLabel?: string
 ): string {
   if (fileType) {
     if (fileType.includes('pdf')) return 'PDF'
@@ -141,11 +72,8 @@ function getFileLabel(
     if (fileType.includes('zip') || fileType.includes('compressed')) return 'Archivo comprimido'
     if (fileType.includes('text')) return 'Texto'
   }
+  if (remoteLabel && remoteLabel !== 'Enlace externo') return remoteLabel
   if (fileUrl) {
-    if (fileUrl.includes('drive.google.com')) return 'Google Drive'
-    if (fileUrl.includes('onedrive.live.com') || fileUrl.includes('1drv.ms')) return 'OneDrive'
-    if (fileUrl.includes('sharepoint.com')) return 'SharePoint'
-    if (fileUrl.includes('dropbox.com')) return 'Dropbox'
     const ext = fileUrl.split('?')[0].split('.').pop()?.toUpperCase()
     if (ext && ext.length <= 5) return ext
   }
@@ -179,13 +107,29 @@ export function FormDetail({
   const { toast } = useToast()
   const [downloading, setDownloading] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
+  const [zoomOpen, setZoomOpen] = useState(false)
   const [downloadCount, setDownloadCount] = useState(form._count.form_downloads)
 
   const hasFile = !!form.fileUrl
   const isLocal = isLocalFile(form.fileUrl)
-  const canPreview = canPreviewUrl(form.fileUrl, form.fileType)
-  const embedUrl = form.fileUrl ? getEmbedUrl(form.fileUrl) : null
+  // Para URLs externas, detectMedia() es la misma detección que usa Noticias y
+  // el propio DocumentFormDialog al pegar el enlace — evita reimplementar por
+  // separado las mismas reglas de Drive/OneDrive/SharePoint/Dropbox y agrega
+  // soporte de YouTube/Vimeo gratis si el "documento" es en realidad un video.
+  const remoteMedia = !isLocal && form.fileUrl ? detectMedia(form.fileUrl) : null
+  const canPreview = isLocal
+    ? !!form.fileType &&
+      (form.fileType.includes('pdf') ||
+        form.fileType.includes('image') ||
+        isOfficeMime(form.fileType))
+    : !!remoteMedia?.canPreview
+  const embedUrl = remoteMedia?.embedUrl ?? null
   const previewSrc = isLocal ? `/api/forms/${form.id}/file` : embedUrl || form.fileUrl
+  // Imagen directa externa (o Dropbox con imagen) — se muestra con <img> + zoom,
+  // no en un <iframe> apuntando a un dominio arbitrario que pegó quien creó el
+  // documento.
+  const isRemoteImage =
+    !isLocal && !!embedUrl && (remoteMedia?.type === 'image' || remoteMedia?.type === 'dropbox')
 
   const isOwner = form.createdBy.id === session?.user?.id
   const isAdmin = session?.user?.role === 'ADMIN'
@@ -339,7 +283,7 @@ export function FormDetail({
                     <span className='text-2xl flex-shrink-0'>{getFileEmoji(form.fileType)}</span>
                     <div className='flex-1 min-w-0'>
                       <p className='text-sm font-medium'>
-                        {getFileLabel(form.fileType, form.fileUrl)}
+                        {getFileLabel(form.fileType, form.fileUrl, remoteMedia?.label)}
                       </p>
                       <div className='flex items-center gap-2 text-xs text-muted-foreground flex-wrap'>
                         {form.fileSize && <span>{formatFileSize(form.fileSize)}</span>}
@@ -363,16 +307,14 @@ export function FormDetail({
                           {downloading ? 'Descargando...' : 'Descargar'}
                         </Button>
 
-                        {/* Vista previa: PDF → modal dedicado, imagen → inline */}
+                        {/* Vista previa: PDF, imagen y Word/Excel → modal dedicado (FilePreviewModal) */}
                         {canPreview && (
                           <Button
                             variant='outline'
                             onClick={() => setShowPreview(v => !v)}
                             className='gap-2'
                           >
-                            {showPreview &&
-                            (form.fileType?.includes('image') ||
-                              form.fileUrl?.match(/\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/i)) ? (
+                            {showPreview ? (
                               <>
                                 <EyeOff className='h-4 w-4' />
                                 Ocultar vista previa
@@ -419,55 +361,81 @@ export function FormDetail({
                   </div>
                 </div>
 
-                {/* Vista previa inline para imágenes locales */}
-                {showPreview &&
-                  canPreview &&
-                  previewSrc &&
-                  isLocal &&
-                  (form.fileType?.includes('image') ||
-                    form.fileUrl?.match(/\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/i)) && (
-                    <div className='rounded-lg overflow-hidden border bg-muted/30'>
+                {/* Vista previa inline para imágenes externas directas (o Dropbox-imagen) —
+                    se muestran con <img>+zoom en vez de meterlas en un <iframe>, ya que su
+                    origen es el dominio que haya pegado quien creó el documento. */}
+                {showPreview && canPreview && previewSrc && isRemoteImage && (
+                  <div className='rounded-lg overflow-hidden border bg-muted/30'>
+                    <button
+                      type='button'
+                      onClick={() => setZoomOpen(true)}
+                      className='w-full block relative cursor-zoom-in group'
+                      aria-label='Ampliar imagen'
+                    >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={previewSrc}
                         alt={form.title}
                         className='w-full max-h-[500px] object-contain'
                       />
+                      <span className='absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/10 transition-colors'>
+                        <ZoomIn className='h-6 w-6 text-white opacity-0 group-hover:opacity-100 drop-shadow transition-opacity' />
+                      </span>
+                    </button>
+                  </div>
+                )}
+
+                {/* Vista previa inline para URLs externas embebibles (Google Drive, OneDrive,
+                    Dropbox, YouTube, Vimeo, Office) — allow-same-origin es seguro aquí porque
+                    `embedUrl` siempre es uno de los dominios fijos que construye detectMedia()
+                    (o el visor de Google Docs, también fijo), nunca uno elegido por quien pegó
+                    la URL; sin este flag algunos reproductores/visores no pueden acceder a su
+                    storage/cookies para inicializar. */}
+                {showPreview &&
+                  canPreview &&
+                  previewSrc &&
+                  !isLocal &&
+                  !isRemoteImage &&
+                  remoteMedia?.canEmbed &&
+                  embedUrl && (
+                    <div className='rounded-lg overflow-hidden border bg-muted/30'>
+                      {remoteMedia.type === 'pdf' ? (
+                        <object data={embedUrl} type='application/pdf' className='w-full h-[500px]'>
+                          <iframe
+                            src={`https://docs.google.com/viewer?url=${encodeURIComponent(embedUrl)}&embedded=true`}
+                            className='w-full h-[500px] border-0'
+                            title={form.title}
+                            sandbox='allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox'
+                          />
+                        </object>
+                      ) : (
+                        <iframe
+                          src={embedUrl}
+                          title={form.title}
+                          className='w-full h-[500px] border-0'
+                          allow='autoplay; fullscreen'
+                          sandbox='allow-scripts allow-same-origin allow-popups allow-presentation'
+                        />
+                      )}
                     </div>
                   )}
 
-                {/* Vista previa inline para URLs externas embebibles (Google Drive, OneDrive, etc.) —
-                    `previewSrc` es una URL que pegó quien creó el documento (no necesariamente un
-                    admin: técnicos/clientes con canManageForms también pueden). Por eso ambos
-                    iframes van con `sandbox` sin `allow-same-origin`: combinarlo con
-                    `allow-scripts` le permitiría al contenido embebido quitarse su propio sandbox. */}
-                {showPreview && canPreview && previewSrc && !isLocal && (
-                  <div className='rounded-lg overflow-hidden border bg-muted/30'>
-                    {/* Para PDFs directos, usar object con fallback a Google Docs Viewer */}
-                    {form.fileType?.includes('pdf') &&
-                    !previewSrc.includes('drive.google.com') &&
-                    !previewSrc.includes('onedrive') &&
-                    !previewSrc.includes('sharepoint') &&
-                    !previewSrc.includes('dropbox') ? (
-                      <object data={previewSrc} type='application/pdf' className='w-full h-[500px]'>
-                        <iframe
-                          src={`https://docs.google.com/viewer?url=${encodeURIComponent(previewSrc)}&embedded=true`}
-                          className='w-full h-[500px] border-0'
-                          title={form.title}
-                          sandbox='allow-scripts allow-popups allow-popups-to-escape-sandbox'
-                        />
-                      </object>
-                    ) : (
-                      <iframe
-                        src={previewSrc}
-                        title={form.title}
-                        className='w-full h-[500px] border-0'
-                        allow='autoplay'
-                        sandbox='allow-scripts allow-popups allow-popups-to-escape-sandbox'
-                      />
-                    )}
-                  </div>
-                )}
+                {/* Enlace válido pero no embebible (SharePoint bloquea iframes por política de
+                    seguridad, carpetas/Docs de Drive, Dropbox de un tipo no soportado, etc.) —
+                    mostramos el motivo en vez de intentar un iframe condenado a fallar. */}
+                {showPreview &&
+                  canPreview &&
+                  !isRemoteImage &&
+                  !(remoteMedia?.canEmbed && embedUrl) &&
+                  !isLocal && (
+                    <div className='flex flex-col items-center justify-center gap-3 py-8 px-4 text-center rounded-lg border bg-muted/30'>
+                      <ExternalLink className='h-8 w-8 text-muted-foreground' />
+                      <p className='text-sm text-muted-foreground max-w-xs'>
+                        {remoteMedia?.previewNote ||
+                          'Este servicio no permite mostrar el contenido en vista previa inline.'}
+                      </p>
+                    </div>
+                  )}
               </>
             ) : (
               <div className='flex flex-col items-center justify-center py-8 text-center border border-dashed rounded-lg'>
@@ -481,25 +449,26 @@ export function FormDetail({
         </DialogContent>
       </Dialog>
 
-      {/* Modal de vista previa para PDFs y Word/Excel locales */}
-      {showPreview &&
-        isLocal &&
-        canPreview &&
-        previewSrc &&
-        (form.fileType?.includes('pdf') || isOfficeMime(form.fileType)) && (
-          <FilePreviewModal
-            isOpen={showPreview}
-            onClose={() => setShowPreview(false)}
-            file={{
-              id: form.id,
-              originalName: form.title,
-              mimeType: form.fileType ?? 'application/pdf',
-              size: form.fileSize ?? 0,
-              url: previewSrc,
-              downloadUrl: `/api/forms/${form.id}/file?download=true`,
-            }}
-          />
-        )}
+      {/* Modal de vista previa para PDFs, imágenes y Word/Excel locales — el zoom de
+          imagen ya viene incluido en FilePreviewModal. */}
+      {showPreview && isLocal && canPreview && previewSrc && (
+        <FilePreviewModal
+          isOpen={showPreview}
+          onClose={() => setShowPreview(false)}
+          file={{
+            id: form.id,
+            originalName: form.title,
+            mimeType: form.fileType ?? 'application/pdf',
+            size: form.fileSize ?? 0,
+            url: previewSrc,
+            downloadUrl: `/api/forms/${form.id}/file?download=true`,
+          }}
+        />
+      )}
+
+      {zoomOpen && isRemoteImage && previewSrc && (
+        <ImageLightbox src={previewSrc} alt={form.title} onClose={() => setZoomOpen(false)} />
+      )}
     </>
   )
 }

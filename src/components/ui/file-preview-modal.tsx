@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { ImageLightbox } from '@/components/ui/image-lightbox'
 import {
   Download,
   FileText,
@@ -29,6 +30,7 @@ import {
   ExternalLink,
   Smartphone,
   FileSpreadsheet,
+  ZoomIn,
 } from 'lucide-react'
 
 const WORD_MIMES = new Set([
@@ -87,6 +89,7 @@ function formatFileSize(bytes: number): string {
 
 export function FilePreviewModal({ isOpen, onClose, file }: FilePreviewModalProps) {
   const [imageError, setImageError] = useState(false)
+  const [zoomOpen, setZoomOpen] = useState(false)
   const [pdfState, setPdfState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [pdfError, setPdfError] = useState('')
   const isMobileBrowser = useIsMobileBrowser()
@@ -106,6 +109,7 @@ export function FilePreviewModal({ isOpen, onClose, file }: FilePreviewModalProp
   // Reset de estado al cambiar de archivo
   useEffect(() => {
     setImageError(false)
+    setZoomOpen(false)
     setPdfState('loading')
     setPdfError('')
     setOfficeState('loading')
@@ -213,258 +217,274 @@ export function FilePreviewModal({ isOpen, onClose, file }: FilePreviewModalProp
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent
-        className='max-w-4xl max-h-[90vh] w-[95vw] overflow-hidden flex flex-col p-4 sm:p-6'
-        aria-describedby={undefined}
-      >
-        <DialogHeader>
-          <DialogTitle className='flex items-center gap-2'>
-            {isImage && <ImageIcon className='h-5 w-5 shrink-0' />}
-            {isPDF && <FileText className='h-5 w-5 shrink-0' />}
-            {isExcel && <FileSpreadsheet className='h-5 w-5 shrink-0' />}
-            {isWord && <FileText className='h-5 w-5 shrink-0' />}
-            {!isImage && !isPDF && !isWord && !isExcel && <File className='h-5 w-5 shrink-0' />}
-            <span className='truncate'>{file.originalName}</span>
-          </DialogTitle>
-          <DialogDescription className='flex items-center justify-between gap-2 flex-wrap'>
-            <span>
-              {formatFileSize(file.size)} · {file.mimeType}
-            </span>
-            <div className='flex gap-2'>
-              {isPDF && pdfState === 'ready' && (
-                <Button variant='outline' size='sm' onClick={handleOpenNewTab}>
-                  <ExternalLink className='h-4 w-4 mr-1.5' />
-                  Abrir en pestaña
+    <>
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent
+          className='max-w-4xl max-h-[90vh] w-[95vw] overflow-hidden flex flex-col p-4 sm:p-6'
+          aria-describedby={undefined}
+        >
+          <DialogHeader>
+            <DialogTitle className='flex items-center gap-2'>
+              {isImage && <ImageIcon className='h-5 w-5 shrink-0' />}
+              {isPDF && <FileText className='h-5 w-5 shrink-0' />}
+              {isExcel && <FileSpreadsheet className='h-5 w-5 shrink-0' />}
+              {isWord && <FileText className='h-5 w-5 shrink-0' />}
+              {!isImage && !isPDF && !isWord && !isExcel && <File className='h-5 w-5 shrink-0' />}
+              <span className='truncate'>{file.originalName}</span>
+            </DialogTitle>
+            <DialogDescription className='flex items-center justify-between gap-2 flex-wrap'>
+              <span>
+                {formatFileSize(file.size)} · {file.mimeType}
+              </span>
+              <div className='flex gap-2'>
+                {isPDF && pdfState === 'ready' && (
+                  <Button variant='outline' size='sm' onClick={handleOpenNewTab}>
+                    <ExternalLink className='h-4 w-4 mr-1.5' />
+                    Abrir en pestaña
+                  </Button>
+                )}
+                <Button variant='outline' size='sm' onClick={handleDownload}>
+                  <Download className='h-4 w-4 mr-1.5' />
+                  Descargar
                 </Button>
-              )}
-              <Button variant='outline' size='sm' onClick={handleDownload}>
-                <Download className='h-4 w-4 mr-1.5' />
-                Descargar
-              </Button>
-            </div>
-          </DialogDescription>
-        </DialogHeader>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
 
-        <div className='flex-1 overflow-auto bg-muted/30 rounded-lg p-4 min-h-0'>
-          {/* ── Imagen ── */}
-          {isImage && !imageError && (
-            <div className='flex items-center justify-center min-h-[400px]'>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={file.url}
-                alt={file.originalName}
-                className='max-w-full max-h-[600px] object-contain'
-                onError={() => setImageError(true)}
-              />
-            </div>
-          )}
+          <div className='flex-1 overflow-auto bg-muted/30 rounded-lg p-4 min-h-0'>
+            {/* ── Imagen ── */}
+            {isImage && !imageError && (
+              <div className='flex items-center justify-center min-h-[400px]'>
+                <button
+                  type='button'
+                  onClick={() => setZoomOpen(true)}
+                  className='relative cursor-zoom-in group'
+                  aria-label='Ampliar imagen'
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={file.url}
+                    alt={file.originalName}
+                    className='max-w-full max-h-[600px] object-contain'
+                    onError={() => setImageError(true)}
+                  />
+                  <span className='absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/10 transition-colors rounded'>
+                    <ZoomIn className='h-6 w-6 text-white opacity-0 group-hover:opacity-100 drop-shadow transition-opacity' />
+                  </span>
+                </button>
+              </div>
+            )}
 
-          {/* ── PDF ── */}
-          {isPDF && (
-            <div className='w-full h-[600px] relative'>
-              {/* En navegadores móviles el iframe no puede renderizar PDFs */}
-              {isMobileBrowser ? (
-                <div className='absolute inset-0 flex flex-col items-center justify-center gap-4 p-8 text-center'>
-                  <Smartphone className='h-10 w-10 text-muted-foreground' />
-                  <div>
-                    <p className='font-medium text-sm'>Vista previa no disponible en móvil</p>
-                    <p className='text-xs text-muted-foreground mt-1'>
-                      Los navegadores móviles no admiten la previsualización de PDFs en línea.
-                      Ábrelo en una nueva pestaña o descárgalo.
-                    </p>
+            {/* ── PDF ── */}
+            {isPDF && (
+              <div className='w-full h-[600px] relative'>
+                {/* En navegadores móviles el iframe no puede renderizar PDFs */}
+                {isMobileBrowser ? (
+                  <div className='absolute inset-0 flex flex-col items-center justify-center gap-4 p-8 text-center'>
+                    <Smartphone className='h-10 w-10 text-muted-foreground' />
+                    <div>
+                      <p className='font-medium text-sm'>Vista previa no disponible en móvil</p>
+                      <p className='text-xs text-muted-foreground mt-1'>
+                        Los navegadores móviles no admiten la previsualización de PDFs en línea.
+                        Ábrelo en una nueva pestaña o descárgalo.
+                      </p>
+                    </div>
+                    <div className='flex gap-2 flex-wrap justify-center'>
+                      <Button size='sm' variant='outline' onClick={handleOpenNewTab}>
+                        <ExternalLink className='h-3.5 w-3.5 mr-1.5' />
+                        Abrir en pestaña
+                      </Button>
+                      <Button size='sm' variant='outline' onClick={handleDownload}>
+                        <Download className='h-3.5 w-3.5 mr-1.5' />
+                        Descargar
+                      </Button>
+                    </div>
                   </div>
-                  <div className='flex gap-2 flex-wrap justify-center'>
-                    <Button size='sm' variant='outline' onClick={handleOpenNewTab}>
-                      <ExternalLink className='h-3.5 w-3.5 mr-1.5' />
-                      Abrir en pestaña
-                    </Button>
+                ) : (
+                  <>
+                    {pdfState === 'loading' && (
+                      <div className='absolute inset-0 flex flex-col items-center justify-center gap-3'>
+                        <Loader2 className='h-8 w-8 animate-spin text-muted-foreground' />
+                        <p className='text-sm text-muted-foreground'>Cargando PDF...</p>
+                      </div>
+                    )}
+
+                    {pdfState === 'error' && (
+                      <div className='absolute inset-0 flex flex-col items-center justify-center gap-4 p-8 text-center'>
+                        <AlertTriangle className='h-10 w-10 text-amber-500' />
+                        <div>
+                          <p className='font-medium text-sm'>No se puede previsualizar el PDF</p>
+                          <p className='text-xs text-muted-foreground mt-1'>{pdfError}</p>
+                        </div>
+                        <div className='flex gap-2 flex-wrap justify-center'>
+                          <Button size='sm' variant='outline' onClick={handleOpenNewTab}>
+                            <ExternalLink className='h-3.5 w-3.5 mr-1.5' />
+                            Abrir en nueva pestaña
+                          </Button>
+                          <Button size='sm' variant='outline' onClick={handleDownload}>
+                            <Download className='h-3.5 w-3.5 mr-1.5' />
+                            Descargar
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
+                    {pdfState === 'ready' && (
+                      <iframe
+                        src={file.url}
+                        className='w-full h-full border-0 rounded'
+                        title={file.originalName}
+                        onError={() => {
+                          setPdfState('error')
+                          setPdfError('El navegador no pudo mostrar el PDF.')
+                        }}
+                        onLoad={e => {
+                          // Detectar si el iframe cargó una página de error (respuesta no-PDF del servidor)
+                          try {
+                            const doc = (e.target as HTMLIFrameElement).contentDocument
+                            if (doc && doc.contentType && !doc.contentType.includes('pdf')) {
+                              const bodyText = doc.body?.innerText ?? ''
+                              if (
+                                bodyText.includes('not found') ||
+                                bodyText.includes('404') ||
+                                bodyText.includes('Unauthorized')
+                              ) {
+                                setPdfState('error')
+                                setPdfError(bodyText.trim().slice(0, 80) || 'Archivo no encontrado')
+                              }
+                            }
+                          } catch {
+                            // cross-origin o acceso denegado al contentDocument — ignorar
+                          }
+                        }}
+                      />
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* ── Texto ── */}
+            {isText && (
+              <div className='bg-background p-4 rounded border'>
+                <iframe
+                  src={file.url}
+                  className='w-full h-[500px] border-0'
+                  title={file.originalName}
+                />
+              </div>
+            )}
+
+            {/* ── Word / Excel (convertidos a HTML en el navegador) ── */}
+            {(isWord || isExcel) && (
+              <div className='w-full min-h-[400px]'>
+                {officeState === 'loading' && (
+                  <div className='flex flex-col items-center justify-center min-h-[400px] gap-3'>
+                    <Loader2 className='h-8 w-8 animate-spin text-muted-foreground' />
+                    <p className='text-sm text-muted-foreground'>Generando vista previa...</p>
+                  </div>
+                )}
+
+                {officeState === 'error' && (
+                  <div className='flex flex-col items-center justify-center min-h-[400px] gap-4 p-8 text-center'>
+                    <AlertTriangle className='h-10 w-10 text-amber-500' />
+                    <div>
+                      <p className='font-medium text-sm'>No se pudo generar la vista previa</p>
+                      <p className='text-xs text-muted-foreground mt-1'>{officeError}</p>
+                    </div>
                     <Button size='sm' variant='outline' onClick={handleDownload}>
                       <Download className='h-3.5 w-3.5 mr-1.5' />
                       Descargar
                     </Button>
                   </div>
-                </div>
-              ) : (
-                <>
-                  {pdfState === 'loading' && (
-                    <div className='absolute inset-0 flex flex-col items-center justify-center gap-3'>
-                      <Loader2 className='h-8 w-8 animate-spin text-muted-foreground' />
-                      <p className='text-sm text-muted-foreground'>Cargando PDF...</p>
-                    </div>
-                  )}
+                )}
 
-                  {pdfState === 'error' && (
-                    <div className='absolute inset-0 flex flex-col items-center justify-center gap-4 p-8 text-center'>
-                      <AlertTriangle className='h-10 w-10 text-amber-500' />
-                      <div>
-                        <p className='font-medium text-sm'>No se puede previsualizar el PDF</p>
-                        <p className='text-xs text-muted-foreground mt-1'>{pdfError}</p>
-                      </div>
-                      <div className='flex gap-2 flex-wrap justify-center'>
-                        <Button size='sm' variant='outline' onClick={handleOpenNewTab}>
-                          <ExternalLink className='h-3.5 w-3.5 mr-1.5' />
-                          Abrir en nueva pestaña
-                        </Button>
-                        <Button size='sm' variant='outline' onClick={handleDownload}>
-                          <Download className='h-3.5 w-3.5 mr-1.5' />
-                          Descargar
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-
-                  {pdfState === 'ready' && (
-                    <iframe
-                      src={file.url}
-                      className='w-full h-full border-0 rounded'
-                      title={file.originalName}
-                      onError={() => {
-                        setPdfState('error')
-                        setPdfError('El navegador no pudo mostrar el PDF.')
-                      }}
-                      onLoad={e => {
-                        // Detectar si el iframe cargó una página de error (respuesta no-PDF del servidor)
-                        try {
-                          const doc = (e.target as HTMLIFrameElement).contentDocument
-                          if (doc && doc.contentType && !doc.contentType.includes('pdf')) {
-                            const bodyText = doc.body?.innerText ?? ''
-                            if (
-                              bodyText.includes('not found') ||
-                              bodyText.includes('404') ||
-                              bodyText.includes('Unauthorized')
-                            ) {
-                              setPdfState('error')
-                              setPdfError(bodyText.trim().slice(0, 80) || 'Archivo no encontrado')
-                            }
-                          }
-                        } catch {
-                          // cross-origin o acceso denegado al contentDocument — ignorar
-                        }
-                      }}
-                    />
-                  )}
-                </>
-              )}
-            </div>
-          )}
-
-          {/* ── Texto ── */}
-          {isText && (
-            <div className='bg-background p-4 rounded border'>
-              <iframe
-                src={file.url}
-                className='w-full h-[500px] border-0'
-                title={file.originalName}
-              />
-            </div>
-          )}
-
-          {/* ── Word / Excel (convertidos a HTML en el navegador) ── */}
-          {(isWord || isExcel) && (
-            <div className='w-full min-h-[400px]'>
-              {officeState === 'loading' && (
-                <div className='flex flex-col items-center justify-center min-h-[400px] gap-3'>
-                  <Loader2 className='h-8 w-8 animate-spin text-muted-foreground' />
-                  <p className='text-sm text-muted-foreground'>Generando vista previa...</p>
-                </div>
-              )}
-
-              {officeState === 'error' && (
-                <div className='flex flex-col items-center justify-center min-h-[400px] gap-4 p-8 text-center'>
-                  <AlertTriangle className='h-10 w-10 text-amber-500' />
-                  <div>
-                    <p className='font-medium text-sm'>No se pudo generar la vista previa</p>
-                    <p className='text-xs text-muted-foreground mt-1'>{officeError}</p>
-                  </div>
-                  <Button size='sm' variant='outline' onClick={handleDownload}>
-                    <Download className='h-3.5 w-3.5 mr-1.5' />
-                    Descargar
-                  </Button>
-                </div>
-              )}
-
-              {officeState === 'ready' && isWord && (
-                <div
-                  className={cn(
-                    'bg-background rounded border p-6 max-h-[600px] overflow-auto text-sm leading-relaxed',
-                    '[&_h1]:text-xl [&_h1]:font-bold [&_h1]:mt-4 [&_h1]:mb-2',
-                    '[&_h2]:text-lg [&_h2]:font-bold [&_h2]:mt-4 [&_h2]:mb-2',
-                    '[&_h3]:text-base [&_h3]:font-semibold [&_h3]:mt-3 [&_h3]:mb-1',
-                    '[&_p]:mb-3',
-                    '[&_ul]:list-disc [&_ul]:pl-5 [&_ul]:mb-3',
-                    '[&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:mb-3',
-                    '[&_table]:border-collapse [&_table]:my-3',
-                    '[&_td]:border [&_td]:border-border [&_td]:px-2 [&_td]:py-1',
-                    '[&_th]:border [&_th]:border-border [&_th]:px-2 [&_th]:py-1 [&_th]:bg-muted',
-                    '[&_a]:text-primary [&_a]:underline',
-                    '[&_strong]:font-semibold'
-                  )}
-                  dangerouslySetInnerHTML={{ __html: wordHtml }}
-                />
-              )}
-
-              {officeState === 'ready' && isExcel && (
-                <div className='space-y-2'>
-                  {sheets.length > 1 && (
-                    <div className='flex gap-1 flex-wrap border-b pb-2'>
-                      {sheets.map((sheet, i) => (
-                        <Button
-                          key={sheet.name}
-                          size='sm'
-                          variant={i === activeSheet ? 'secondary' : 'ghost'}
-                          onClick={() => setActiveSheet(i)}
-                        >
-                          {sheet.name}
-                        </Button>
-                      ))}
-                    </div>
-                  )}
+                {officeState === 'ready' && isWord && (
                   <div
                     className={cn(
-                      'bg-background rounded border overflow-auto max-h-[550px]',
-                      '[&_table]:border-collapse [&_table]:text-xs',
+                      'bg-background rounded border p-6 max-h-[600px] overflow-auto text-sm leading-relaxed',
+                      '[&_h1]:text-xl [&_h1]:font-bold [&_h1]:mt-4 [&_h1]:mb-2',
+                      '[&_h2]:text-lg [&_h2]:font-bold [&_h2]:mt-4 [&_h2]:mb-2',
+                      '[&_h3]:text-base [&_h3]:font-semibold [&_h3]:mt-3 [&_h3]:mb-1',
+                      '[&_p]:mb-3',
+                      '[&_ul]:list-disc [&_ul]:pl-5 [&_ul]:mb-3',
+                      '[&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:mb-3',
+                      '[&_table]:border-collapse [&_table]:my-3',
                       '[&_td]:border [&_td]:border-border [&_td]:px-2 [&_td]:py-1',
-                      '[&_th]:border [&_th]:border-border [&_th]:px-2 [&_th]:py-1 [&_th]:bg-muted'
+                      '[&_th]:border [&_th]:border-border [&_th]:px-2 [&_th]:py-1 [&_th]:bg-muted',
+                      '[&_a]:text-primary [&_a]:underline',
+                      '[&_strong]:font-semibold'
                     )}
-                    dangerouslySetInnerHTML={{ __html: sheets[activeSheet]?.html || '' }}
+                    dangerouslySetInnerHTML={{ __html: wordHtml }}
                   />
-                </div>
-              )}
-            </div>
-          )}
+                )}
 
-          {/* ── Tipo no soportado ── */}
-          {!isImage && !isPDF && !isText && !isWord && !isExcel && (
-            <div className='flex flex-col items-center justify-center min-h-[400px] text-center'>
-              <File className='h-16 w-16 text-muted-foreground mb-4' />
-              <p className='text-lg font-medium'>Vista previa no disponible</p>
-              <p className='text-sm text-muted-foreground mt-2'>
-                Este tipo de archivo no se puede previsualizar
-              </p>
-              <Button className='mt-4' onClick={handleDownload}>
-                <Download className='h-4 w-4 mr-2' />
-                Descargar archivo
-              </Button>
-            </div>
-          )}
+                {officeState === 'ready' && isExcel && (
+                  <div className='space-y-2'>
+                    {sheets.length > 1 && (
+                      <div className='flex gap-1 flex-wrap border-b pb-2'>
+                        {sheets.map((sheet, i) => (
+                          <Button
+                            key={sheet.name}
+                            size='sm'
+                            variant={i === activeSheet ? 'secondary' : 'ghost'}
+                            onClick={() => setActiveSheet(i)}
+                          >
+                            {sheet.name}
+                          </Button>
+                        ))}
+                      </div>
+                    )}
+                    <div
+                      className={cn(
+                        'bg-background rounded border overflow-auto max-h-[550px]',
+                        '[&_table]:border-collapse [&_table]:text-xs',
+                        '[&_td]:border [&_td]:border-border [&_td]:px-2 [&_td]:py-1',
+                        '[&_th]:border [&_th]:border-border [&_th]:px-2 [&_th]:py-1 [&_th]:bg-muted'
+                      )}
+                      dangerouslySetInnerHTML={{ __html: sheets[activeSheet]?.html || '' }}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
 
-          {/* ── Error de imagen ── */}
-          {isImage && imageError && (
-            <div className='flex flex-col items-center justify-center min-h-[400px] text-center'>
-              <ImageIcon className='h-16 w-16 text-muted-foreground mb-4' />
-              <p className='text-lg font-medium'>Error al cargar la imagen</p>
-              <p className='text-sm text-muted-foreground mt-2'>
-                No se pudo cargar la vista previa
-              </p>
-              <Button className='mt-4' onClick={handleDownload}>
-                <Download className='h-4 w-4 mr-2' />
-                Descargar archivo
-              </Button>
-            </div>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
+            {/* ── Tipo no soportado ── */}
+            {!isImage && !isPDF && !isText && !isWord && !isExcel && (
+              <div className='flex flex-col items-center justify-center min-h-[400px] text-center'>
+                <File className='h-16 w-16 text-muted-foreground mb-4' />
+                <p className='text-lg font-medium'>Vista previa no disponible</p>
+                <p className='text-sm text-muted-foreground mt-2'>
+                  Este tipo de archivo no se puede previsualizar
+                </p>
+                <Button className='mt-4' onClick={handleDownload}>
+                  <Download className='h-4 w-4 mr-2' />
+                  Descargar archivo
+                </Button>
+              </div>
+            )}
+
+            {/* ── Error de imagen ── */}
+            {isImage && imageError && (
+              <div className='flex flex-col items-center justify-center min-h-[400px] text-center'>
+                <ImageIcon className='h-16 w-16 text-muted-foreground mb-4' />
+                <p className='text-lg font-medium'>Error al cargar la imagen</p>
+                <p className='text-sm text-muted-foreground mt-2'>
+                  No se pudo cargar la vista previa
+                </p>
+                <Button className='mt-4' onClick={handleDownload}>
+                  <Download className='h-4 w-4 mr-2' />
+                  Descargar archivo
+                </Button>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {zoomOpen && isImage && !imageError && (
+        <ImageLightbox src={file.url} alt={file.originalName} onClose={() => setZoomOpen(false)} />
+      )}
+    </>
   )
 }

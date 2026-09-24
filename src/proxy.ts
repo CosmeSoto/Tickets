@@ -265,7 +265,7 @@ export async function proxy(request: NextRequest) {
   response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload')
   response.headers.set(
     'Content-Security-Policy',
-    "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com https://drive.google.com https://onedrive.live.com https://1drv.ms https://view.officeapps.live.com https://www.dropbox.com; frame-ancestors 'none';"
+    "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self'; connect-src 'self'; frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com https://player.vimeo.com https://drive.google.com https://onedrive.live.com https://1drv.ms https://view.officeapps.live.com https://www.dropbox.com; frame-ancestors 'none';"
   )
 
   const isPublic = isPublicRoute(request.nextUrl.pathname)
