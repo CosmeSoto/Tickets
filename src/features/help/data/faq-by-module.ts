@@ -401,8 +401,8 @@ export const HELP_FAQS: HelpFaqItem[] = [
     category: 'Noticias',
     question: '¿Dónde veo las noticias y anuncios de la organización?',
     answer:
-      'En el menú Noticias verás comunicados, anuncios, eventos y otras publicaciones internas, más recientes primero. Algunas solo son visibles para ciertas áreas o roles, según cómo las haya configurado quien las publicó.',
-    keywords: ['noticia', 'anuncio', 'comunicado', 'evento'],
+      'En la sección "Centro de Noticias" de tu pantalla de inicio, con comunicados, anuncios, eventos y otras publicaciones internas separados en Alertas urgentes, Destacados y el resto, más recientes primero. Podés filtrar por tipo y por período (hoy/semana/mes). Algunas noticias solo son visibles para ciertas áreas o roles, según cómo las haya configurado quien las publicó. Si además tenés permiso para gestionar Noticias, vas a ver un menú "Noticias" aparte: ese es para crear y editar publicaciones, no para leerlas.',
+    keywords: ['noticia', 'anuncio', 'comunicado', 'evento', 'inicio', 'dashboard'],
   },
   {
     id: 'news-2',
@@ -410,7 +410,7 @@ export const HELP_FAQS: HelpFaqItem[] = [
     category: 'Noticias',
     question: '¿Quién puede publicar una noticia?',
     answer:
-      'Usuarios con permiso de gestión de Noticias pueden crear y publicar (texto, imágenes o video incrustado desde YouTube/Drive). El resto de usuarios solo las consulta según la visibilidad configurada para su área o rol.',
+      'Usuarios con permiso de gestión de Noticias pueden crear y publicar (texto, imágenes o video incrustado desde YouTube/Drive) desde el menú "Noticias". El resto de usuarios solo las consulta en el Centro de Noticias de su pantalla de inicio, según la visibilidad configurada para su área o rol.',
     keywords: ['publicar', 'crear', 'permiso'],
     roles: ['ADMIN', 'TECHNICIAN'],
   },
