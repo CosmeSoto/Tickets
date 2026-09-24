@@ -7,6 +7,7 @@ import {
   BookOpen,
   ChevronDown,
   ChevronUp,
+  ExternalLink,
   HelpCircle,
   Mail,
   Package,
@@ -20,6 +21,7 @@ import {
   Newspaper,
   Workflow,
   ScanLine,
+  ZoomIn,
 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -29,6 +31,7 @@ import { cn } from '@/lib/utils'
 import { useUserModules } from '@/hooks/use-user-modules'
 import { useSyncDashboardPageMeta } from '@/contexts/dashboard-shell-context'
 import { detectMedia } from '@/components/common/media-url-input'
+import { ImageLightbox } from '@/components/ui/image-lightbox'
 import type { HelpFaqItem, HelpModuleId } from '@/features/help/data/faq-by-module'
 import {
   faqMatchesQuery,
@@ -62,42 +65,84 @@ const MODULE_ICONS: Record<HelpModuleId, typeof HelpCircle> = {
   access: ScanLine,
 }
 
-/** Mismo criterio que el carrusel de Noticias (news-detail.tsx): imagen
- *  directa se muestra con <img>, todo lo demás embebible (YouTube, Google
- *  Drive) con <iframe> sandboxeado; lo no embebible (SharePoint, carpetas de
- *  Drive) se deja como enlace externo simple. */
+/** Mismo criterio que Noticias (news-detail.tsx) y Documentos (FormDetail.tsx):
+ *  imagen directa se muestra con <img> con zoom (ImageLightbox), lo embebible
+ *  (YouTube, Vimeo, Google Drive) con <iframe> sandboxeado, y lo que el
+ *  proveedor bloquea (SharePoint, carpetas de Drive) muestra una tarjeta con
+ *  el motivo en vez de un iframe condenado a fallar. */
 function FaqMedia({ url }: { url: string }) {
+  const [zoomOpen, setZoomOpen] = useState(false)
   const media = detectMedia(url)
-  if (!media.canPreview || !media.embedUrl) {
+
+  if (!media.canPreview) {
     return (
       <a
         href={url}
         target='_blank'
         rel='noopener noreferrer'
-        className='text-xs text-primary underline underline-offset-2'
+        className='inline-flex items-center gap-1.5 text-xs text-primary underline underline-offset-2'
       >
+        <ExternalLink className='h-3 w-3' />
         Ver adjunto
       </a>
     )
   }
-  if (media.type === 'image') {
+
+  if (media.type === 'image' && media.embedUrl) {
     return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
+      <>
+        <button
+          type='button'
+          onClick={() => setZoomOpen(true)}
+          className='group relative block w-full overflow-hidden rounded-md border'
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={media.embedUrl} alt='' className='w-full h-auto max-h-[320px] object-contain' />
+          <span className='absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/30 transition-colors'>
+            <ZoomIn className='h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity' />
+          </span>
+        </button>
+        {zoomOpen && (
+          <ImageLightbox src={media.embedUrl} alt='Adjunto' onClose={() => setZoomOpen(false)} />
+        )}
+      </>
+    )
+  }
+
+  if (media.canEmbed && media.embedUrl) {
+    return (
+      <iframe
         src={media.embedUrl}
-        alt=''
-        className='w-full h-auto max-h-[320px] object-contain rounded-md border'
+        title='Adjunto'
+        className='w-full h-[220px] sm:h-[300px] rounded-md border-0'
+        allow='autoplay; fullscreen'
+        // allow-same-origin: el src siempre es un dominio fijo y confiable
+        // construido por detectMedia (youtube-nocookie.com, vimeo, drive.google.com,
+        // etc.), nunca la URL cruda pegada por el editor. Sin este flag, YouTube y
+        // otros reproductores no pueden inicializar su botón de play (queda en negro).
+        sandbox='allow-scripts allow-same-origin allow-popups allow-forms allow-presentation'
       />
     )
   }
+
+  // canPreview pero no embebible (SharePoint, carpetas de Drive, etc.)
   return (
-    <iframe
-      src={media.embedUrl}
-      title='Adjunto'
-      className='w-full h-[220px] sm:h-[300px] rounded-md border-0'
-      allow='autoplay; fullscreen'
-      sandbox='allow-scripts allow-popups allow-presentation'
-    />
+    <div className='flex flex-col items-center justify-center gap-2 py-6 px-4 text-center rounded-md border bg-muted/30'>
+      <p className='text-xs font-medium'>{media.label}</p>
+      <p className='text-xs text-muted-foreground max-w-xs'>
+        {media.previewNote || 'Este servicio no permite mostrar el contenido en vista previa.'}
+      </p>
+      <Button
+        type='button'
+        variant='outline'
+        size='sm'
+        onClick={() => window.open(url, '_blank')}
+        className='gap-1.5'
+      >
+        <ExternalLink className='h-3.5 w-3.5' />
+        Abrir en nueva pestaña
+      </Button>
+    </div>
   )
 }
 
