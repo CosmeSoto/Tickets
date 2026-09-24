@@ -40,6 +40,7 @@ import {
   Inbox,
   Wrench,
   Cloud,
+  HelpCircle,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { invalidateLandingCache } from '@/hooks/use-landing-data'
@@ -636,7 +637,7 @@ function SettingsPage() {
         value={activeTab}
         className='space-y-6'
         onValueChange={tab => {
-          const superAdminTabs = ['email', 'security', 'oauth', 'sla', 'telegram']
+          const superAdminTabs = ['email', 'security', 'oauth', 'sla', 'telegram', 'help']
           if (superAdminTabs.includes(tab) && !isSuperAdmin) return
           setActiveTab(tab)
         }}
@@ -648,9 +649,6 @@ function SettingsPage() {
             </TabsTrigger>
             <TabsTrigger value='notifications' className='shrink-0 px-3'>
               Notificaciones
-            </TabsTrigger>
-            <TabsTrigger value='help' className='shrink-0 px-3'>
-              Ayuda
             </TabsTrigger>
             {/* Tabs solo para Super Admin */}
             <TabsTrigger value='sla' className='shrink-0 px-3' disabled={!isSuperAdmin}>
@@ -692,6 +690,13 @@ function SettingsPage() {
                 {!isSuperAdmin && <Crown className='h-3 w-3 text-amber-500' />}
                 <Cloud className='h-4 w-4 hidden sm:inline' />
                 <span>Almacenamiento</span>
+              </span>
+            </TabsTrigger>
+            <TabsTrigger value='help' className='shrink-0 px-3' disabled={!isSuperAdmin}>
+              <span className='flex items-center gap-1'>
+                {!isSuperAdmin && <Crown className='h-3 w-3 text-amber-500' />}
+                <HelpCircle className='h-4 w-4 hidden sm:inline' />
+                <span>Ayuda</span>
               </span>
             </TabsTrigger>
           </TabsList>
@@ -2148,7 +2153,17 @@ function SettingsPage() {
 
         {/* Preguntas frecuentes del Centro de Ayuda */}
         <TabsContent value='help'>
-          <HelpFaqsTab />
+          {!isSuperAdmin ? (
+            <div className='flex flex-col items-center justify-center py-16 text-center'>
+              <Crown className='h-12 w-12 text-amber-500 mb-4' />
+              <h3 className='text-lg font-semibold text-foreground mb-2'>Acceso restringido</h3>
+              <p className='text-muted-foreground max-w-sm'>
+                Esta sección solo está disponible para Administradores Principales (Super Admin).
+              </p>
+            </div>
+          ) : (
+            <HelpFaqsTab />
+          )}
         </TabsContent>
       </Tabs>
     </ModuleLayout>

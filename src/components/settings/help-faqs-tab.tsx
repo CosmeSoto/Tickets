@@ -8,6 +8,11 @@
  * como antes — acá solo se administra el contenido: preguntas, respuestas,
  * a qué módulo pertenecen, para qué roles aplican y un adjunto opcional
  * (imagen o video vía URL, mismo componente que usa Noticias).
+ *
+ * Pestaña y endpoints (/api/admin/help-faqs*) restringidos a Super Admin,
+ * igual que OAuth/Backups/Almacenamiento — el propio componente confía en
+ * que el padre (admin/settings/page.tsx) ya bloqueó el acceso antes de
+ * montarlo, no vuelve a chequear el rol acá.
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -230,6 +235,12 @@ export function HelpFaqsTab() {
       })
       const data = await res.json()
       if (!data.success) throw new Error(data.message)
+      // Reafirma el valor confirmado por el servidor — si mientras esta
+      // petición estaba en curso un create/edit disparó load() y trajo de
+      // vuelta el estado viejo de esta fila (la respuesta de load() puede
+      // llegar antes de que este PUT termine), esto corrige el pisado en vez
+      // de dejar el switch mostrando algo distinto a lo que ya quedó en BD.
+      setFaqs(current => current.map(f => (f.id === row.id ? { ...f, isActive } : f)))
     } catch {
       setFaqs(current => current.map(f => (f.id === row.id ? { ...f, isActive: row.isActive } : f)))
       toast({ title: 'No se pudo cambiar el estado', variant: 'destructive' })

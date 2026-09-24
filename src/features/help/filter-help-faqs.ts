@@ -9,6 +9,10 @@ export type HelpModuleFlags = {
   patrols: boolean
   forms: boolean
   credentials: boolean
+  planner: boolean
+  news: boolean
+  processes: boolean
+  access: boolean
   /** Knowledge = tickets + canAccessKnowledge */
   knowledge: boolean
 }
@@ -35,6 +39,14 @@ export function isHelpModuleEnabled(moduleId: HelpModuleId, flags: HelpModuleFla
       return flags.forms
     case 'credentials':
       return flags.credentials
+    case 'planner':
+      return flags.planner
+    case 'news':
+      return flags.news
+    case 'processes':
+      return flags.processes
+    case 'access':
+      return flags.access
     default:
       return false
   }

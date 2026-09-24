@@ -6,20 +6,18 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
+import { requireSuperAdmin } from '@/lib/auth/require-super-admin'
 import { HELP_MODULE_SECTIONS } from '@/features/help/data/faq-by-module'
 
 const VALID_MODULES = new Set(HELP_MODULE_SECTIONS.map(s => s.id))
 const VALID_ROLES = new Set(['ADMIN', 'TECHNICIAN', 'CLIENT'])
 
-function requireAdmin(session: { user?: { role?: string } } | null) {
-  return session?.user?.role === 'ADMIN'
-}
-
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
-    if (!requireAdmin(session)) {
-      return NextResponse.json({ success: false, message: 'No autorizado' }, { status: 403 })
+    const gate = await requireSuperAdmin(session)
+    if (!gate.ok) {
+      return NextResponse.json({ success: false, message: gate.error }, { status: gate.status })
     }
 
     const { id } = await params
@@ -48,22 +46,25 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       isActive,
     } = body
 
+    // typeof antes de trim(): un valor no-string (ej. un número) pasaría el
+    // `!== undefined` y tiraría una excepción sin capturar en trim(), cayendo
+    // al catch genérico como 500 en vez de un 400 claro.
     if (moduleId !== undefined && !VALID_MODULES.has(moduleId)) {
       return NextResponse.json({ success: false, message: 'Módulo inválido' }, { status: 400 })
     }
-    if (category !== undefined && !category?.trim()) {
+    if (category !== undefined && (typeof category !== 'string' || !category.trim())) {
       return NextResponse.json(
         { success: false, message: 'La categoría es obligatoria' },
         { status: 400 }
       )
     }
-    if (question !== undefined && !question?.trim()) {
+    if (question !== undefined && (typeof question !== 'string' || !question.trim())) {
       return NextResponse.json(
         { success: false, message: 'La pregunta es obligatoria' },
         { status: 400 }
       )
     }
-    if (answer !== undefined && !answer?.trim()) {
+    if (answer !== undefined && (typeof answer !== 'string' || !answer.trim())) {
       return NextResponse.json(
         { success: false, message: 'La respuesta es obligatoria' },
         { status: 400 }
@@ -78,7 +79,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (category !== undefined) updateData.category = category.trim()
     if (question !== undefined) updateData.question = question.trim()
     if (answer !== undefined) updateData.answer = answer.trim()
-    if (mediaUrl !== undefined) updateData.mediaUrl = mediaUrl?.trim() || null
+    if (mediaUrl !== undefined) {
+      updateData.mediaUrl = typeof mediaUrl === 'string' ? mediaUrl.trim() || null : null
+    }
     if (roles !== undefined) updateData.roles = Array.isArray(roles) ? roles : []
     if (keywords !== undefined) updateData.keywords = Array.isArray(keywords) ? keywords : []
     if (order !== undefined) updateData.order = typeof order === 'number' ? order : 0
@@ -102,8 +105,9 @@ export async function DELETE(
 ) {
   try {
     const session = await getServerSession(authOptions)
-    if (!requireAdmin(session)) {
-      return NextResponse.json({ success: false, message: 'No autorizado' }, { status: 403 })
+    const gate = await requireSuperAdmin(session)
+    if (!gate.ok) {
+      return NextResponse.json({ success: false, message: gate.error }, { status: gate.status })
     }
 
     const { id } = await params

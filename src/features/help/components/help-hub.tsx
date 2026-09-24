@@ -16,6 +16,10 @@ import {
   FileText,
   Ticket,
   User,
+  ListTodo,
+  Newspaper,
+  Workflow,
+  ScanLine,
 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -52,6 +56,10 @@ const MODULE_ICONS: Record<HelpModuleId, typeof HelpCircle> = {
   knowledge: BookOpen,
   forms: FileText,
   credentials: KeyRound,
+  planner: ListTodo,
+  news: Newspaper,
+  processes: Workflow,
+  access: ScanLine,
 }
 
 /** Mismo criterio que el carrusel de Noticias (news-detail.tsx): imagen
@@ -107,6 +115,10 @@ export function HelpHub() {
     patrols,
     forms,
     credentials,
+    planner,
+    news,
+    processes,
+    access,
     canRequestAssets,
     canAccessKnowledge,
     loading: modulesLoading,
@@ -151,9 +163,25 @@ export function HelpHub() {
       patrols: !!patrols,
       forms: !!forms,
       credentials: !!credentials,
+      planner: !!planner,
+      news: !!news,
+      processes: !!processes,
+      access: !!access,
       knowledge: !!tickets && !!canAccessKnowledge,
     }),
-    [tickets, inventory, canRequestAssets, patrols, forms, credentials, canAccessKnowledge]
+    [
+      tickets,
+      inventory,
+      canRequestAssets,
+      patrols,
+      forms,
+      credentials,
+      planner,
+      news,
+      processes,
+      access,
+      canAccessKnowledge,
+    ]
   )
 
   const visibleFaqs = useMemo(

@@ -19,6 +19,10 @@ export type HelpModuleId =
   | 'knowledge'
   | 'forms'
   | 'credentials'
+  | 'planner'
+  | 'news'
+  | 'processes'
+  | 'access'
 
 export interface HelpFaqItem {
   id: string
@@ -74,6 +78,26 @@ export const HELP_MODULE_SECTIONS: HelpModuleSection[] = [
     id: 'credentials',
     title: 'Credenciales',
     description: 'Bóveda de secretos y accesos',
+  },
+  {
+    id: 'planner',
+    title: 'Tareas',
+    description: 'Tablero Kanban y calendario, tareas de ticket e independientes',
+  },
+  {
+    id: 'news',
+    title: 'Noticias',
+    description: 'Comunicados internos de la organización',
+  },
+  {
+    id: 'processes',
+    title: 'Procesos',
+    description: 'Catálogo interno de procesos y procedimientos por área',
+  },
+  {
+    id: 'access',
+    title: 'Accesos',
+    description: 'Pases QR para visitantes, contratistas y personal externo',
   },
 ]
 
@@ -249,6 +273,25 @@ export const HELP_FAQS: HelpFaqItem[] = [
       'Registra el incidente desde la ronda o desde Incidentes, con descripción y evidencia si es posible. El personal de supervisión podrá dar seguimiento desde el módulo de rondas.',
     keywords: ['incidente', 'anomalía'],
   },
+  {
+    id: 'pat-3',
+    module: 'patrols',
+    category: 'Rondas',
+    question: '¿Qué es un checkpoint y cómo lo completo?',
+    answer:
+      'Un checkpoint es un punto físico de la ruta (con su propia instrucción) que debes marcar como completado al pasar por ahí durante la ronda — algunos piden foto o comentario según cómo esté configurado. Si un checkpoint no aparece o la ruta cambió, avisa a quien programa las rutas.',
+    keywords: ['checkpoint', 'ruta', 'punto'],
+  },
+  {
+    id: 'pat-4',
+    module: 'patrols',
+    category: 'Rondas',
+    question: '¿Quién programa las rutas y la agenda de rondas?',
+    answer:
+      'Administradores y técnicos con permiso de gestión de rondas crean rutas (secuencia de checkpoints) y programan la agenda (quién, cuándo, con qué frecuencia). El personal asignado solo ve y ejecuta lo que le corresponde.',
+    keywords: ['ruta', 'programación', 'agenda'],
+    roles: ['ADMIN', 'TECHNICIAN'],
+  },
 
   // ── Conocimientos ───────────────────────────────────────────────────────
   {
@@ -281,6 +324,16 @@ export const HELP_FAQS: HelpFaqItem[] = [
       'Desde Documentos/Formularios puedes completar o consultar los formularios habilitados para tu área. Si no ves la sección, el módulo no está activo para tu usuario.',
     keywords: ['formulario', 'documento'],
   },
+  {
+    id: 'frm-2',
+    module: 'forms',
+    category: 'Documentos',
+    question: '¿Quién crea o publica un formulario nuevo?',
+    answer:
+      'Administradores y técnicos con permiso de gestión de Documentos crean y publican formularios para su área. El resto de usuarios solo completa o consulta los que ya están publicados y habilitados para ellos.',
+    keywords: ['formulario', 'publicar', 'crear'],
+    roles: ['ADMIN', 'TECHNICIAN'],
+  },
 
   // ── Credenciales ────────────────────────────────────────────────────────
   {
@@ -291,6 +344,117 @@ export const HELP_FAQS: HelpFaqItem[] = [
     answer:
       'Es un espacio para guardar secretos de acceso de forma cifrada (no en texto plano en respaldos). Solo usuarios con el módulo y permisos adecuados pueden ver o revelar entradas; las acciones sensibles quedan auditadas.',
     keywords: ['credencial', 'bóveda', 'secreto', 'password'],
+  },
+  {
+    id: 'crd-2',
+    module: 'credentials',
+    category: 'Credenciales',
+    question: '¿Cómo comparto una credencial con otra persona sin decirle la contraseña?',
+    answer:
+      'Usa «Compartir» sobre la entrada y elige con quién (persona o área). La otra persona puede revelarla desde su propia sesión si tiene permiso — no hace falta enviarla por chat o correo. Revocar el acceso compartido no borra la credencial, solo quita la visibilidad de esa persona.',
+    keywords: ['compartir', 'revelar', 'acceso'],
+    roles: ['ADMIN', 'TECHNICIAN'],
+  },
+
+  // ── Tareas (Planner) ───────────────────────────────────────────────────
+  {
+    id: 'plnr-1',
+    module: 'planner',
+    category: 'Tareas',
+    question: '¿Qué son las tareas independientes?',
+    answer:
+      'Además de las tareas que salen de un plan de resolución de un ticket, puedes crear tareas propias del día a día directamente desde el tablero o el calendario — sin que dependan de ningún ticket. Son tuyas: solo tú puedes editarlas o borrarlas.',
+    keywords: ['tarea', 'independiente', 'tablero', 'calendario'],
+  },
+  {
+    id: 'plnr-2',
+    module: 'planner',
+    category: 'Tareas',
+    question: '¿Cómo creo una tarea desde el calendario?',
+    answer:
+      'En la vista Semana o Día, haz clic en un horario vacío para crear una tarea con esa fecha y hora ya cargadas. En la vista Mes, pasa el mouse sobre un día para ver el botón «+». También puedes usar «Nueva tarea» en la barra superior del tablero.',
+    keywords: ['crear', 'calendario', 'semana', 'mes'],
+  },
+  {
+    id: 'plnr-3',
+    module: 'planner',
+    category: 'Tareas',
+    question: '¿Puedo sincronizar mis tareas con Microsoft To Do?',
+    answer:
+      'Sí, desde Mi Perfil → Microsoft To Do puedes vincular tu propia cuenta de Microsoft. Una vez conectada, tus tareas independientes se sincronizan automáticamente en ambos sentidos. Si no conectas ninguna cuenta, tus tareas simplemente quedan solo en la app — no es un error.',
+    keywords: ['sincronizar', 'microsoft', 'to do', 'perfil'],
+  },
+  {
+    id: 'plnr-4',
+    module: 'planner',
+    category: 'Tareas',
+    question: '¿Dónde veo reportes de cumplimiento de tareas?',
+    answer:
+      'En Tareas → Reportes (en el sidebar, debajo del tablero) puedes filtrar por técnico, por origen (de ticket o independiente), por estado (cumplidas o pendientes/vencidas) y por área, en un rango de día/semana/mes o personalizado. Ver el reporte de otro técnico requiere permiso de gestión del módulo.',
+    keywords: ['reporte', 'cumplimiento', 'vencida'],
+  },
+
+  // ── Noticias ─────────────────────────────────────────────────────────────
+  {
+    id: 'news-1',
+    module: 'news',
+    category: 'Noticias',
+    question: '¿Dónde veo las noticias y anuncios de la organización?',
+    answer:
+      'En el menú Noticias verás comunicados, anuncios, eventos y otras publicaciones internas, más recientes primero. Algunas solo son visibles para ciertas áreas o roles, según cómo las haya configurado quien las publicó.',
+    keywords: ['noticia', 'anuncio', 'comunicado', 'evento'],
+  },
+  {
+    id: 'news-2',
+    module: 'news',
+    category: 'Noticias',
+    question: '¿Quién puede publicar una noticia?',
+    answer:
+      'Usuarios con permiso de gestión de Noticias pueden crear y publicar (texto, imágenes o video incrustado desde YouTube/Drive). El resto de usuarios solo las consulta según la visibilidad configurada para su área o rol.',
+    keywords: ['publicar', 'crear', 'permiso'],
+    roles: ['ADMIN', 'TECHNICIAN'],
+  },
+
+  // ── Procesos ─────────────────────────────────────────────────────────────
+  {
+    id: 'proc-1',
+    module: 'processes',
+    category: 'Procesos',
+    question: '¿Para qué sirve el módulo de Procesos?',
+    answer:
+      'Es el catálogo interno de procesos y procedimientos de tu organización, organizados por área — con sus versiones y diagramas. Úsalo como referencia antes de ejecutar un procedimiento poco frecuente, en vez de repreguntar cada vez.',
+    keywords: ['proceso', 'procedimiento', 'catálogo', 'diagrama'],
+  },
+  {
+    id: 'proc-2',
+    module: 'processes',
+    category: 'Procesos',
+    question: '¿Quién puede editar o publicar una nueva versión de un proceso?',
+    answer:
+      'Usuarios con permiso de gestión de Procesos de esa área. Cada edición relevante genera una nueva versión — las versiones anteriores no se pierden, quedan disponibles para consulta.',
+    keywords: ['editar', 'versión', 'publicar'],
+    roles: ['ADMIN', 'TECHNICIAN'],
+  },
+
+  // ── Accesos ──────────────────────────────────────────────────────────────
+  {
+    id: 'acc-9',
+    module: 'access',
+    category: 'Accesos',
+    question: '¿Qué es el módulo de Accesos?',
+    answer:
+      'Genera pases QR verificables para personal externo, visitantes y contratistas que necesitan ingresar a tus instalaciones — por área, con fecha/hora de validez. Quien recibe el pase lo presenta y el personal de seguridad lo verifica escaneándolo.',
+    keywords: ['acceso', 'pase', 'qr', 'visitante'],
+  },
+  {
+    id: 'acc-10',
+    module: 'access',
+    category: 'Accesos',
+    question: '¿Cómo genero o reviso un pase QR?',
+    answer:
+      'Desde Accesos, «Nuevo pase» pide los datos de la persona, el área y la validez. El QR generado se puede compartir o imprimir. Para revisar el historial de pases emitidos y su estado (usado, vencido, revocado), consulta el listado del módulo.',
+    keywords: ['generar', 'revisar', 'historial'],
+    roles: ['ADMIN', 'TECHNICIAN'],
   },
 
   // ── Administración / auditoría / respaldos ──────────────────────────────

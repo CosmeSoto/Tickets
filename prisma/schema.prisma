@@ -904,6 +904,15 @@ model personal_task_ms_todo_links {
 /// (src/features/help/filter-help-faqs.ts) sin duplicar esa lógica.
 model help_faqs {
   id        String   @id @default(uuid())
+  /// Id estable del array semilla (ej. 'acc-1', ver faq-by-module.ts) — solo
+  /// para que el seed sepa qué ya existe SIN depender del texto de la
+  /// pregunta. Antes el match era por (module, question): si un admin editaba
+  /// el texto de una pregunta y alguien volvía a correr `npm run db:seed`
+  /// (documentado como "seguro repetirlo" en README/SETUP), el seed ya no
+  /// encontraba esa fila y creaba un duplicado con el texto viejo. Null en
+  /// cualquier fila creada desde la pantalla de administración — el seed
+  /// nunca las toca.
+  seedKey   String?  @unique @map("seed_key")
   module    String
   category  String
   question  String
