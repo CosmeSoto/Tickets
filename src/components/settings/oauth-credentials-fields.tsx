@@ -16,7 +16,7 @@
  * lógica de carga/guardado/prueba viven acá.
  */
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -115,6 +115,14 @@ export function OAuthCredentialsFields({
   const [testing, setTesting] = useState(false)
   const [copied, setCopied] = useState<string | null>(null)
 
+  // Última versión realmente guardada en BD — se compara contra `config` para
+  // saber si hay cambios sin guardar. "Probar conexión" llama a un endpoint
+  // que lee la fila de BD, no el estado local: si el admin activa el switch
+  // y prueba sin guardar antes, el botón parecía habilitado pero el backend
+  // respondía "No hay configuración guardada" (o probaba una versión vieja),
+  // un error confuso que no explicaba que faltaba guardar.
+  const savedRef = useRef({ isEnabled: false, clientId: '', tenantId: '', reuseSource: false })
+
   const load = useCallback(async () => {
     try {
       const res = await fetch('/api/admin/oauth-config')
@@ -129,6 +137,12 @@ export function OAuthCredentialsFields({
             isEnabled: existing.isEnabled ?? false,
             hasExistingSecret: Boolean(existing.hasClientSecret),
             reuseSource: Boolean(existing.reuseAzureAdCredentials),
+          }
+          savedRef.current = {
+            isEnabled: next.isEnabled,
+            clientId: next.clientId,
+            tenantId: next.tenantId,
+            reuseSource: next.reuseSource,
           }
           onStateChange?.({ isEnabled: next.isEnabled, clientId: next.clientId })
           return next
@@ -220,6 +234,12 @@ export function OAuthCredentialsFields({
         return
       }
       toast({ title: 'Credenciales guardadas' })
+      savedRef.current = {
+        isEnabled: config.isEnabled,
+        clientId: config.clientId,
+        tenantId: config.tenantId,
+        reuseSource: config.reuseSource,
+      }
       setConfig(current => ({ ...current, clientSecret: '', hasExistingSecret: true }))
     } catch {
       toast({ title: 'Error de conexión', variant: 'destructive' })
@@ -283,6 +303,13 @@ export function OAuthCredentialsFields({
     setCopied(uri)
     setTimeout(() => setCopied(null), 2000)
   }
+
+  const isDirty =
+    config.clientSecret !== '' ||
+    config.isEnabled !== savedRef.current.isEnabled ||
+    config.clientId !== savedRef.current.clientId ||
+    config.tenantId !== savedRef.current.tenantId ||
+    config.reuseSource !== savedRef.current.reuseSource
 
   if (loading) {
     return (
@@ -442,11 +469,15 @@ export function OAuthCredentialsFields({
           variant='outline'
           size={buttonSize}
           onClick={() => void test()}
-          disabled={testing || !config.isEnabled || (!config.reuseSource && !config.clientId)}
+          disabled={
+            testing || !config.isEnabled || (!config.reuseSource && !config.clientId) || isDirty
+          }
           title={
-            !config.isEnabled
-              ? 'Habilita las credenciales para poder probarlas'
-              : 'Verifica las credenciales contra el proveedor'
+            isDirty
+              ? 'Guarda los cambios antes de probar la conexión'
+              : !config.isEnabled
+                ? 'Habilita las credenciales para poder probarlas'
+                : 'Verifica las credenciales contra el proveedor'
           }
         >
           {testing ? (
