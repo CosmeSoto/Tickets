@@ -241,7 +241,16 @@ export async function POST(request: NextRequest) {
           isEnabled: isEnabled ?? false,
           reuseAzureAdCredentials: reuse,
           action: existingConfig ? 'updated' : 'created',
-          clientIdChanged: existingConfig ? existingConfig.clientId !== clientId : true,
+          // Con reuse activo, el clientId de ESTA fila no se toca (se
+          // resuelve en vivo desde 'azure-ad') — comparar contra el `clientId`
+          // del body (siempre undefined en ese caso, porque el frontend no lo
+          // envía) reportaría "cambió" en cada guardado sin que nada haya
+          // cambiado.
+          clientIdChanged: reuse
+            ? false
+            : existingConfig
+              ? existingConfig.clientId !== clientId
+              : true,
           secretChanged: !!clientSecret,
         },
       })

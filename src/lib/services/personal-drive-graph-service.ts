@@ -30,6 +30,16 @@ export class PersonalDriveNotConnectedError extends Error {
 }
 
 export class PersonalDriveGraphService {
+  // Single-flight por usuario: FileService.uploadMultiple sube hasta 3
+  // archivos en paralelo para el MISMO uploaderId — sin esto, si el token
+  // cacheado ya venció, las 3 llamadas concurrentes leerían el mismo
+  // refreshToken y pedirían un refresh cada una; Microsoft rota el refresh
+  // token en cada uso, así que solo la primera tendría éxito y las otras 2
+  // fallarían con invalid_grant — y con el diseño de "falla dura" de
+  // storeAttachmentBytes, esos archivos quedarían sin subir de pura mala
+  // suerte de timing, no por un problema real de la cuenta.
+  private static inflightRefresh = new Map<string, Promise<string>>()
+
   /** Igual que MsTodoGraphService.getAccessToken — cachea el access token
    *  vigente (evita un refresh por cada subida/descarga/borrado) y rota el
    *  refresh token cifrado en oauth_accounts cuando hace falta. */
@@ -44,6 +54,23 @@ export class PersonalDriveGraphService {
     if (account.expiresAt && account.expiresAt.getTime() - Date.now() > 2 * 60 * 1000) {
       return decrypt(account.accessToken)
     }
+
+    const existingRefresh = this.inflightRefresh.get(userId)
+    if (existingRefresh) return existingRefresh
+
+    const refreshPromise = this.refreshAndPersist(account).finally(() => {
+      this.inflightRefresh.delete(userId)
+    })
+    this.inflightRefresh.set(userId, refreshPromise)
+    return refreshPromise
+  }
+
+  private static async refreshAndPersist(account: {
+    id: string
+    refreshToken: string | null
+    scope: string | null
+  }): Promise<string> {
+    if (!account.refreshToken) throw new PersonalDriveNotConnectedError()
 
     const creds = await getOAuthCredentials('azure-ad')
     if (!creds) {
