@@ -2147,7 +2147,7 @@ function SettingsPage() {
               </p>
             </div>
           ) : (
-            <AttachmentsStorageTab />
+            <AttachmentsStorageTab onGoToOAuthTab={() => setActiveTab('oauth')} />
           )}
         </TabsContent>
 

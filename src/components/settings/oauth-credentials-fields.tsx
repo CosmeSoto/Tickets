@@ -497,9 +497,21 @@ export interface OAuthCredentialsStatus {
   isEnabled: boolean
 }
 
+const CREDENTIALS_TITLE: Record<OAuthCredentialsProvider, string> = {
+  google: 'Credenciales de Google',
+  'azure-ad': 'Credenciales de la aplicación (Entra ID)',
+  'azure-ad-sharepoint': 'Credenciales de la aplicación (Entra ID)',
+}
+
 interface OAuthCredentialsStatusLinkProps {
   provider: OAuthCredentialsProvider
   onStatus?: (status: OAuthCredentialsStatus) => void
+  /** Si se pasa, se usa en vez del <Link> — para saltar de tab dentro de la
+   *  misma página (Ajustes → Almacenamiento) sin recargarla, ya que ahí un
+   *  <Link> a la misma ruta con otro ?tab= no remonta el componente y el tab
+   *  visible no cambia. Omitir cuando se llama desde otra ruta (Planner,
+   *  SharePoint) — ahí sí hace falta la navegación real. */
+  onNavigate?: () => void
 }
 
 /**
@@ -513,6 +525,7 @@ interface OAuthCredentialsStatusLinkProps {
 export function OAuthCredentialsStatusLink({
   provider,
   onStatus,
+  onNavigate,
 }: OAuthCredentialsStatusLinkProps) {
   const [status, setStatus] = useState<OAuthCredentialsStatus | null>(null)
 
@@ -552,12 +565,18 @@ export function OAuthCredentialsStatusLink({
   return (
     <div className='flex items-center justify-between gap-3 rounded-lg border p-3'>
       <div>
-        <p className='text-sm font-medium'>Credenciales de la aplicación (Entra ID)</p>
+        <p className='text-sm font-medium'>{CREDENTIALS_TITLE[provider]}</p>
         <p className='text-xs text-muted-foreground'>{label}</p>
       </div>
-      <Button variant='outline' size='sm' asChild>
-        <Link href='/admin/settings?tab=oauth'>Ir a Ajustes → OAuth</Link>
-      </Button>
+      {onNavigate ? (
+        <Button variant='outline' size='sm' onClick={onNavigate}>
+          Ir a OAuth
+        </Button>
+      ) : (
+        <Button variant='outline' size='sm' asChild>
+          <Link href='/admin/settings?tab=oauth'>Ir a Ajustes → OAuth</Link>
+        </Button>
+      )}
     </div>
   )
 }

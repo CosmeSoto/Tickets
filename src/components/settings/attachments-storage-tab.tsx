@@ -22,7 +22,11 @@ import { Label } from '@/components/ui/label'
 import { Cloud, HardDrive, CheckCircle2, RefreshCw, User } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { SharePointStorageCard } from '@/components/settings/sharepoint-storage-card'
-import { RedirectUriNote } from '@/components/settings/oauth-credentials-fields'
+import {
+  RedirectUriNote,
+  OAuthCredentialsStatusLink,
+  type OAuthCredentialsProvider,
+} from '@/components/settings/oauth-credentials-fields'
 
 const ATTACHMENTS_CALLBACK_PATH = '/api/admin/attachments/cloud-auth/callback'
 
@@ -48,7 +52,12 @@ const PROVIDER_LABEL: Record<'google-drive' | 'onedrive' | 'sharepoint', string>
   sharepoint: 'SharePoint',
 }
 
-export function AttachmentsStorageTab() {
+export function AttachmentsStorageTab({
+  onGoToOAuthTab,
+}: {
+  /** Cambia a la pestaña OAuth dentro de la misma página de Ajustes. */
+  onGoToOAuthTab?: () => void
+}) {
   const { toast } = useToast()
   const [settings, setSettings] = useState<StorageSettings | null>(null)
   const [loading, setLoading] = useState(true)
@@ -209,6 +218,8 @@ export function AttachmentsStorageTab() {
         enabled={settings.googleDrive.enabled}
         authorized={settings.googleDrive.authorized}
         saving={saving}
+        oauthProvider='google'
+        onGoToOAuthTab={onGoToOAuthTab}
         onToggle={enabled => patch({ googleDriveEnabled: enabled })}
         onAuthorize={() => authorize('google-drive')}
         onRevoke={() => revoke('google-drive')}
@@ -220,6 +231,8 @@ export function AttachmentsStorageTab() {
         enabled={settings.oneDrive.enabled}
         authorized={settings.oneDrive.authorized}
         saving={saving}
+        oauthProvider='azure-ad'
+        onGoToOAuthTab={onGoToOAuthTab}
         onToggle={enabled => patch({ oneDriveEnabled: enabled })}
         onAuthorize={() => authorize('onedrive')}
         onRevoke={() => revoke('onedrive')}
@@ -304,6 +317,8 @@ function ProviderCard({
   enabled,
   authorized,
   saving,
+  oauthProvider,
+  onGoToOAuthTab,
   onToggle,
   onAuthorize,
   onRevoke,
@@ -313,6 +328,8 @@ function ProviderCard({
   enabled: boolean
   authorized: boolean
   saving: boolean
+  oauthProvider: OAuthCredentialsProvider
+  onGoToOAuthTab?: () => void
   onToggle: (enabled: boolean) => void
   onAuthorize: () => void
   onRevoke: () => void
@@ -339,9 +356,12 @@ function ProviderCard({
             <HardDrive className='h-4 w-4 mr-2' /> Revocar acceso
           </Button>
         ) : (
-          <Button variant='outline' size='sm' onClick={onAuthorize}>
-            <Cloud className='h-4 w-4 mr-2' /> Autorizar acceso
-          </Button>
+          <>
+            <OAuthCredentialsStatusLink provider={oauthProvider} onNavigate={onGoToOAuthTab} />
+            <Button variant='outline' size='sm' onClick={onAuthorize}>
+              <Cloud className='h-4 w-4 mr-2' /> Autorizar acceso
+            </Button>
+          </>
         )}
       </CardContent>
     </Card>
