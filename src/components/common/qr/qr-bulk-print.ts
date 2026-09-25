@@ -26,6 +26,14 @@ interface GridConfig {
 }
 
 const GRID_CONFIG: Record<PrintFormat, GridConfig> = {
+  '50x20': {
+    cols: 1,
+    cellWidthMm: 48,
+    cellHeightMm: 18,
+    qrSizeMm: 13,
+    fontSizePt: 5,
+    subfontSizePt: 4,
+  },
   '57x40': {
     cols: 1,
     cellWidthMm: 55,
@@ -56,9 +64,17 @@ const GRID_CONFIG: Record<PrintFormat, GridConfig> = {
 // ── CSS por formato ───────────────────────────────────────────────────────────
 
 function buildBulkCSS(format: PrintFormat, cfg: GridConfig): string {
-  const isLabel = format === '57x40' || format === '58x40'
+  const isLabel = format === '50x20' || format === '57x40' || format === '58x40'
   const pageWidth =
-    format === '57x40' ? '57mm' : format === '58x40' ? '58mm' : format === 'A4' ? 'A4' : 'letter'
+    format === '50x20'
+      ? '50mm'
+      : format === '57x40'
+        ? '57mm'
+        : format === '58x40'
+          ? '58mm'
+          : format === 'A4'
+            ? 'A4'
+            : 'letter'
   const pageMargin = isLabel ? '1mm' : '8mm'
 
   return `

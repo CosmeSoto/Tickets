@@ -27,7 +27,7 @@ import { Label } from '@/components/ui/label'
 
 // ── Tipos ────────────────────────────────────────────────────────────────────
 
-export type PrintFormat = '57x40' | '58x40' | 'A4' | 'Letter'
+export type PrintFormat = '50x20' | '57x40' | '58x40' | 'A4' | 'Letter'
 
 export interface QRPrintItem {
   /** Imagen QR: data URL base64 o URL de imagen */
@@ -47,7 +47,8 @@ interface QRPrintDialogProps {
 // ── Constantes ───────────────────────────────────────────────────────────────
 
 const FORMAT_OPTIONS: { value: PrintFormat; label: string; description: string }[] = [
-  { value: '57x40', label: '57 × 40 mm', description: 'Rollo estándar (GA-2408T y similares)' },
+  { value: '50x20', label: '50 × 20 mm', description: 'Rollo compacto (GA-2408T, config. actual)' },
+  { value: '57x40', label: '57 × 40 mm', description: 'Rollo estándar (otras etiquetadoras)' },
   { value: '58x40', label: '58 × 40 mm', description: 'Rollo alternativo (otras etiquetadoras)' },
   { value: 'A4', label: 'A4', description: 'Impresora de oficina — centrado en página' },
   { value: 'Letter', label: 'Letter', description: 'Impresora de oficina — tamaño carta' },
@@ -58,6 +59,16 @@ const STORAGE_KEY = 'qr_print_format'
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function buildPrintCSS(format: PrintFormat): string {
+  if (format === '50x20') {
+    return `
+      @page { size: 50mm 20mm; margin: 1mm; }
+      body { margin: 0; display: flex; align-items: center; justify-content: center; width: 50mm; height: 20mm; }
+      .label-wrap { display: flex; flex-direction: column; align-items: center; gap: 0.5mm; width: 100%; }
+      .qr-img { width: 13mm; height: 13mm; }
+      .label-text { font-size: 5pt; font-weight: 600; font-family: monospace; text-align: center; max-width: 48mm; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+      .sublabel-text { font-size: 4pt; font-family: sans-serif; color: #555; text-align: center; max-width: 48mm; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    `
+  }
   if (format === '57x40') {
     return `
       @page { size: 57mm 40mm; margin: 1mm; }
@@ -135,7 +146,7 @@ function openPrintWindow(item: QRPrintItem, format: PrintFormat) {
 // ── Componente ───────────────────────────────────────────────────────────────
 
 export function QRPrintDialog({ open, onOpenChange, item }: QRPrintDialogProps) {
-  const [format, setFormat] = useState<PrintFormat>('57x40')
+  const [format, setFormat] = useState<PrintFormat>('50x20')
   const loadedRef = useRef(false)
 
   // Cargar preferencia guardada una sola vez

@@ -312,7 +312,7 @@ export function useCheckpoints({ checkpoints, reload }: UseCheckpointsOptions) {
         return
       }
 
-      let savedFormat: PrintFormat = '57x40'
+      let savedFormat: PrintFormat = '50x20'
       try {
         const stored = localStorage.getItem('qr_print_format') as PrintFormat | null
         if (stored) savedFormat = stored

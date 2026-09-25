@@ -31,7 +31,8 @@ interface QRBulkPrintDialogProps {
 }
 
 const FORMAT_OPTIONS: { value: PrintFormat; label: string; description: string }[] = [
-  { value: '57x40', label: '57 × 40 mm', description: 'Rollo estándar (GA-2408T y similares)' },
+  { value: '50x20', label: '50 × 20 mm', description: 'Rollo compacto (GA-2408T, config. actual)' },
+  { value: '57x40', label: '57 × 40 mm', description: 'Rollo estándar (otras etiquetadoras)' },
   { value: '58x40', label: '58 × 40 mm', description: 'Rollo alternativo (otras etiquetadoras)' },
   { value: 'A4', label: 'A4', description: 'Impresora de oficina — 4 por página' },
   { value: 'Letter', label: 'Letter', description: 'Impresora de oficina — 4 por página' },
@@ -45,7 +46,7 @@ export function QRBulkPrintDialog({
   selectedIds,
   assets,
 }: QRBulkPrintDialogProps) {
-  const [format, setFormat] = useState<PrintFormat>('57x40')
+  const [format, setFormat] = useState<PrintFormat>('50x20')
   const [loading, setLoading] = useState(false)
   const [progress, setProgress] = useState(0)
   const loadedRef = useRef(false)
