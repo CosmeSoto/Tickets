@@ -64,13 +64,14 @@ export async function POST(request: NextRequest, { params }: Params) {
     // — no hace falta mantener una conexión de BD abierta durante la lectura
     // y compresión. Un link pegado a mano no tiene nada que procesar.
     const prepared = file
-      ? await FileService.prepareFormFileUpload(file, id)
+      ? await FileService.prepareFormFileUpload(file, id, session.user.id)
       : FileService.prepareExternalLinkAttachment(externalUrl)
     const fileUrl = `/api/forms/${id}/file`
     const oldAttachments = form.form_attachments.map(a => ({
       path: a.path,
       storageProvider: a.storageProvider,
       externalId: a.externalId,
+      uploadedById: a.uploadedById,
     }))
 
     // Borrar adjuntos viejos + crear el nuevo + actualizar `forms` en una

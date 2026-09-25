@@ -38,6 +38,10 @@ import { randomUUID } from 'crypto'
 import { getUploadDir } from '@/lib/upload-path'
 import { CloudStorageService } from '@/lib/services/cloud-storage-service'
 import {
+  PersonalDriveGraphService,
+  PERSONAL_DRIVE_PROVIDER,
+} from '@/lib/services/personal-drive-graph-service'
+import {
   EXT_BY_MIME,
   resolveSafeUploadMime,
   sanitizeOriginalFilename,
@@ -198,15 +202,56 @@ export class FileService {
    * pasan por acá, así la lógica de branching no queda copiada por módulo.
    * Nunca cae a disco en silencio si el admin configuró la nube y esta
    * quedó inválida — `getActiveProvider` lanza en ese caso.
+   *
+   * Antes de eso, si el admin habilitó el Drive personal (Ajustes →
+   * Almacenamiento) y quien sube el archivo tiene su propio OneDrive
+   * conectado, el archivo va DIRECTO ahí — nunca toca disco ni el destino
+   * compartido de la organización. Si esa subida falla (token revocado,
+   * Microsoft caído), se relanza el error tal cual — no cae en silencio al
+   * destino compartido: el usuario eligió a propósito guardar en su propio
+   * Drive, y redirigir ese archivo a un destino distinto sin avisar sería
+   * una sorpresa, no una ayuda.
    */
   private static async storeAttachmentBytes(
     buffer: Buffer,
     mime: SafeUploadMime,
     originalFileName: string,
     module: string,
-    entityId: string
+    entityId: string,
+    uploaderId: string
   ) {
     const originalName = sanitizeOriginalFilename(originalFileName)
+
+    if (await CloudStorageService.isPersonalDriveEnabled()) {
+      const personalAccount = await prisma.oauth_accounts.findUnique({
+        where: {
+          provider_providerId: { provider: PERSONAL_DRIVE_PROVIDER, providerId: uploaderId },
+        },
+      })
+      if (personalAccount) {
+        const accessToken = await PersonalDriveGraphService.getAccessToken(uploaderId)
+        const cloudFilename = `${randomUUID().slice(0, 8)}-${originalName}`
+        const uploaded = await CloudStorageService.uploadToPersonalDrive(
+          accessToken,
+          buffer,
+          cloudFilename,
+          mime,
+          module,
+          entityId
+        )
+        return {
+          filename: cloudFilename,
+          originalName,
+          mimeType: mime as string,
+          size: buffer.length,
+          path: null,
+          storageProvider: 'onedrive-personal' as const,
+          externalId: uploaded.externalId,
+          externalUrl: uploaded.externalUrl ?? null,
+        }
+      }
+    }
+
     const activeProvider = await CloudStorageService.getActiveProvider()
 
     if (activeProvider === 'local') {
@@ -305,7 +350,8 @@ export class FileService {
       finalMime,
       file.name,
       'tickets',
-      ticketId
+      ticketId,
+      uploadedBy
     )
 
     // 7. Registrar en BD con tamaño final (post-compresión)
@@ -397,7 +443,8 @@ export class FileService {
       finalMime,
       params.originalName,
       'tickets',
-      params.ticketId
+      params.ticketId,
+      params.uploadedBy
     )
 
     const attachment = await prisma.attachments.create({
@@ -563,10 +610,36 @@ export class FileService {
     path: string | null
     storageProvider?: string | null
     externalId?: string | null
+    /** Presente en `attachments`/`equipment_attachments`/`license_attachments`/`contract_attachments`. */
+    uploadedBy?: string | null
+    /** Presente en `news_attachments`/`form_attachments`/`process_attachments`. */
+    uploadedById?: string | null
   }): Promise<Buffer | null> {
     if (!attachment.storageProvider || attachment.storageProvider === 'local') {
       if (!attachment.path || !existsSync(attachment.path)) return null
       return readFile(attachment.path)
+    }
+
+    if (attachment.storageProvider === 'onedrive-personal' && attachment.externalId) {
+      const uploaderId = attachment.uploadedBy ?? attachment.uploadedById ?? null
+      if (!uploaderId) return null
+      try {
+        const accessToken = await PersonalDriveGraphService.getAccessToken(uploaderId)
+        const result = await CloudStorageService.downloadFromPersonalDrive(
+          accessToken,
+          attachment.externalId
+        )
+        return result?.buffer ?? null
+      } catch (error) {
+        // Nunca un 500 crudo por acá: el dueño pudo desconectar su Drive
+        // personal, o Microsoft revocó el token — no hay bytes que devolver,
+        // igual que cualquier otro adjunto ya no disponible.
+        console.warn(
+          `[FileService] No se pudo leer un adjunto de Drive personal (uploader ${uploaderId}):`,
+          error
+        )
+        return null
+      }
     }
 
     if (
@@ -585,12 +658,64 @@ export class FileService {
     return null
   }
 
+  /**
+   * Mensaje específico cuando un adjunto de Drive personal ya no es legible
+   * porque su dueño desconectó la cuenta — reemplaza el genérico "Archivo no
+   * disponible" solo en ese caso puntual (si sigue conectado, la falla fue
+   * transitoria y el mensaje genérico ya es correcto).
+   */
+  static async describeAttachmentUnavailable(attachment: {
+    storageProvider?: string | null
+    uploadedBy?: string | null
+    uploadedById?: string | null
+  }): Promise<string | null> {
+    if (attachment.storageProvider !== 'onedrive-personal') return null
+    const uploaderId = attachment.uploadedBy ?? attachment.uploadedById ?? null
+    if (!uploaderId) return null
+
+    const stillConnected = await prisma.oauth_accounts.findUnique({
+      where: { provider_providerId: { provider: PERSONAL_DRIVE_PROVIDER, providerId: uploaderId } },
+    })
+    if (stillConnected) return null
+
+    const uploader = await prisma.users.findUnique({
+      where: { id: uploaderId },
+      select: { name: true },
+    })
+    return `Este adjunto se guardó en el Drive personal de ${uploader?.name ?? 'un usuario que ya no está'}, que ya no está conectado.`
+  }
+
+  /**
+   * Cuántos adjuntos de ESTE usuario quedaron guardados en su Drive personal,
+   * en cualquier módulo — usado solo para advertir antes de desconectar
+   * (`/api/attachments/personal-drive/status`): una vez desconectado, la app
+   * pierde acceso de lectura/borrado a esos archivos (siguen en su OneDrive,
+   * pero huérfanos para el sistema).
+   */
+  static async countPersonalDriveAttachments(userId: string): Promise<number> {
+    const where = { storageProvider: 'onedrive-personal' as const }
+    const [tickets, news, forms, processes, equipment, licenses, contracts] = await Promise.all([
+      prisma.attachments.count({ where: { ...where, uploadedBy: userId } }),
+      prisma.news_attachments.count({ where: { ...where, uploadedById: userId } }),
+      prisma.form_attachments.count({ where: { ...where, uploadedById: userId } }),
+      prisma.process_attachments.count({ where: { ...where, uploadedById: userId } }),
+      prisma.equipment_attachments.count({ where: { ...where, uploadedBy: userId } }),
+      prisma.license_attachments.count({ where: { ...where, uploadedBy: userId } }),
+      prisma.contract_attachments.count({ where: { ...where, uploadedBy: userId } }),
+    ])
+    return tickets + news + forms + processes + equipment + licenses + contracts
+  }
+
   static async downloadFile(fileId: string) {
     const attachment = await prisma.attachments.findUnique({ where: { id: fileId } })
     if (!attachment) throw new Error('Archivo no encontrado')
 
     const buffer = await this.readAttachmentBytes(attachment)
-    if (!buffer) throw new Error('Archivo no disponible')
+    if (!buffer) {
+      throw new Error(
+        (await this.describeAttachmentUnavailable(attachment)) ?? 'Archivo no disponible'
+      )
+    }
 
     return {
       buffer,
@@ -604,7 +729,11 @@ export class FileService {
     if (!attachment) throw new Error('Archivo no encontrado')
 
     const buffer = await this.readAttachmentBytes(attachment)
-    if (!buffer) throw new Error('Archivo no disponible')
+    if (!buffer) {
+      throw new Error(
+        (await this.describeAttachmentUnavailable(attachment)) ?? 'Archivo no disponible'
+      )
+    }
 
     return {
       buffer,
@@ -679,7 +808,8 @@ export class FileService {
       finalMime,
       file.name,
       'news',
-      newsId
+      newsId,
+      uploadedBy
     )
 
     // 6. Registrar en BD
@@ -732,7 +862,7 @@ export class FileService {
    * mantener una conexión abierta durante la lectura/compresión del
    * archivo.
    */
-  static async prepareFormFileUpload(file: File, formId: string) {
+  static async prepareFormFileUpload(file: File, formId: string, uploaderId: string) {
     // 1. Validar tamaño y el tipo DECLARADO por el cliente (política
     // configurable del admin — allowedFileTypes). No es la única defensa:
     // el contenido real se verifica en el paso 2 (mismo pipeline que
@@ -762,7 +892,7 @@ export class FileService {
       finalMime = result.ext === 'webp' ? 'image/webp' : 'image/jpeg'
     }
 
-    return this.storeAttachmentBytes(finalBuffer, finalMime, file.name, 'forms', formId)
+    return this.storeAttachmentBytes(finalBuffer, finalMime, file.name, 'forms', formId, uploaderId)
   }
 
   /**
@@ -793,7 +923,7 @@ export class FileService {
     const form = await prisma.forms.findUnique({ where: { id: formId } })
     if (!form) throw new Error('Documento no encontrado')
 
-    const prepared = await this.prepareFormFileUpload(file, formId)
+    const prepared = await this.prepareFormFileUpload(file, formId, uploadedById)
 
     return prisma.form_attachments.create({
       data: {
@@ -824,11 +954,33 @@ export class FileService {
    * borrar en absoluto. Best-effort en los tres casos.
    */
   static async deleteAttachmentFiles(
-    attachments: { path: string | null; storageProvider: string; externalId: string | null }[]
+    attachments: {
+      path: string | null
+      storageProvider: string
+      externalId: string | null
+      uploadedBy?: string | null
+      uploadedById?: string | null
+    }[]
   ) {
     for (const attachment of attachments) {
       if (attachment.storageProvider === 'local') {
         if (attachment.path) await this.deletePhysicalFiles([attachment.path])
+      } else if (attachment.storageProvider === 'onedrive-personal' && attachment.externalId) {
+        const uploaderId = attachment.uploadedBy ?? attachment.uploadedById ?? null
+        if (uploaderId) {
+          try {
+            const accessToken = await PersonalDriveGraphService.getAccessToken(uploaderId)
+            await CloudStorageService.deleteFromPersonalDrive(accessToken, attachment.externalId)
+          } catch (error) {
+            // Best-effort, igual que el resto de este método: un archivo
+            // huérfano en el Drive personal de alguien ya no es un problema
+            // de integridad de datos de la app.
+            console.warn(
+              `[FileService] No se pudo borrar en el Drive personal (uploader ${uploaderId}):`,
+              error
+            )
+          }
+        }
       } else if (
         (attachment.storageProvider === 'google-drive' ||
           attachment.storageProvider === 'onedrive' ||
@@ -894,7 +1046,8 @@ export class FileService {
       finalMime,
       file.name,
       'processes',
-      processId
+      processId,
+      uploadedById
     )
 
     return prisma.process_attachments.create({
@@ -952,7 +1105,8 @@ export class FileService {
       safeMime,
       file.name,
       'equipment',
-      equipmentId
+      equipmentId,
+      uploadedBy
     )
 
     return prisma.equipment_attachments.create({
@@ -989,7 +1143,8 @@ export class FileService {
       safeMime,
       file.name,
       'licenses',
-      licenseId
+      licenseId,
+      uploadedBy
     )
 
     return prisma.license_attachments.create({
@@ -1023,7 +1178,8 @@ export class FileService {
       safeMime,
       file.name,
       'contracts',
-      contractId
+      contractId,
+      uploadedBy
     )
 
     return prisma.contract_attachments.create({

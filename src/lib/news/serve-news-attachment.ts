@@ -44,7 +44,8 @@ export async function serveNewsAttachment(
 
   const fileBuffer = await FileService.readAttachmentBytes(attachment)
   if (!fileBuffer) {
-    return new NextResponse('Archivo no disponible', { status: 404 })
+    const reason = await FileService.describeAttachmentUnavailable(attachment)
+    return new NextResponse(reason ?? 'Archivo no disponible', { status: 404 })
   }
 
   const inline = INLINE_SAFE_MIMES.has(attachment.mimeType)

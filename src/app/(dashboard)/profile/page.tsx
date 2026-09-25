@@ -58,6 +58,7 @@ import {
 import { UserModulesPanel } from '@/components/users/user-modules-panel'
 import { TelegramLinkCard } from '@/components/notifications/telegram-link-card'
 import { MsTodoLinkCard } from '@/components/planner/ms-todo-link-card'
+import { PersonalDriveLinkCard } from '@/components/attachments/personal-drive-link-card'
 
 export default function ProfilePage() {
   const { data: session, status, update } = useAuthReady()
@@ -645,6 +646,12 @@ export default function ProfilePage() {
         {((session.user as any).plannerEnabled || (session.user as any).canManagePlanner) && (
           <MsTodoLinkCard />
         )}
+
+        {/* Drive personal — adjuntos nuevos van directo a tu OneDrive si lo
+            conectás. Sin relación con el módulo Tareas, por eso no depende de
+            plannerEnabled — la propia tarjeta se oculta si el admin no
+            habilitó la función y nunca te conectaste. */}
+        <PersonalDriveLinkCard />
 
         {/* Seguridad */}
         <Card>

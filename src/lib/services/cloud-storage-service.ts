@@ -92,6 +92,16 @@ export class CloudStorageService {
     return provider
   }
 
+  /** Si el admin habilitó que cada usuario pueda conectar su propio OneDrive
+   *  para sus adjuntos (Ajustes → Almacenamiento → Drive personal). Apagado
+   *  por defecto — sin esto, nadie ve la opción y nada cambia. */
+  static async isPersonalDriveEnabled(): Promise<boolean> {
+    const setting = await prisma.system_settings.findUnique({
+      where: { key: 'attachmentsPersonalDriveEnabled' },
+    })
+    return setting?.value === 'true'
+  }
+
   static async uploadAttachment(
     buffer: Buffer,
     fileName: string,
@@ -776,5 +786,42 @@ export class CloudStorageService {
     const { driveId, itemId } = this.splitSharePointExternalId(externalId)
     const accessToken = await this.getSharePointAccessToken()
     await this.deleteFromDriveLike(accessToken, `/drives/${driveId}`, itemId)
+  }
+
+  // ── OneDrive personal de cada usuario (adjuntos) ────────────────────────────
+  // A diferencia de uploadToOneDrive/downloadFromOneDrive/deleteFromOneDrive
+  // (una sola cuenta de servicio compartida, token resuelto acá mismo), estos
+  // reciben el accessToken ya resuelto por PersonalDriveGraphService.getAccessToken
+  // (uno distinto por usuario, cacheado y refrescado ahí) — reusan las mismas
+  // primitivas *DriveLike ya parametrizadas por token, sin lógica de Graph nueva.
+
+  static async uploadToPersonalDrive(
+    accessToken: string,
+    buffer: Buffer,
+    fileName: string,
+    mimeType: string,
+    module: string,
+    entityId: string
+  ): Promise<CloudAttachmentUploadResult> {
+    return this.uploadToDriveLike(
+      accessToken,
+      '/me/drive',
+      buffer,
+      fileName,
+      mimeType,
+      module,
+      entityId
+    )
+  }
+
+  static async downloadFromPersonalDrive(
+    accessToken: string,
+    itemId: string
+  ): Promise<CloudAttachmentDownload | null> {
+    return this.downloadFromDriveLike(accessToken, '/me/drive', itemId)
+  }
+
+  static async deleteFromPersonalDrive(accessToken: string, itemId: string): Promise<void> {
+    await this.deleteFromDriveLike(accessToken, '/me/drive', itemId)
   }
 }

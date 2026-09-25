@@ -19,7 +19,7 @@ import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
-import { Cloud, HardDrive, CheckCircle2, RefreshCw } from 'lucide-react'
+import { Cloud, HardDrive, CheckCircle2, RefreshCw, User } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { SharePointStorageCard } from '@/components/settings/sharepoint-storage-card'
 import { RedirectUriNote } from '@/components/settings/oauth-credentials-fields'
@@ -33,6 +33,7 @@ interface StorageSettings {
   googleDrive: { enabled: boolean; authorized: boolean }
   oneDrive: { enabled: boolean; authorized: boolean }
   sharePoint: { enabled: boolean; configured: boolean; siteUrl: string | null }
+  personalDriveEnabled: boolean
 }
 
 const PROVIDER_LABEL: Record<'google-drive' | 'onedrive' | 'sharepoint', string> = {
@@ -226,6 +227,29 @@ export function AttachmentsStorageTab() {
         onToggleEnabled={enabled => patch({ sharePointEnabled: enabled })}
         onSiteConfigChanged={load}
       />
+
+      <Card>
+        <CardHeader className='flex flex-row items-center justify-between'>
+          <div>
+            <CardTitle className='flex items-center gap-2'>
+              <User className='h-5 w-5' />
+              Drive personal de cada usuario
+            </CardTitle>
+            <CardDescription>
+              Permite que cualquier usuario conecte su propia cuenta de OneDrive desde su perfil.
+              Cuando la conecta, SUS archivos nuevos van directo a su Drive en vez del destino de
+              arriba — reduce el uso de almacenamiento del servidor/nube compartida para
+              organizaciones donde los usuarios ya tienen licencia de Microsoft 365 propia. Apagado
+              por defecto.
+            </CardDescription>
+          </div>
+          <Switch
+            checked={settings.personalDriveEnabled}
+            disabled={saving}
+            onCheckedChange={enabled => patch({ personalDriveEnabled: enabled })}
+          />
+        </CardHeader>
+      </Card>
     </div>
   )
 }

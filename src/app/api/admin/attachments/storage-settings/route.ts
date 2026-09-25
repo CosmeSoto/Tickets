@@ -38,6 +38,7 @@ const SETTINGS_KEYS = [
   'attachmentsMicrosoftRefreshToken',
   'attachmentsSharePointDriveId',
   'attachmentsSharePointSiteUrl',
+  'attachmentsPersonalDriveEnabled',
 ] as const
 
 async function loadSettings() {
@@ -58,6 +59,10 @@ async function loadSettings() {
       configured: !!map.get('attachmentsSharePointDriveId'),
       siteUrl: map.get('attachmentsSharePointSiteUrl') || null,
     },
+    // Orthogonal al destino activo de arriba: no compite con local/Google/
+    // OneDrive/SharePoint — es un override por-usuario que se consulta ANTES
+    // de llegar a esa elección (ver FileService.storeAttachmentBytes).
+    personalDriveEnabled: map.get('attachmentsPersonalDriveEnabled') === 'true',
   }
 }
 
@@ -80,11 +85,18 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: 'Cuerpo inválido' }, { status: 400 })
   }
 
-  const { activeProvider, googleDriveEnabled, oneDriveEnabled, sharePointEnabled } = body as {
+  const {
+    activeProvider,
+    googleDriveEnabled,
+    oneDriveEnabled,
+    sharePointEnabled,
+    personalDriveEnabled,
+  } = body as {
     activeProvider?: ActiveProvider
     googleDriveEnabled?: boolean
     oneDriveEnabled?: boolean
     sharePointEnabled?: boolean
+    personalDriveEnabled?: boolean
   }
 
   const previousActiveProvider = (await loadSettings()).activeProvider
@@ -131,6 +143,14 @@ export async function PUT(request: NextRequest) {
       'SharePoint habilitado como destino de adjuntos'
     )
     if (!sharePointEnabled) await resetActiveProviderIfMatches('sharepoint', session!.user!.id)
+  }
+
+  if (typeof personalDriveEnabled === 'boolean') {
+    await upsert(
+      'attachmentsPersonalDriveEnabled',
+      String(personalDriveEnabled),
+      'Permite que cada usuario conecte su propio OneDrive para sus adjuntos'
+    )
   }
 
   if (activeProvider) {

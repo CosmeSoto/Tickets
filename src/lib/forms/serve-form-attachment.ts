@@ -72,7 +72,8 @@ export async function serveFormAttachment(
 
   const buffer = await readFormAttachmentBuffer(attachment)
   if (!buffer) {
-    return new NextResponse('Archivo no disponible', { status: 404 })
+    const reason = await FileService.describeAttachmentUnavailable(attachment)
+    return new NextResponse(reason ?? 'Archivo no disponible', { status: 404 })
   }
 
   return buildFormAttachmentResponse(attachment, buffer, download)
