@@ -63,12 +63,12 @@ export function ImageLightbox({ src, alt, onClose, onPrev, onNext, counter }: Im
           type='button'
           aria-label='Cerrar'
           onClick={onClose}
-          className='absolute top-4 right-4 text-white bg-black/50 hover:bg-black/75 p-2 rounded-full transition-colors'
+          className='absolute top-4 right-4 z-10 text-white bg-black/50 hover:bg-black/75 p-2 rounded-full transition-colors'
         >
           <X className='h-5 w-5' />
         </button>
 
-        <div className='absolute top-4 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-black/50 rounded-full px-1.5 py-1'>
+        <div className='absolute top-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1 bg-black/50 rounded-full px-1.5 py-1'>
           <button
             type='button'
             aria-label='Alejar'
@@ -96,7 +96,7 @@ export function ImageLightbox({ src, alt, onClose, onPrev, onNext, counter }: Im
               type='button'
               aria-label='Anterior'
               onClick={onPrev}
-              className='absolute left-4 top-1/2 -translate-y-1/2 text-white bg-black/50 hover:bg-black/75 p-2 rounded-full transition-colors'
+              className='absolute left-4 top-1/2 -translate-y-1/2 z-10 text-white bg-black/50 hover:bg-black/75 p-2 rounded-full transition-colors'
             >
               <ChevronLeft className='h-5 w-5' />
             </button>
@@ -104,7 +104,7 @@ export function ImageLightbox({ src, alt, onClose, onPrev, onNext, counter }: Im
               type='button'
               aria-label='Siguiente'
               onClick={onNext}
-              className='absolute right-4 top-1/2 -translate-y-1/2 text-white bg-black/50 hover:bg-black/75 p-2 rounded-full transition-colors'
+              className='absolute right-4 top-1/2 -translate-y-1/2 z-10 text-white bg-black/50 hover:bg-black/75 p-2 rounded-full transition-colors'
             >
               <ChevronRight className='h-5 w-5' />
             </button>
@@ -112,7 +112,7 @@ export function ImageLightbox({ src, alt, onClose, onPrev, onNext, counter }: Im
         )}
 
         {counter && (
-          <div className='absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/50 text-white text-xs px-2 py-0.5 rounded-full'>
+          <div className='absolute bottom-4 left-1/2 -translate-x-1/2 z-10 bg-black/50 text-white text-xs px-2 py-0.5 rounded-full'>
             {counter}
           </div>
         )}
