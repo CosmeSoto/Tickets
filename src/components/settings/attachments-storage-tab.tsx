@@ -28,12 +28,18 @@ const ATTACHMENTS_CALLBACK_PATH = '/api/admin/attachments/cloud-auth/callback'
 
 type ProviderId = 'local' | 'google-drive' | 'onedrive' | 'sharepoint'
 
+interface PersonalConnectionsSummary {
+  count: number
+  users: { id: string; name: string; email: string; connectedAt: string }[]
+}
+
 interface StorageSettings {
   activeProvider: ProviderId
   googleDrive: { enabled: boolean; authorized: boolean }
   oneDrive: { enabled: boolean; authorized: boolean }
   sharePoint: { enabled: boolean; configured: boolean; siteUrl: string | null }
   personalDriveEnabled: boolean
+  personalDriveConnections: PersonalConnectionsSummary
 }
 
 const PROVIDER_LABEL: Record<'google-drive' | 'onedrive' | 'sharepoint', string> = {
@@ -249,7 +255,45 @@ export function AttachmentsStorageTab() {
             onCheckedChange={enabled => patch({ personalDriveEnabled: enabled })}
           />
         </CardHeader>
+        <CardContent>
+          <PersonalConnectionsList
+            emptyLabel='Todavía nadie conectó su Drive personal.'
+            summary={settings.personalDriveConnections}
+          />
+        </CardContent>
       </Card>
+    </div>
+  )
+}
+
+function PersonalConnectionsList({
+  summary,
+  emptyLabel,
+}: {
+  summary: PersonalConnectionsSummary
+  emptyLabel: string
+}) {
+  if (summary.count === 0) {
+    return <p className='text-sm text-muted-foreground'>{emptyLabel}</p>
+  }
+  return (
+    <div className='space-y-2'>
+      <p className='text-sm font-medium'>
+        {summary.count} usuario{summary.count === 1 ? '' : 's'} conectado
+        {summary.count === 1 ? '' : 's'}
+      </p>
+      <ul className='space-y-1 rounded-lg border p-3'>
+        {summary.users.map(u => (
+          <li key={u.id} className='flex items-center justify-between text-xs'>
+            <span>
+              {u.name} <span className='text-muted-foreground'>({u.email})</span>
+            </span>
+            <span className='text-muted-foreground'>
+              {new Date(u.connectedAt).toLocaleDateString('es-EC')}
+            </span>
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }

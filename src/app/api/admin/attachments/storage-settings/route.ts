@@ -25,6 +25,7 @@ import { randomUUID } from 'crypto'
 import { requireAttachmentsSuperAdmin } from '../_auth'
 import { resetActiveProviderIfMatches } from '../_storage-settings'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
+import { PERSONAL_DRIVE_PROVIDER } from '@/lib/services/personal-drive-graph-service'
 
 type ActiveProvider = 'local' | 'google-drive' | 'onedrive' | 'sharepoint'
 type CloudProvider = Exclude<ActiveProvider, 'local'>
@@ -68,12 +69,39 @@ async function loadSettings() {
 
 export type StorageSettingsSnapshot = Awaited<ReturnType<typeof loadSettings>>
 
+/**
+ * Quiénes conectaron su Drive personal — solo para que el Super Admin vea si
+ * vale la pena tener la función activada y para soporte ("¿de verdad estoy
+ * conectado?"). Esta ruta ya está gateada a Super Admin completo (no hay un
+ * nivel intermedio como en Planner), así que no hace falta ocultar la lista
+ * detrás de un permiso aparte.
+ */
+async function loadPersonalDriveConnections() {
+  const accounts = await prisma.oauth_accounts.findMany({
+    where: { provider: PERSONAL_DRIVE_PROVIDER },
+    include: { users: { select: { id: true, name: true, email: true } } },
+    orderBy: { createdAt: 'desc' },
+  })
+  return {
+    count: accounts.length,
+    users: accounts.map(a => ({
+      id: a.users.id,
+      name: a.users.name,
+      email: a.users.email,
+      connectedAt: a.createdAt,
+    })),
+  }
+}
+
 export async function GET() {
   const { errorResponse } = await requireAttachmentsSuperAdmin()
   if (errorResponse) return errorResponse
 
-  const settings = await loadSettings()
-  return NextResponse.json(settings)
+  const [settings, personalDriveConnections] = await Promise.all([
+    loadSettings(),
+    loadPersonalDriveConnections(),
+  ])
+  return NextResponse.json({ ...settings, personalDriveConnections })
 }
 
 export async function PUT(request: NextRequest) {

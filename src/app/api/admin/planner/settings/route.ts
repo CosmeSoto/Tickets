@@ -6,6 +6,7 @@ import prisma from '@/lib/prisma'
 import { invalidateCache } from '@/lib/api-cache'
 import { assertCanManagePlanner } from '@/lib/planner/access'
 import { getPlannerModuleSettings, setPlannerModuleSettings } from '@/lib/planner/settings'
+import { MS_TODO_PROVIDER } from '@/lib/services/ms-todo-graph-service'
 
 const schema = z.object({
   enabled: z.boolean().optional(),
@@ -30,11 +31,38 @@ export async function GET() {
   const tokenSetting = await prisma.system_settings.findUnique({
     where: { key: 'plannerMicrosoftRefreshToken' },
   })
+  const canWrite = canWriteSettings(session)
+
+  // Quiénes conectaron su Microsoft To Do personal — solo para Super Admin
+  // (mismo nivel que puede conectar/desconectar la cuenta de servicio de
+  // Planner de acá abajo). Un gestor de familia con acceso de solo lectura a
+  // esta pantalla no necesita ver correos de otros usuarios.
+  let msTodoConnections: {
+    count: number
+    users: { id: string; name: string; email: string; connectedAt: Date }[]
+  } | null = null
+  if (canWrite) {
+    const accounts = await prisma.oauth_accounts.findMany({
+      where: { provider: MS_TODO_PROVIDER },
+      include: { users: { select: { id: true, name: true, email: true } } },
+      orderBy: { createdAt: 'desc' },
+    })
+    msTodoConnections = {
+      count: accounts.length,
+      users: accounts.map(a => ({
+        id: a.users.id,
+        name: a.users.name,
+        email: a.users.email,
+        connectedAt: a.createdAt,
+      })),
+    }
+  }
 
   return NextResponse.json({
     settings,
     connected: !!tokenSetting?.value,
-    canWrite: canWriteSettings(session),
+    canWrite,
+    msTodoConnections,
   })
 }
 

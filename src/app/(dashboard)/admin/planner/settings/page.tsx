@@ -41,6 +41,11 @@ interface SyncLink {
   lastSyncedAt: string | null
 }
 
+interface MsTodoConnectionsSummary {
+  count: number
+  users: { id: string; name: string; email: string; connectedAt: string }[]
+}
+
 export default function PlannerSettingsPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -60,6 +65,7 @@ export default function PlannerSettingsPage() {
   const [loadingPlans, setLoadingPlans] = useState(false)
 
   const [links, setLinks] = useState<SyncLink[]>([])
+  const [msTodoConnections, setMsTodoConnections] = useState<MsTodoConnectionsSummary | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -70,6 +76,7 @@ export default function PlannerSettingsPage() {
       setSettings({ ...initialSettings, ...data.settings })
       setConnected(data.connected === true)
       setCanWrite(data.canWrite === true)
+      setMsTodoConnections(data.msTodoConnections ?? null)
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Error de configuración.')
     } finally {
@@ -297,6 +304,44 @@ export default function PlannerSettingsPage() {
             )}
           </CardContent>
         </Card>
+
+        {msTodoConnections && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Microsoft To Do personal</CardTitle>
+              <CardDescription>
+                Usuarios que conectaron su propia cuenta desde su perfil (Mi Perfil → Microsoft To
+                Do) — distinto de la cuenta de servicio de arriba, esta es la suya propia.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {msTodoConnections.count === 0 ? (
+                <p className='text-sm text-muted-foreground'>
+                  Todavía nadie conectó su Microsoft To Do personal.
+                </p>
+              ) : (
+                <div className='space-y-2'>
+                  <p className='text-sm font-medium'>
+                    {msTodoConnections.count} usuario{msTodoConnections.count === 1 ? '' : 's'}{' '}
+                    conectado{msTodoConnections.count === 1 ? '' : 's'}
+                  </p>
+                  <ul className='space-y-1 rounded-lg border p-3'>
+                    {msTodoConnections.users.map(u => (
+                      <li key={u.id} className='flex items-center justify-between text-xs'>
+                        <span>
+                          {u.name} <span className='text-muted-foreground'>({u.email})</span>
+                        </span>
+                        <span className='text-muted-foreground'>
+                          {new Date(u.connectedAt).toLocaleDateString('es-EC')}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardHeader>
