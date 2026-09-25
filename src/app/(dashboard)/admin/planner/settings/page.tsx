@@ -16,10 +16,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
-import {
-  OAuthCredentialsStatusLink,
-  RedirectUriNote,
-} from '@/components/settings/oauth-credentials-fields'
+import { RedirectUriNote } from '@/components/settings/oauth-credentials-fields'
 
 type PlannerSettings = {
   enabled: boolean
@@ -244,25 +241,11 @@ export default function PlannerSettingsPage() {
       <div className='space-y-6 max-w-2xl'>
         <Card>
           <CardHeader>
-            <CardTitle>Credenciales de la aplicación (Azure AD)</CardTitle>
-            <CardDescription>
-              Se configuran una sola vez para todo el sistema en Ajustes → OAuth, junto con las
-              demás credenciales de Microsoft (login, SharePoint, OneDrive). Esa misma credencial
-              también habilita que cada usuario conecte su propia cuenta de Microsoft To Do desde su
-              perfil (Mi Perfil → Microsoft To Do) — no requiere configurarse aparte acá.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <OAuthCredentialsStatusLink provider='azure-ad' />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
             <CardTitle>Cuenta de Microsoft 365</CardTitle>
             <CardDescription>
               Usa la cuenta dedicada de Microsoft 365 (recomendado, no la de una persona) — solo se
-              autoriza una vez.
+              autoriza una vez. Usa las credenciales de la app ya configuradas en Ajustes → OAuth;
+              si todavía no están listas, &quot;Conectar cuenta&quot; te lo va a avisar ahí mismo.
             </CardDescription>
           </CardHeader>
           <CardContent>
