@@ -182,11 +182,26 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (!config.clientId || !config.clientSecret) {
+    // Con reuse activo, el Client ID/Secret reales viven en la fila
+    // 'azure-ad', no en esta — mismo criterio que getOAuthCredentials en
+    // oauth-config.ts, para no duplicar la lógica de "de dónde salen".
+    let effectiveClientId = config.clientId
+    let effectiveClientSecretEncrypted = config.clientSecret
+    if (provider === 'azure-ad-sharepoint' && config.reuseAzureAdCredentials) {
+      const azureAd = await prisma.oauth_configs.findUnique({ where: { provider: 'azure-ad' } })
+      effectiveClientId = azureAd?.clientId ?? null
+      effectiveClientSecretEncrypted = azureAd?.clientSecret ?? null
+    }
+
+    if (!effectiveClientId || !effectiveClientSecretEncrypted) {
+      const source =
+        provider === 'azure-ad-sharepoint' && config.reuseAzureAdCredentials
+          ? 'de la app de Microsoft OAuth que estás reutilizando'
+          : `de ${label}`
       return NextResponse.json(
         {
           success: false,
-          error: `La configuración de ${label} está incompleta. Verifica Client ID y Client Secret.`,
+          error: `La configuración ${source} está incompleta. Verifica Client ID y Client Secret.`,
         },
         { status: 400 }
       )
@@ -195,7 +210,7 @@ export async function POST(request: NextRequest) {
     // Desencriptar secret para las verificaciones
     let plainSecret: string
     try {
-      plainSecret = decrypt(config.clientSecret)
+      plainSecret = decrypt(effectiveClientSecretEncrypted)
     } catch {
       return NextResponse.json(
         { success: false, error: 'Error al leer el Client Secret guardado. Vuelve a ingresarlo.' },
@@ -238,7 +253,7 @@ export async function POST(request: NextRequest) {
             'Confírmalo completando el inicio de sesión real (Conectar cuenta / probar el login).'
         )
       } else {
-        const credsCheck = await verifyAzureCredentials(tenant, config.clientId, plainSecret)
+        const credsCheck = await verifyAzureCredentials(tenant, effectiveClientId, plainSecret)
         if (!credsCheck.ok) {
           return NextResponse.json(
             {
@@ -255,7 +270,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (provider === 'google') {
-      const credsCheck = await verifyGoogleCredentials(config.clientId, plainSecret)
+      const credsCheck = await verifyGoogleCredentials(effectiveClientId, plainSecret)
       if (!credsCheck.ok) {
         return NextResponse.json(
           {

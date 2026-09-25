@@ -257,16 +257,25 @@ model oauth_accounts {
 }
 
 model oauth_configs {
-  id           String   @id
-  provider     String   @unique
-  clientId     String
-  clientSecret String
-  tenantId     String?
-  isEnabled    Boolean  @default(false)
-  redirectUri  String?
-  scopes       String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime
+  id                      String   @id
+  provider                String   @unique
+  /// Nulo cuando `provider = 'azure-ad-sharepoint'` y `reuseAzureAdCredentials`
+  /// es true: en ese caso el Client ID/Secret efectivos se resuelven en vivo
+  /// desde la fila 'azure-ad' (ver getOAuthCredentials en oauth-config.ts).
+  clientId                String?
+  clientSecret            String?
+  tenantId                String?
+  isEnabled               Boolean  @default(false)
+  redirectUri             String?
+  scopes                  String?
+  /// Solo tiene efecto en provider = 'azure-ad-sharepoint'. Evita que el admin
+  /// tenga que retipear el mismo Client ID/Secret ya cargado en la fila
+  /// 'azure-ad' cuando SharePoint usa la misma app registrada — el Tenant ID
+  /// de esta fila SIEMPRE se usa igual (nunca el de 'azure-ad', que puede ser
+  /// "common").
+  reuseAzureAdCredentials Boolean  @default(false)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime
 }
 
 model pages {

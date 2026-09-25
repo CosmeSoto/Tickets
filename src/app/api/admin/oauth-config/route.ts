@@ -38,6 +38,7 @@ export async function GET() {
       isEnabled: config.isEnabled,
       redirectUri: config.redirectUri,
       scopes: config.scopes,
+      reuseAzureAdCredentials: config.reuseAzureAdCredentials,
       updatedAt: config.updatedAt,
     }))
 
@@ -69,14 +70,19 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { provider, clientId, clientSecret, tenantId, isEnabled, redirectUri, scopes } = body
+    const {
+      provider,
+      clientId,
+      clientSecret,
+      tenantId,
+      isEnabled,
+      redirectUri,
+      scopes,
+      reuseAzureAdCredentials,
+    } = body
 
-    // Validaciones
-    if (!provider || !clientId) {
-      return NextResponse.json(
-        { success: false, error: 'Provider y clientId son requeridos' },
-        { status: 400 }
-      )
+    if (!provider) {
+      return NextResponse.json({ success: false, error: 'Provider es requerido' }, { status: 400 })
     }
 
     if (!['google', 'azure-ad', 'azure-ad-sharepoint'].includes(provider)) {
@@ -89,27 +95,65 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Solo tiene sentido en la fila de aplicación de SharePoint — evita una
+    // fila inconsistente (p. ej. 'google' apuntando a reusar credenciales
+    // ajenas sin que ningún flujo de este provider lo contemple).
+    if (reuseAzureAdCredentials && provider !== 'azure-ad-sharepoint') {
+      return NextResponse.json(
+        { success: false, error: 'reuseAzureAdCredentials solo aplica a "azure-ad-sharepoint"' },
+        { status: 400 }
+      )
+    }
+    const reuse = provider === 'azure-ad-sharepoint' && Boolean(reuseAzureAdCredentials)
+
+    // Con reuse activo, Client ID/Secret no los tipea el admin acá — se
+    // resuelven en vivo desde 'azure-ad' (ver oauth-config.ts) — así que
+    // ninguna de las validaciones de "campo requerido" de abajo aplica.
+    if (!reuse && !clientId) {
+      return NextResponse.json(
+        { success: false, error: 'Provider y clientId son requeridos' },
+        { status: 400 }
+      )
+    }
+
     // Buscar configuración existente
     const existingConfig = await prisma.oauth_configs.findUnique({
       where: { provider },
     })
 
-    // Si es una nueva configuración, clientSecret es obligatorio
-    if (!existingConfig && !clientSecret) {
-      return NextResponse.json(
-        { success: false, error: 'Client Secret es requerido para nueva configuración' },
-        { status: 400 }
-      )
-    }
+    if (!reuse) {
+      // Si es una nueva configuración, clientSecret es obligatorio
+      if (!existingConfig && !clientSecret) {
+        return NextResponse.json(
+          { success: false, error: 'Client Secret es requerido para nueva configuración' },
+          { status: 400 }
+        )
+      }
 
-    if (isEnabled && (!clientId || (!clientSecret && !existingConfig?.clientSecret))) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'No puedes activar OAuth sin Client ID y Client Secret configurados',
-        },
-        { status: 400 }
-      )
+      if (isEnabled && (!clientId || (!clientSecret && !existingConfig?.clientSecret))) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'No puedes activar OAuth sin Client ID y Client Secret configurados',
+          },
+          { status: 400 }
+        )
+      }
+    } else if (isEnabled) {
+      // Con reuse activo, la fuente real de las credenciales es 'azure-ad' —
+      // si esa fila no tiene Client ID/Secret todavía, activar SharePoint acá
+      // fallaría en silencio recién al intentar subir un archivo.
+      const azureAd = await prisma.oauth_configs.findUnique({ where: { provider: 'azure-ad' } })
+      if (!azureAd?.clientId || !azureAd?.clientSecret) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              'Para reusar la app de Microsoft OAuth, primero configúrala y guárdala en la tarjeta de arriba (con Client ID y Client Secret).',
+          },
+          { status: 400 }
+        )
+      }
     }
 
     // 'azure-ad-sharepoint' usa client_credentials, que Microsoft no admite
@@ -119,7 +163,8 @@ export async function POST(request: NextRequest) {
     // críptico que decirlo aquí al guardar. Se valida el valor, no solo que
     // no esté vacío: escribir "common" por costumbre (es el valor sugerido
     // para los demás providers) pasaría la comprobación de "no vacío" pero
-    // fallaría igual al usarlo de verdad.
+    // fallaría igual al usarlo de verdad. Aplica igual si se reusa la app de
+    // Microsoft OAuth — el Tenant ID sigue siendo el propio de esta fila.
     if (provider === 'azure-ad-sharepoint' && isEnabled) {
       const effectiveTenant = (tenantId || existingConfig?.tenantId || '').trim().toLowerCase()
       if (!effectiveTenant || ['common', 'organizations', 'consumers'].includes(effectiveTenant)) {
@@ -136,17 +181,23 @@ export async function POST(request: NextRequest) {
 
     // Preparar datos de actualización
     const updateData: any = {
-      clientId,
       tenantId: tenantId || null,
       isEnabled: isEnabled ?? false,
       redirectUri: redirectUri || null,
       scopes: scopes || null,
+      reuseAzureAdCredentials: reuse,
       updatedAt: new Date(),
     }
 
-    // Solo encriptar si se proporcionó un secret nuevo — encrypt(undefined) lanza.
-    if (clientSecret) {
-      updateData.clientSecret = encrypt(clientSecret)
+    // Con reuse activo, deliberadamente NO se tocan clientId/clientSecret acá
+    // — se dejan como estén (si antes hubo una app dedicada, reaparece intacta
+    // al desactivar el reuse más adelante, sin volver a tipearla).
+    if (!reuse) {
+      updateData.clientId = clientId
+      // Solo encriptar si se proporcionó un secret nuevo — encrypt(undefined) lanza.
+      if (clientSecret) {
+        updateData.clientSecret = encrypt(clientSecret)
+      }
     }
 
     // Create/update explícitos en vez de upsert: Prisma valida los tipos de
@@ -162,12 +213,13 @@ export async function POST(request: NextRequest) {
           data: {
             id: randomUUID(),
             provider,
-            clientId,
-            clientSecret: encrypt(clientSecret!), // Sabemos que existe porque lo validamos arriba
+            clientId: reuse ? null : clientId,
+            clientSecret: reuse ? null : encrypt(clientSecret!), // Sabemos que existe porque lo validamos arriba
             tenantId: tenantId || null,
             isEnabled: isEnabled ?? false,
             redirectUri: redirectUri || null,
             scopes: scopes || null,
+            reuseAzureAdCredentials: reuse,
             createdAt: new Date(),
             updatedAt: new Date(),
           },
@@ -187,6 +239,7 @@ export async function POST(request: NextRequest) {
         details: {
           provider,
           isEnabled: isEnabled ?? false,
+          reuseAzureAdCredentials: reuse,
           action: existingConfig ? 'updated' : 'created',
           clientIdChanged: existingConfig ? existingConfig.clientId !== clientId : true,
           secretChanged: !!clientSecret,

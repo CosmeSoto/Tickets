@@ -193,7 +193,8 @@ export function OAuthSettingsTab() {
                 <CardTitle>Microsoft (SharePoint)</CardTitle>
                 <CardDescription>
                   Credenciales de aplicación (client_credentials) para usar SharePoint como destino
-                  de adjuntos en Ajustes → Almacenamiento.
+                  de adjuntos en Ajustes → Almacenamiento. Puede ser la misma app de Microsoft OAuth
+                  de arriba (marca la casilla abajo) o una app dedicada.
                 </CardDescription>
               </div>
             </div>
@@ -214,20 +215,22 @@ export function OAuthSettingsTab() {
                 falla con error 403:
               </p>
               <p>
-                <strong>1)</strong> En Azure Portal → esta app → API permissions, agregar{' '}
-                <code className='font-mono'>Sites.Selected</code> como permiso de{' '}
-                <strong>aplicación</strong> (Application permission) de Microsoft Graph, y un
-                administrador debe presionar <strong>&quot;Grant admin consent&quot;</strong> para
-                el tenant. Sin este consentimiento a nivel de la app, el paso 2 no tiene ningún
+                <strong>1)</strong> En Azure Portal → la app que uses acá abajo (la misma de
+                Microsoft OAuth si activas &quot;Usar la misma app&quot;, o una dedicada si no) →
+                API permissions, agregar <code className='font-mono'>Sites.Selected</code> como
+                permiso de <strong>aplicación</strong> (Application permission) de Microsoft Graph,
+                y un administrador debe presionar <strong>&quot;Grant admin consent&quot;</strong>{' '}
+                para el tenant. Sin este consentimiento a nivel de la app, el paso 2 no tiene ningún
                 efecto aunque parezca completarse sin error.
               </p>
               <p>
-                <strong>2)</strong> Ya con eso hecho, otorgarle a esta app acceso al sitio
-                específico con rol <code className='font-mono'>write</code> (no solo{' '}
+                <strong>2)</strong> Ya con eso hecho, otorgarle a esa app acceso al sitio específico
+                con rol <code className='font-mono'>write</code> (no solo{' '}
                 <code className='font-mono'>read</code>) — un paso aparte con PowerShell (PnP) o
-                Graph Explorer, fuera de esta app. Con solo lectura, conectar el sitio abajo va a
-                funcionar (son llamadas de consulta) pero subir un archivo real va a fallar después
-                con otro 403 — más difícil de relacionar con el permiso si no se sabe de antemano.
+                Graph Explorer, fuera de esta pantalla. Con solo lectura, conectar el sitio abajo va
+                a funcionar (son llamadas de consulta) pero subir un archivo real va a fallar
+                después con otro 403 — más difícil de relacionar con el permiso si no se sabe de
+                antemano.
               </p>
             </AlertDescription>
           </Alert>
@@ -238,8 +241,19 @@ export function OAuthSettingsTab() {
             showTenantId
             tenantRequired
             tenantPlaceholder='ID del directorio (tenant) — no uses "common" aquí'
+            tenantHint={
+              <p className='text-xs text-muted-foreground'>
+                Es independiente del Tenant ID de Microsoft OAuth (ese puede ser &quot;common&quot;)
+                — acá siempre hace falta el GUID real del directorio, aunque uses la misma app.
+              </p>
+            }
             enabledLabel='Habilitar estas credenciales'
             enabledDescription='Debe estar activo para poder conectar un sitio en Ajustes → Almacenamiento.'
+            reuseToggle={{
+              checkboxLabel: 'Usar la misma app que Microsoft OAuth',
+              sourceProvider: 'azure-ad',
+              sourceLabel: 'Microsoft OAuth',
+            }}
             onStateChange={s => setSharePointEnabled(s.isEnabled)}
           />
         </CardContent>

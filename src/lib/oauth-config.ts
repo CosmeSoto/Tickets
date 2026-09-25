@@ -27,12 +27,19 @@ export interface OAuthCredentials {
  * `oauth_configs` con provider='azure-ad' — solo ese Client ID/Secret se
  * configura, en Ajustes → OAuth, sin repetirlo en cada pantalla de función.
  *
- * 'azure-ad-sharepoint' es la única excepción real, no accidental: usa
- * credenciales de APLICACIÓN (client_credentials + permiso Sites.Selected),
- * un flujo sin usuario ni popup de consentimiento, con su propio perfil de
- * seguridad (least-privilege: no conviene que la misma app con permisos de
- * aplicación tenant-wide sea también la de login). No hay `redirectUri` real
- * ni token de usuario que guardar — ver `CloudStorageService.getSharePointAccessToken`.
+ * 'azure-ad-sharepoint' usa credenciales de APLICACIÓN (client_credentials +
+ * permiso Sites.Selected), un flujo sin usuario ni popup de consentimiento —
+ * por eso, a diferencia de 'azure-ad', puede convenir una app de Azure
+ * dedicada, distinta de la de login (least-privilege: no conviene que la
+ * misma app con permisos de aplicación tenant-wide sea también la de login).
+ * Pero también puede ser, a propósito, LA MISMA app: si el admin activa
+ * `reuseAzureAdCredentials` en esta fila (checkbox en Ajustes → OAuth),
+ * `getOAuthCredentials('azure-ad-sharepoint')` resuelve el Client ID/Secret
+ * en vivo desde la fila 'azure-ad' en vez de pedirlos duplicados acá — el
+ * Tenant ID de esta fila SIEMPRE es el propio (nunca el de 'azure-ad', que
+ * puede ser "common"; SharePoint exige el GUID real). No hay `redirectUri`
+ * real ni token de usuario que guardar — ver
+ * `CloudStorageService.getSharePointAccessToken`.
  */
 export type OAuthProviderKey = 'google' | 'azure-ad' | 'azure-ad-sharepoint'
 
@@ -51,12 +58,27 @@ export async function getOAuthCredentials(
       return null
     }
 
-    // Desencriptar client secret
-    const clientSecret = decrypt(config.clientSecret)
+    if (provider === 'azure-ad-sharepoint' && config.reuseAzureAdCredentials) {
+      const azureAd = await prisma.oauth_configs.findUnique({
+        where: { provider: 'azure-ad' },
+      })
+      if (!azureAd?.clientId || !azureAd?.clientSecret) return null
+
+      return {
+        clientId: azureAd.clientId,
+        clientSecret: decrypt(azureAd.clientSecret),
+        // El Tenant ID es siempre el propio de esta fila, nunca el de
+        // 'azure-ad' — ese puede ser "common", inválido para client_credentials.
+        tenantId: config.tenantId || undefined,
+        isEnabled: config.isEnabled,
+      }
+    }
+
+    if (!config.clientId || !config.clientSecret) return null
 
     return {
       clientId: config.clientId,
-      clientSecret,
+      clientSecret: decrypt(config.clientSecret),
       tenantId: config.tenantId || undefined,
       isEnabled: config.isEnabled,
     }

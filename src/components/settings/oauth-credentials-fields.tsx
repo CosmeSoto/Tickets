@@ -29,10 +29,20 @@ export type OAuthCredentialsProvider = 'google' | 'azure-ad' | 'azure-ad-sharepo
 
 interface OAuthConfigApiRow {
   provider: string
-  clientId: string
+  clientId: string | null
   hasClientSecret?: boolean
   tenantId?: string | null
   isEnabled: boolean
+  reuseAzureAdCredentials?: boolean
+}
+
+interface ReuseToggleConfig {
+  /** Texto del switch, ej. "Usar la misma app que Microsoft OAuth". */
+  checkboxLabel: string
+  /** Provider cuyas credenciales se reutilizan (siempre 'azure-ad' hoy). */
+  sourceProvider: OAuthCredentialsProvider
+  /** Nombre legible del provider fuente, ej. "Microsoft OAuth". */
+  sourceLabel: string
 }
 
 interface OAuthCredentialsFieldsProps {
@@ -58,6 +68,15 @@ interface OAuthCredentialsFieldsProps {
   buttonSize?: 'default' | 'sm'
   /** Se llama tras cargar y tras cada cambio, para que el contenedor (ej. el badge Activo/Inactivo) se mantenga en sincronía sin duplicar el estado. */
   onStateChange?: (state: { isEnabled: boolean; clientId: string }) => void
+  /**
+   * Si se pasa, agrega un switch "usar la misma app que <sourceProvider>":
+   * activado, oculta Client ID/Secret y el guardado le pide al backend que
+   * los resuelva en vivo desde esa otra fila en vez de pedirlos acá — evita
+   * que el admin tipee el mismo Client ID/Secret dos veces cuando de verdad
+   * es la misma app registrada en Azure/Google. Tenant ID (si aplica) sigue
+   * siendo siempre el propio de este formulario, nunca el de la fuente.
+   */
+  reuseToggle?: ReuseToggleConfig
 }
 
 export function OAuthCredentialsFields({
@@ -77,6 +96,7 @@ export function OAuthCredentialsFields({
   saveLabel = 'Guardar credenciales',
   buttonSize = 'default',
   onStateChange,
+  reuseToggle,
 }: OAuthCredentialsFieldsProps) {
   const { toast } = useToast()
 
@@ -87,7 +107,9 @@ export function OAuthCredentialsFields({
     isEnabled: false,
     showSecret: false,
     hasExistingSecret: false,
+    reuseSource: false,
   })
+  const [sourceStatus, setSourceStatus] = useState<OAuthCredentialsStatus | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
@@ -106,9 +128,19 @@ export function OAuthCredentialsFields({
             tenantId: existing.tenantId ?? '',
             isEnabled: existing.isEnabled ?? false,
             hasExistingSecret: Boolean(existing.hasClientSecret),
+            reuseSource: Boolean(existing.reuseAzureAdCredentials),
           }
           onStateChange?.({ isEnabled: next.isEnabled, clientId: next.clientId })
           return next
+        })
+      }
+      if (reuseToggle) {
+        const source = data.data?.find(
+          (c: OAuthConfigApiRow) => c.provider === reuseToggle.sourceProvider
+        )
+        setSourceStatus({
+          configured: Boolean(source?.clientId && source?.hasClientSecret),
+          isEnabled: Boolean(source?.isEnabled),
         })
       }
     } catch {
@@ -142,7 +174,10 @@ export function OAuthCredentialsFields({
   }
 
   const save = async () => {
-    if (!config.clientId || (!config.clientSecret && !config.hasExistingSecret)) {
+    if (
+      !config.reuseSource &&
+      (!config.clientId || (!config.clientSecret && !config.hasExistingSecret))
+    ) {
       toast({
         title: 'Campos requeridos',
         description: 'Client ID y Client Secret son obligatorios',
@@ -163,13 +198,16 @@ export function OAuthCredentialsFields({
     try {
       const payload: Record<string, unknown> = {
         provider,
-        clientId: config.clientId,
         tenantId: config.tenantId || null,
         isEnabled: config.isEnabled,
         redirectUri: redirectUri || undefined,
         scopes: scopes || undefined,
       }
-      if (config.clientSecret) payload.clientSecret = config.clientSecret
+      if (reuseToggle) payload.reuseAzureAdCredentials = config.reuseSource
+      if (!config.reuseSource) {
+        payload.clientId = config.clientId
+        if (config.clientSecret) payload.clientSecret = config.clientSecret
+      }
 
       const res = await fetch('/api/admin/oauth-config', {
         method: 'POST',
@@ -282,49 +320,89 @@ export function OAuthCredentialsFields({
         </div>
       )}
 
-      <div className='space-y-2'>
-        <Label htmlFor={`${provider}-client-id`}>{clientIdLabel}</Label>
-        <Input
-          id={`${provider}-client-id`}
-          value={config.clientId}
-          onChange={e => setConfig(current => ({ ...current, clientId: e.target.value }))}
-          placeholder={clientIdPlaceholder}
-          className='font-mono text-sm'
-        />
-      </div>
-
-      <div className='space-y-2'>
-        <Label htmlFor={`${provider}-client-secret`}>
-          Client Secret {config.hasExistingSecret ? '(dejar vacío para mantener el actual)' : '*'}
-        </Label>
-        {config.hasExistingSecret && !config.clientSecret && (
-          <div className='flex items-center gap-2 rounded-md border border-border bg-muted/50 px-3 py-2 text-xs text-muted-foreground'>
-            <Key className='h-3.5 w-3.5 shrink-0' />
-            Secret guardado — deja vacío para mantenerlo o escribe uno nuevo para reemplazarlo
+      {reuseToggle && (
+        <div className='flex items-center justify-between rounded-lg border p-4'>
+          <div>
+            <p className='font-medium'>{reuseToggle.checkboxLabel}</p>
+            <p className='text-sm text-muted-foreground'>
+              Si está activo, se usan en vivo el Client ID y Client Secret de{' '}
+              {reuseToggle.sourceLabel} — rotar el secret ahí lo actualiza acá también, sin volver a
+              escribirlo.
+            </p>
           </div>
-        )}
-        <div className='relative'>
-          <Input
-            id={`${provider}-client-secret`}
-            type={config.showSecret ? 'text' : 'password'}
-            value={config.clientSecret}
-            onChange={e => setConfig(current => ({ ...current, clientSecret: e.target.value }))}
-            placeholder={
-              config.hasExistingSecret ? '••••••••  (sin cambios)' : clientSecretPlaceholder
+          <Switch
+            checked={config.reuseSource}
+            onCheckedChange={checked =>
+              setConfig(current => ({ ...current, reuseSource: checked }))
             }
-            className='pr-10 font-mono text-sm'
           />
-          <Button
-            type='button'
-            variant='ghost'
-            size='sm'
-            className='absolute right-0 top-0 h-full px-3'
-            onClick={() => setConfig(current => ({ ...current, showSecret: !current.showSecret }))}
-          >
-            {config.showSecret ? <EyeOff className='h-4 w-4' /> : <Eye className='h-4 w-4' />}
-          </Button>
         </div>
-      </div>
+      )}
+
+      {(!reuseToggle || !config.reuseSource) && (
+        <>
+          <div className='space-y-2'>
+            <Label htmlFor={`${provider}-client-id`}>{clientIdLabel}</Label>
+            <Input
+              id={`${provider}-client-id`}
+              value={config.clientId}
+              onChange={e => setConfig(current => ({ ...current, clientId: e.target.value }))}
+              placeholder={clientIdPlaceholder}
+              className='font-mono text-sm'
+            />
+          </div>
+
+          <div className='space-y-2'>
+            <Label htmlFor={`${provider}-client-secret`}>
+              Client Secret{' '}
+              {config.hasExistingSecret ? '(dejar vacío para mantener el actual)' : '*'}
+            </Label>
+            {config.hasExistingSecret && !config.clientSecret && (
+              <div className='flex items-center gap-2 rounded-md border border-border bg-muted/50 px-3 py-2 text-xs text-muted-foreground'>
+                <Key className='h-3.5 w-3.5 shrink-0' />
+                Secret guardado — deja vacío para mantenerlo o escribe uno nuevo para reemplazarlo
+              </div>
+            )}
+            <div className='relative'>
+              <Input
+                id={`${provider}-client-secret`}
+                type={config.showSecret ? 'text' : 'password'}
+                value={config.clientSecret}
+                onChange={e => setConfig(current => ({ ...current, clientSecret: e.target.value }))}
+                placeholder={
+                  config.hasExistingSecret ? '••••••••  (sin cambios)' : clientSecretPlaceholder
+                }
+                className='pr-10 font-mono text-sm'
+              />
+              <Button
+                type='button'
+                variant='ghost'
+                size='sm'
+                className='absolute right-0 top-0 h-full px-3'
+                onClick={() =>
+                  setConfig(current => ({ ...current, showSecret: !current.showSecret }))
+                }
+              >
+                {config.showSecret ? <EyeOff className='h-4 w-4' /> : <Eye className='h-4 w-4' />}
+              </Button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {reuseToggle && config.reuseSource && (
+        <div className='flex items-center gap-2 rounded-md border bg-muted/50 px-3 py-2 text-xs text-muted-foreground'>
+          <Key className='h-3.5 w-3.5 shrink-0' />
+          Reutilizando la app de {reuseToggle.sourceLabel}:{' '}
+          {!sourceStatus
+            ? 'verificando…'
+            : sourceStatus.isEnabled
+              ? 'configurada y habilitada'
+              : sourceStatus.configured
+                ? 'configurada, pero deshabilitada'
+                : 'sin configurar — cárgala primero en la tarjeta de arriba'}
+        </div>
+      )}
 
       {showTenantId && (
         <div className='space-y-2'>
@@ -363,7 +441,7 @@ export function OAuthCredentialsFields({
           variant='outline'
           size={buttonSize}
           onClick={() => void test()}
-          disabled={testing || !config.isEnabled || !config.clientId}
+          disabled={testing || !config.isEnabled || (!config.reuseSource && !config.clientId)}
           title={
             !config.isEnabled
               ? 'Habilita las credenciales para poder probarlas'
