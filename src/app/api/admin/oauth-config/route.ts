@@ -121,6 +121,14 @@ export async function POST(request: NextRequest) {
       where: { provider },
     })
 
+    // Con reuse activo se necesita la fila 'azure-ad' para dos cosas: validar
+    // que tenga Client ID/Secret, y tomar de ahí el Tenant ID — con reuse, el
+    // Tenant ID YA NO es un dato propio de esta fila (pedirlo de nuevo acá
+    // sería la misma info dos veces: es una sola app, un solo tenant).
+    const azureAd = reuse
+      ? await prisma.oauth_configs.findUnique({ where: { provider: 'azure-ad' } })
+      : null
+
     if (!reuse) {
       // Si es una nueva configuración, clientSecret es obligatorio
       if (!existingConfig && !clientSecret) {
@@ -143,7 +151,6 @@ export async function POST(request: NextRequest) {
       // Con reuse activo, la fuente real de las credenciales es 'azure-ad' —
       // si esa fila no tiene Client ID/Secret todavía, activar SharePoint acá
       // fallaría en silencio recién al intentar subir un archivo.
-      const azureAd = await prisma.oauth_configs.findUnique({ where: { provider: 'azure-ad' } })
       if (!azureAd?.clientId || !azureAd?.clientSecret) {
         return NextResponse.json(
           {
@@ -163,16 +170,22 @@ export async function POST(request: NextRequest) {
     // críptico que decirlo aquí al guardar. Se valida el valor, no solo que
     // no esté vacío: escribir "common" por costumbre (es el valor sugerido
     // para los demás providers) pasaría la comprobación de "no vacío" pero
-    // fallaría igual al usarlo de verdad. Aplica igual si se reusa la app de
-    // Microsoft OAuth — el Tenant ID sigue siendo el propio de esta fila.
+    // fallaría igual al usarlo de verdad.
+    //
+    // Con reuse activo, el Tenant ID que importa es el de 'azure-ad' (no se
+    // pide uno propio acá) — si esa fila tiene "common"/vacío, el problema
+    // hay que corregirlo ahí, no agregando un campo duplicado en esta tarjeta.
     if (provider === 'azure-ad-sharepoint' && isEnabled) {
-      const effectiveTenant = (tenantId || existingConfig?.tenantId || '').trim().toLowerCase()
+      const effectiveTenant = reuse
+        ? (azureAd?.tenantId || '').trim().toLowerCase()
+        : (tenantId || existingConfig?.tenantId || '').trim().toLowerCase()
       if (!effectiveTenant || ['common', 'organizations', 'consumers'].includes(effectiveTenant)) {
         return NextResponse.json(
           {
             success: false,
-            error:
-              'SharePoint requiere el Tenant ID real del directorio — no se puede usar "common", "organizations" ni "consumers"',
+            error: reuse
+              ? 'El Tenant ID de Microsoft OAuth es "common" (o está vacío) — para reusar esa app en SharePoint, poné ahí el GUID real del directorio (Ajustes → OAuth → Microsoft OAuth).'
+              : 'SharePoint requiere el Tenant ID real del directorio — no se puede usar "common", "organizations" ni "consumers"',
           },
           { status: 400 }
         )
@@ -181,7 +194,6 @@ export async function POST(request: NextRequest) {
 
     // Preparar datos de actualización
     const updateData: any = {
-      tenantId: tenantId || null,
       isEnabled: isEnabled ?? false,
       redirectUri: redirectUri || null,
       scopes: scopes || null,
@@ -189,11 +201,13 @@ export async function POST(request: NextRequest) {
       updatedAt: new Date(),
     }
 
-    // Con reuse activo, deliberadamente NO se tocan clientId/clientSecret acá
-    // — se dejan como estén (si antes hubo una app dedicada, reaparece intacta
-    // al desactivar el reuse más adelante, sin volver a tipearla).
+    // Con reuse activo, deliberadamente NO se tocan clientId/clientSecret/
+    // tenantId acá — se dejan como estén (si antes hubo una app dedicada,
+    // reaparece intacta al desactivar el reuse más adelante, sin volver a
+    // tipear nada).
     if (!reuse) {
       updateData.clientId = clientId
+      updateData.tenantId = tenantId || null
       // Solo encriptar si se proporcionó un secret nuevo — encrypt(undefined) lanza.
       if (clientSecret) {
         updateData.clientSecret = encrypt(clientSecret)
@@ -215,7 +229,7 @@ export async function POST(request: NextRequest) {
             provider,
             clientId: reuse ? null : clientId,
             clientSecret: reuse ? null : encrypt(clientSecret!), // Sabemos que existe porque lo validamos arriba
-            tenantId: tenantId || null,
+            tenantId: reuse ? null : tenantId || null,
             isEnabled: isEnabled ?? false,
             redirectUri: redirectUri || null,
             scopes: scopes || null,

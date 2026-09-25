@@ -243,8 +243,8 @@ export function OAuthSettingsTab() {
             tenantPlaceholder='ID del directorio (tenant) — no uses "common" aquí'
             tenantHint={
               <p className='text-xs text-muted-foreground'>
-                Es independiente del Tenant ID de Microsoft OAuth (ese puede ser &quot;common&quot;)
-                — acá siempre hace falta el GUID real del directorio, aunque uses la misma app.
+                SharePoint no admite &quot;common&quot; — poné el GUID real del directorio de esta
+                app dedicada.
               </p>
             }
             enabledLabel='Habilitar estas credenciales'

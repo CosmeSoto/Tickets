@@ -34,11 +34,13 @@ export interface OAuthCredentials {
  * misma app con permisos de aplicación tenant-wide sea también la de login).
  * Pero también puede ser, a propósito, LA MISMA app: si el admin activa
  * `reuseAzureAdCredentials` en esta fila (checkbox en Ajustes → OAuth),
- * `getOAuthCredentials('azure-ad-sharepoint')` resuelve el Client ID/Secret
- * en vivo desde la fila 'azure-ad' en vez de pedirlos duplicados acá — el
- * Tenant ID de esta fila SIEMPRE es el propio (nunca el de 'azure-ad', que
- * puede ser "common"; SharePoint exige el GUID real). No hay `redirectUri`
- * real ni token de usuario que guardar — ver
+ * `getOAuthCredentials('azure-ad-sharepoint')` resuelve Client ID, Client
+ * Secret Y Tenant ID en vivo desde la fila 'azure-ad' — es una sola app, un
+ * solo tenant, así que con reuse activo esta fila no guarda ningún dato
+ * propio (pedir un Tenant ID aparte sería la misma info dos veces). Si el
+ * Tenant ID de 'azure-ad' es "common"/vacío (inválido para client_credentials),
+ * el problema se corrige ahí — no agregando un campo duplicado acá. No hay
+ * `redirectUri` real ni token de usuario que guardar — ver
  * `CloudStorageService.getSharePointAccessToken`.
  */
 export type OAuthProviderKey = 'google' | 'azure-ad' | 'azure-ad-sharepoint'
@@ -67,9 +69,10 @@ export async function getOAuthCredentials(
       return {
         clientId: azureAd.clientId,
         clientSecret: decrypt(azureAd.clientSecret),
-        // El Tenant ID es siempre el propio de esta fila, nunca el de
-        // 'azure-ad' — ese puede ser "common", inválido para client_credentials.
-        tenantId: config.tenantId || undefined,
+        // También el de 'azure-ad' — es la misma app, un solo tenant. El
+        // caller (getSharePointAccessToken) ya valida que no sea "common" y
+        // devuelve un error claro apuntando a corregirlo en Microsoft OAuth.
+        tenantId: azureAd.tenantId || undefined,
         isEnabled: config.isEnabled,
       }
     }

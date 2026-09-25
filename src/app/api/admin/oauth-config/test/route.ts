@@ -182,15 +182,17 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Con reuse activo, el Client ID/Secret reales viven en la fila
+    // Con reuse activo, el Client ID/Secret/Tenant ID reales viven en la fila
     // 'azure-ad', no en esta — mismo criterio que getOAuthCredentials en
     // oauth-config.ts, para no duplicar la lógica de "de dónde salen".
     let effectiveClientId = config.clientId
     let effectiveClientSecretEncrypted = config.clientSecret
+    let effectiveTenantId = config.tenantId
     if (provider === 'azure-ad-sharepoint' && config.reuseAzureAdCredentials) {
       const azureAd = await prisma.oauth_configs.findUnique({ where: { provider: 'azure-ad' } })
       effectiveClientId = azureAd?.clientId ?? null
       effectiveClientSecretEncrypted = azureAd?.clientSecret ?? null
+      effectiveTenantId = azureAd?.tenantId ?? null
     }
 
     if (!effectiveClientId || !effectiveClientSecretEncrypted) {
@@ -222,7 +224,7 @@ export async function POST(request: NextRequest) {
     let secretVerified = true
 
     if (provider === 'azure-ad' || provider === 'azure-ad-sharepoint') {
-      const tenant = config.tenantId || 'common'
+      const tenant = effectiveTenantId || 'common'
 
       // Paso 1: verificar que el tenant existe
       const tenantCheck = await verifyAzureTenant(tenant)

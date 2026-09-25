@@ -70,11 +70,11 @@ interface OAuthCredentialsFieldsProps {
   onStateChange?: (state: { isEnabled: boolean; clientId: string }) => void
   /**
    * Si se pasa, agrega un switch "usar la misma app que <sourceProvider>":
-   * activado, oculta Client ID/Secret y el guardado le pide al backend que
-   * los resuelva en vivo desde esa otra fila en vez de pedirlos acá — evita
-   * que el admin tipee el mismo Client ID/Secret dos veces cuando de verdad
-   * es la misma app registrada en Azure/Google. Tenant ID (si aplica) sigue
-   * siendo siempre el propio de este formulario, nunca el de la fuente.
+   * activado, oculta Client ID/Secret/Tenant ID (si aplica) y el guardado le
+   * pide al backend que los resuelva en vivo desde esa otra fila en vez de
+   * pedirlos acá — evita que el admin tipee la misma info dos veces cuando de
+   * verdad es la misma app registrada en Azure/Google (mismo Tenant, no solo
+   * mismo Client ID/Secret).
    */
   reuseToggle?: ReuseToggleConfig
 }
@@ -185,7 +185,7 @@ export function OAuthCredentialsFields({
       })
       return
     }
-    if (showTenantId && tenantRequired && !config.tenantId) {
+    if (!config.reuseSource && showTenantId && tenantRequired && !config.tenantId) {
       toast({
         title: 'Tenant ID requerido',
         description: 'Este proveedor no admite el valor "common" — indica el ID del directorio.',
@@ -198,7 +198,6 @@ export function OAuthCredentialsFields({
     try {
       const payload: Record<string, unknown> = {
         provider,
-        tenantId: config.tenantId || null,
         isEnabled: config.isEnabled,
         redirectUri: redirectUri || undefined,
         scopes: scopes || undefined,
@@ -206,6 +205,7 @@ export function OAuthCredentialsFields({
       if (reuseToggle) payload.reuseAzureAdCredentials = config.reuseSource
       if (!config.reuseSource) {
         payload.clientId = config.clientId
+        payload.tenantId = config.tenantId || null
         if (config.clientSecret) payload.clientSecret = config.clientSecret
       }
 
@@ -393,7 +393,8 @@ export function OAuthCredentialsFields({
       {reuseToggle && config.reuseSource && (
         <div className='flex items-center gap-2 rounded-md border bg-muted/50 px-3 py-2 text-xs text-muted-foreground'>
           <Key className='h-3.5 w-3.5 shrink-0' />
-          Reutilizando la app de {reuseToggle.sourceLabel}:{' '}
+          Reutilizando Client ID, Client Secret{showTenantId ? ' y Tenant ID' : ''} de{' '}
+          {reuseToggle.sourceLabel}:{' '}
           {!sourceStatus
             ? 'verificando…'
             : sourceStatus.isEnabled
@@ -404,7 +405,7 @@ export function OAuthCredentialsFields({
         </div>
       )}
 
-      {showTenantId && (
+      {showTenantId && (!reuseToggle || !config.reuseSource) && (
         <div className='space-y-2'>
           <Label htmlFor={`${provider}-tenant-id`}>
             {tenantLabel} {tenantRequired ? '*' : '(opcional)'}
