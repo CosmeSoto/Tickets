@@ -16,7 +16,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
-import { RedirectUriNote } from '@/components/settings/oauth-credentials-fields'
+import { OAuthCredentialsStatusLink } from '@/components/settings/oauth-credentials-fields'
 
 type PlannerSettings = {
   enabled: boolean
@@ -299,7 +299,7 @@ export default function PlannerSettingsPage() {
             </div>
             {!connected && (
               <div className='mt-3'>
-                <RedirectUriNote path='/api/planner/oauth-callback' />
+                <OAuthCredentialsStatusLink provider='azure-ad' />
               </div>
             )}
           </CardContent>
