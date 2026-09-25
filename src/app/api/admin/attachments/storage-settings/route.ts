@@ -235,6 +235,9 @@ export async function PUT(request: NextRequest) {
     }
   }
 
-  const settings = await loadSettings()
-  return NextResponse.json(settings)
+  const [settings, personalDriveConnections] = await Promise.all([
+    loadSettings(),
+    loadPersonalDriveConnections(),
+  ])
+  return NextResponse.json({ ...settings, personalDriveConnections })
 }
