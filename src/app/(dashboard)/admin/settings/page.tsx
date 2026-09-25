@@ -2117,7 +2117,7 @@ function SettingsPage() {
               </p>
             </div>
           ) : (
-            <OAuthSettingsTab />
+            <OAuthSettingsTab onGoToStorageTab={() => setActiveTab('storage')} />
           )}
         </TabsContent>
 

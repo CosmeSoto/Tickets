@@ -4,7 +4,8 @@ import { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
-import { Shield, Key, Info } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Shield, Key, Info, Cloud } from 'lucide-react'
 import { OAuthCredentialsFields } from '@/components/settings/oauth-credentials-fields'
 
 const MicrosoftIcon = () => (
@@ -44,7 +45,12 @@ function ProviderStatusBadge({ isEnabled }: { isEnabled: boolean }) {
   )
 }
 
-export function OAuthSettingsTab() {
+export function OAuthSettingsTab({
+  onGoToStorageTab,
+}: {
+  /** Cambia a la pestaña Almacenamiento dentro de la misma página de Ajustes. */
+  onGoToStorageTab?: () => void
+}) {
   const [googleEnabled, setGoogleEnabled] = useState(false)
   const [microsoftEnabled, setMicrosoftEnabled] = useState(false)
   const [sharePointEnabled, setSharePointEnabled] = useState(false)
@@ -256,6 +262,35 @@ export function OAuthSettingsTab() {
             }}
             onStateChange={s => setSharePointEnabled(s.isEnabled)}
           />
+        </CardContent>
+      </Card>
+
+      {/* Enlace al módulo de almacenamiento — mismo patrón que Seguridad → Backups */}
+      <Card>
+        <CardHeader>
+          <CardTitle className='flex items-center'>
+            <Cloud className='h-5 w-5 mr-2' />
+            Almacenamiento en la nube
+          </CardTitle>
+          <CardDescription>
+            Con las credenciales de arriba ya configuradas, conecta Google Drive, OneDrive o
+            SharePoint como destino de los adjuntos en Ajustes → Almacenamiento.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className='flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between p-4 bg-muted border border-border rounded-lg'>
+            <div className='min-w-0'>
+              <h4 className='font-medium text-foreground'>Destino de adjuntos</h4>
+              <p className='text-sm text-muted-foreground mt-1'>
+                Elige el proveedor activo, autoriza el acceso y revisa quién conectó su Drive
+                personal.
+              </p>
+            </div>
+            <Button className='w-full sm:w-auto flex-shrink-0' onClick={() => onGoToStorageTab?.()}>
+              <Cloud className='h-4 w-4 mr-2' />
+              Ir a Almacenamiento
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
