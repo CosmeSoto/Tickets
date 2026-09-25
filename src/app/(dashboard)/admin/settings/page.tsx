@@ -39,7 +39,6 @@ import {
   EyeOff,
   Inbox,
   Wrench,
-  Cloud,
   HelpCircle,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
@@ -685,13 +684,13 @@ function SettingsPage() {
                 <span>Telegram</span>
               </span>
             </TabsTrigger>
-            <TabsTrigger value='storage' className='shrink-0 px-3' disabled={!isSuperAdmin}>
-              <span className='flex items-center gap-1'>
-                {!isSuperAdmin && <Crown className='h-3 w-3 text-amber-500' />}
-                <Cloud className='h-4 w-4 hidden sm:inline' />
-                <span>Almacenamiento</span>
-              </span>
-            </TabsTrigger>
+            {/* Almacenamiento ya no tiene tab propio en la barra — se llega acá
+                solo desde el botón "Ir a Almacenamiento" dentro de OAuth (o
+                desde el callback de autorización de Google/OneDrive, que
+                redirige directo con ?tab=storage). El TabsContent sigue
+                existiendo abajo sin cambios; Tabs es controlado por
+                `activeTab`, así que no necesita un TabsTrigger para
+                mostrarse. */}
             <TabsTrigger value='help' className='shrink-0 px-3' disabled={!isSuperAdmin}>
               <span className='flex items-center gap-1'>
                 {!isSuperAdmin && <Crown className='h-3 w-3 text-amber-500' />}
